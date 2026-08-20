@@ -362,6 +362,50 @@ export class Renderer {
     return { left: this.viewW * r.cx - side / 2, top: this.viewH * r.cy - side / 2, size: side };
   }
 
+  /**
+   * The distributed set (GDD §26.2). Small objects on the floor, and the whole point of
+   * them is that they are indistinguishable.
+   *
+   * ⚠ ONE MESH, ONE COLOUR, ONE SIZE, FOR ALL OF THEM. It would be trivial to tint the
+   * real ones and it would delete the incident: the squad's job is to tell them apart with
+   * an instrument, and a renderer that answered the question for free would make the
+   * imager decoration. The eye view is deliberately unhelpful here.
+   *
+   * On the imager they are DARK — colder than the floor — and that is the only channel
+   * that distinguishes them. It is not drawn from a per-object flag either: the thermal
+   * floor already paints the field, and these sit on top of what it paints.
+   */
+  _syncInstances() {
+    const THREE = this.THREE;
+    const set = this.game.instances;
+    if (!set || !set.candidates) return;
+    if (!this._instMeshes) this._instMeshes = new Map();
+    for (const inst of set.list) {
+      let g = this._instMeshes.get(inst.id);
+      if (!g) {
+        g = new THREE.Group();
+        const disc = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.075, 0.075, 0.022, 10),
+          new THREE.MeshLambertMaterial({ color: 0xb08d4a }),
+        );
+        disc.position.y = 0.011;
+        g.add(disc);
+        g.traverse((o) => {
+          o.layers.enable(1);
+          if (!o.isMesh) return;
+          o.userData.thermalMat = new THREE.MeshBasicMaterial({ color: 0x0a1420 });
+          this.thermalSwap.push(o);
+        });
+        this.scene.add(g);
+        this._instMeshes.set(inst.id, g);
+      }
+      /* Carried in the hands and deposited in the case are both "not on the floor", and
+       * neither wants a disc lying at the operative's feet. */
+      g.visible = inst.loose;
+      if (inst.loose) g.position.set(inst.x, 0, inst.z);
+    }
+  }
+
   _syncDeployables() {
     const THREE = this.THREE;
     const seen = new Set();
@@ -757,6 +801,7 @@ export class Renderer {
     this.lampTarget.position.set(p.x + fx * 6, p.eyeHeight() + fy * 6, p.z + fz * 6);
 
     this._syncDeployables();
+    this._syncInstances();
     this._syncLights();
     this._syncIce();
     this._syncMates();

@@ -308,6 +308,29 @@ export class Hud {
       const held = g.anomaly.sealedIn ? g.anomaly.sealedIn.custodyHeldMs / 1000 : 0;
       return `Hold custody — ${held.toFixed(0)}s of ${CONFIG.anomaly.custodyVerifySeconds}s. Keep the case powered.`;
     }
+    /**
+     * The distributed set (GDD §26.2). What the HUD is allowed to say here is the whole
+     * design of the family, so it is worth being explicit about the line it does not cross.
+     *
+     * ⚠ IT REPORTS THE CASE'S COUNT AND NEVER THE TOTAL. The count is a reading off an
+     * instrument the squad is standing next to, so it is theirs. The total is on the
+     * stocktake sheet in the office, and a HUD that printed "3 of 5" would hand over the
+     * one fact the entire incident is organised around finding — §7.4 asks for confidence
+     * rather than checklist completion, and a checklist is exactly what that would be.
+     *
+     * It also never says the case is contaminated. The case takes a wrong object silently
+     * and the number does not move; noticing THAT is the mechanic.
+     */
+    if (g.anomaly.isDistributed) {
+      if (g.anomaly.isHeld) return 'The account is closed. Seal the case.';
+      const n = g.instances.counted;
+      const carrying = g.instances.carriedBy(me.id);
+      if (carrying) return `Logged: ${n}. Carry it to the case.`;
+      return n === 0
+        ? 'Logged: 0. Sweep on thermal — they read colder than the floor.'
+        : `Logged: ${n}. Keep sweeping until the sheet is satisfied.`;
+    }
+
     if (g.anomaly.isHeld) return 'It is held. Get the case within 1.5m and seal it.';
     if (g.mission.procedure) return 'Execute the committed procedure.';
     return 'Establish what it is and what stops it. Plan on the tablet (TAB).';
