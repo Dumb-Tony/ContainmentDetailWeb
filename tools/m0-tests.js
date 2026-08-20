@@ -2023,6 +2023,48 @@ async function sectionT(content) {
   for (let i = 3; i < md.length; i += 4) if (md[i] > 8) mLit++;
   ok('T8 a teammate is drawn — where your squad is was never the question', mLit > 0);
 
+  /* ⚠ SOLID AND POROUS MUST NOT LOOK THE SAME. The aid drew everything from
+   * `blockingRects()`, which is what stops a PERSON — so a chain-link fence and a concrete
+   * wall were the same line. Indoors that is a small lie; on the forest reserve 441.8m of
+   * 491m of built length is porous, so nine tenths of the drawn map would have claimed to
+   * hold a draught and held nothing. */
+  const forest = await loadContent({ incident: 'blackthorn-caller' });
+  const gF = new Game(forest, { seed: 'nav-forest' });
+  const hudF = new Hud(host, gF, null);
+  hudF.setNavigationAid('minimap');
+  hudF._drawNavAid();
+  const solidRects = new Set(gF.site.insulatedRects());
+  const porous = gF.site.blockingRects().filter((r) => !solidRects.has(r));
+  note(`forest reserve: ${gF.site.blockingRects().length} blocking rects, ${porous.length} of them porous to the draught`);
+  ok('T8b the reserve is mostly porous, which is what makes the distinction matter',
+    porous.length > gF.site.blockingRects().length / 2);
+  /* Read the pixels along a porous run and a solid one: a dashed line leaves gaps, a
+   * continuous one does not. */
+  const ctxF = hudF.navAid.getContext('2d');
+  const bF = forest.map.bounds;
+  const sF = Math.min(hudF.navAid.width / (bF.maxX - bF.minX), hudF.navAid.height / (bF.maxZ - bF.minZ)) * 0.92;
+  const oxF = hudF.navAid.width / 2 - ((bF.minX + bF.maxX) / 2) * sF;
+  const oyF = hudF.navAid.height / 2 + ((bF.minZ + bF.maxZ) / 2) * sF;
+  const runGaps = (r) => {
+    const y = Math.round(oyF - r[1] * sF);
+    const x0 = Math.round(oxF + r[0] * sF), x1 = Math.round(oxF + r[2] * sF);
+    if (x1 - x0 < 8 || y < 0 || y >= hudF.navAid.height) return null;
+    const row = ctxF.getImageData(x0, Math.max(0, Math.min(hudF.navAid.height - 1, y)), x1 - x0, 1).data;
+    let gaps = 0;
+    for (let i = 3; i < row.length; i += 4) if (row[i] < 8) gaps++;
+    return gaps / (x1 - x0);
+  };
+  const longPorous = porous.filter((r) => r[2] - r[0] > 6).sort((a, b) => (b[2] - b[0]) - (a[2] - a[0]))[0];
+  const longSolid = [...solidRects].filter((r) => r[2] - r[0] > 3).sort((a, b) => (b[2] - b[0]) - (a[2] - a[0]))[0];
+  if (longPorous && longSolid) {
+    const gp = runGaps(longPorous), gs = runGaps(longSolid);
+    note(`  gap fraction along the longest run: porous ${gp === null ? 'n/a' : gp.toFixed(2)} · solid ${gs === null ? 'n/a' : gs.toFixed(2)}`);
+    ok('T8c a porous run is drawn broken and a solid one continuous',
+      gp !== null && gs !== null && gp > gs, `${gp} vs ${gs}`);
+  } else {
+    ok('T8c the reserve has runs of both kinds long enough to compare', false, 'no comparable runs');
+  }
+
   /* Still nothing at the anomaly, now that something else has been drawn. */
   const px2 = ctx.getImageData(ax - 4, az - 4, 9, 9).data;
   let lit2 = 0;

@@ -158,10 +158,31 @@ export class Hud {
     const px = (x) => ox + x * s;
     const py = (z) => oy - z * s;
 
-    c.strokeStyle = ink; c.globalAlpha = 0.75;
+    /**
+     * ⚠ SOLID AND POROUS ARE DRAWN DIFFERENTLY, because on some floors they are mostly the
+     * same line and mean opposite things.
+     *
+     * This drew everything from `blockingRects()`, which is what stops a PERSON. Indoors
+     * that was a small lie — the steel racking in the cold-store aisles reads as wall and
+     * is not one to the draught. On the forest reserve it is not small: 441.8m of the map's
+     * 491m of built length is deer fence, chain-link, timber and tree line, so nine tenths
+     * of the drawn map would have been a wall to the squad and nothing at all to the thing
+     * they are fencing. A navigation aid that tells you a chain-link fence will hold a
+     * draught is worse than one that shows nothing.
+     *
+     * Solid is a continuous outline; porous is dashed. Two channels, not colour — §19.2,
+     * and the aid has to work in the colour-vision presets.
+     */
+    const insulated = new Set(g.site.insulatedRects());
+    c.globalAlpha = 0.75;
     for (const r of g.site.blockingRects()) {
+      const solid = insulated.has(r);
+      c.strokeStyle = ink;
+      c.setLineDash(solid ? [] : [2, 2]);
+      c.globalAlpha = solid ? 0.85 : 0.45;
       c.strokeRect(px(r[0]), py(r[3]), (r[2] - r[0]) * s, (r[3] - r[1]) * s);
     }
+    c.setLineDash([]);
     c.globalAlpha = 1;
     /* An open door is a gap you can walk through and it is drawn as one. */
     c.strokeStyle = warm;
