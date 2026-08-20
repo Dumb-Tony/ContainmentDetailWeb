@@ -849,9 +849,29 @@ export class Game {
       else cands.push({ d, kind: 'door', text: `${door.open ? 'Close' : 'Open'} the ${door.displayName.toLowerCase()}`, target: door });
     }
 
-    const src = sourceInReach(this.site, p.x, p.z, reach + 0.6);
-    if (src && !this.ledger.has(src.evidenceId)) {
-      cands.push({ d: dist(p.x, p.z, src.at[0], src.at[1]), kind: 'evidence', text: src.prompt, target: src });
+    /* Nearest UNLOGGED source, not nearest source. Asking for the nearest and then throwing
+     * it away when it is already in the ledger is what hid the one behind it. */
+    const src = sourceInReach(this.site, p.x, p.z, reach + 0.6, (s) => this.ledger.has(s.evidenceId));
+    if (src) {
+      /**
+       * ⚠ `requiresEquipment` WAS VALIDATED AT LOAD AND NEVER CHECKED HERE, so the two
+       * sources that were meant to cost something — the aisle B camera feed and the thermal
+       * reading at the sighting — could be logged by an operative carrying neither a camera
+       * nor an imager. The cargo wager (§10.7) is the whole of the loadout decision, and an
+       * instrument-gated observation that does not need the instrument quietly refunds it.
+       *
+       * It is offered as `blocked` rather than hidden: §18.1 says the UI may not
+       * misrepresent what is available, and "there is something here you cannot read yet"
+       * is information a squad can act on. Silence would just look like empty floor.
+       */
+      const missing = (src.requiresEquipment || []).filter((id) => !p.carrying(id));
+      const d = dist(p.x, p.z, src.at[0], src.at[1]);
+      if (missing.length) {
+        const names = missing.map((id) => this.itemsById.get(id).displayName.toLowerCase()).join(' and ');
+        cands.push({ d, kind: 'blocked', text: `${src.prompt} — needs the ${names}`, target: src });
+      } else {
+        cands.push({ d, kind: 'evidence', text: src.prompt, target: src });
+      }
     }
 
     const dCache = dist(p.x, p.z, this.site.cache.x, this.site.cache.z);

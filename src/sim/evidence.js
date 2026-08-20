@@ -21,21 +21,27 @@ import { dist } from './geometry.js';
  *  which rules the squad actually worked out. `truth` is what the simulation does; it is
  *  never shown before the debrief and never used to auto-resolve a claim. */
 export const CLAIMS = Object.freeze([
+  /* ⚠ THE BOARD HAS TO KNOW ABOUT THE EVIDENCE THAT EXISTS. `supportFor` returns "strong"
+   * only on two hits with a confirmed one among them, so a claim listing a single source
+   * was permanently stuck below strong however carefully a squad worked — and two of these
+   * listed exactly one. GDD §27.2 asks for two evidence paths per rule and the content now
+   * has them; a board that had not been told is a board that quietly disagrees with the
+   * ledger about what the squad has proved. */
   { id: 'claim-heat-hunts', dimension: 'trigger',
     text: 'It moves toward the strongest heat it can reach.',
-    truth: true, supportedBy: ['survivor-account', 'thermal-void', 'frost-bloom'] },
+    truth: true, supportedBy: ['survivor-account', 'thermal-void', 'frost-bloom', 'lantern-pair', 'chart-recorder'] },
   { id: 'claim-gradient-blocks', dimension: 'constraint',
     text: 'A sustained heat gradient above 40C stops it dead.',
-    truth: true, supportedBy: ['frost-boundary', 'frost-bloom'] },
+    truth: true, supportedBy: ['frost-boundary', 'frost-bloom', 'ambulance-transcript'] },
   { id: 'claim-insulation-blocks', dimension: 'constraint',
     text: 'Closed-cell insulation stops it. Steel racking does not.',
     truth: true, supportedBy: ['frost-boundary', 'thermal-void'] },
   { id: 'claim-thermal-visible', dimension: 'form',
     text: 'Thermal imaging sees it in every state. There is no stealth phase.',
-    truth: true, supportedBy: ['thermal-void'] },
+    truth: true, supportedBy: ['thermal-void', 'crew-imager'] },
   { id: 'claim-drains-batteries', dimension: 'capability',
     text: 'It drains battery-powered equipment near it.',
-    truth: true, supportedBy: ['battery-drain'] },
+    truth: true, supportedBy: ['battery-drain', 'spent-cells'] },
   { id: 'claim-chiller-anchor', dimension: 'anchor',
     text: 'The failed chiller is the anchor. Kill the chiller and it disperses.',
     truth: false, supportedBy: ['maintenance-log'] },
@@ -137,11 +143,26 @@ const RELIABILITY_RANK = { unreliable: 0, disputed: 1, probable: 2, confirmed: 3
  * does, with the provenance attached, so there is exactly one writer. */
 
 /** A static source on the map, close enough to examine. */
-export function sourceInReach(site, x, z, reach) {
+/**
+ * The NEAREST static source within reach, skipping any the caller does not want.
+ *
+ * ⚠ RETURNING THE FIRST HIT IN ARRAY ORDER MADE ARRAY POSITION A GAMEPLAY PROPERTY, and it
+ * is half of the bug class that has now bitten this project three times. Of two sources
+ * inside `reach` of each other, the earlier one in the JSON answered for both — and once
+ * it was logged, the later one had NO VERB AT ALL, because `contextAction` only offers an
+ * evidence candidate the ledger does not already hold. Two shipped pairs were in exactly
+ * that state and neither had ever been stood on.
+ *
+ * The `skip` predicate is the part that matters. Without it a logged nearest source still
+ * swallows the one behind it, which is the same bug one step further along.
+ */
+export function sourceInReach(site, x, z, reach, skip = null) {
+  let best = null, bestD = Infinity;
   for (const s of site.doc.evidenceSources || []) {
-    if (dist(x, z, s.at[0], s.at[1]) <= reach) return s;
+    const d = dist(x, z, s.at[0], s.at[1]);
+    if (d <= reach && d < bestD && !(skip && skip(s))) { best = s; bestD = d; }
   }
-  return null;
+  return best;
 }
 
 /** `thermal-void`: the imager held on the mass long enough to see it hold its shape. */

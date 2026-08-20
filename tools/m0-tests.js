@@ -4188,6 +4188,119 @@ async function sectionAG() {
     a2.state === 'stilled' || !heard, `${a2.state}, heard ${heard ? heard.id : 'none'}`);
   emit();
 }
+
+/* ══ AH. the board, the ledger and the cargo wager agree with each other ═══════
+ *
+ * Three separate things that each looked correct alone and disagreed in pairs.
+ */
+async function sectionAH(content) {
+  lines.push('--- AH. the hypothesis board can actually be satisfied ---');
+
+  /* ⚠ A TRUE CLAIM MUST BE REACHABLE. `supportFor` returns "strong" only on two hits with
+   * a confirmed one among them, so a claim listing a single source is stuck below strong
+   * however carefully a squad works — and two of them listed exactly one. Nothing said so:
+   * the board simply never got better, and a player would read that as their own failure. */
+  const ledger = new EvidenceLedger(content.anomaly);
+  const known = new Set(content.anomaly.evidenceRules.map((e) => e.id));
+  const unreachable = [], dangling = [];
+  for (const c of CLAIMS) {
+    for (const id of c.supportedBy) if (!known.has(id)) dangling.push(`${c.id} → ${id}`);
+    const rules = c.supportedBy.filter((id) => known.has(id)).map((id) => content.anomaly.evidenceRules.find((e) => e.id === id));
+    const confirmed = rules.filter((r) => r.reliability === 'confirmed').length;
+    if (!c.truth) continue;                       // a false claim is not meant to be provable
+    if (rules.length < 2 || confirmed < 1) unreachable.push(`${c.id} (${rules.length} sources, ${confirmed} confirmed)`);
+  }
+  eq(`AH1 no claim names evidence that does not exist${dangling.length ? ` — ${dangling.join(', ')}` : ''}`, dangling.length, 0);
+  eq(`AH2 every TRUE claim can reach "strong"${unreachable.length ? ` — ${unreachable.join(', ')}` : ''}`, unreachable.length, 0);
+
+  /* And prove it by actually reaching it, through the real ledger. */
+  for (const c of CLAIMS.filter((x) => x.truth)) {
+    for (const id of c.supportedBy) ledger.record(id, { simTimeMs: 0, x: 0, z: 0, room: 'test', source: 'test' });
+  }
+  const weak = CLAIMS.filter((c) => c.truth && ledger.supportFor(c).word !== 'strong')
+    .map((c) => `${c.id}=${ledger.supportFor(c).word}`);
+  eq(`AH3 and does, with every source logged${weak.length ? ` — ${weak.join(', ')}` : ''}`, weak.length, 0);
+
+  /* ⚠ FALSE CLAIMS MUST NOT. A board on which the wrong answer also goes strong is not a
+   * board, it is a checklist with two columns. */
+  const falseStrong = CLAIMS.filter((c) => !c.truth && ledger.supportFor(c).word === 'strong').map((c) => c.id);
+  eq(`AH4 and the false leads do not${falseStrong.length ? ` — ${falseStrong.join(', ')}` : ''}`, falseStrong.length, 0);
+
+  /* ── the nearest source, not the first one in the file ────────────────────── */
+  lines.push('--- AH. reading the floor ---');
+  const g = new Game(content, { seed: 'ev' });
+  g.commitLoadout(RECOMMENDED_MANIFEST);
+  const srcs = content.map.evidenceSources;
+  /* Stand between two sources, nearer to the second one in the array. Whichever is nearer
+   * is what a player expects; array order is not a thing they can see. */
+  const pairs = [];
+  for (let i = 0; i < srcs.length; i++) {
+    for (let j = i + 1; j < srcs.length; j++) {
+      const d = dist(srcs[i].at[0], srcs[i].at[1], srcs[j].at[0], srcs[j].at[1]);
+      if (d < 7) pairs.push({ a: srcs[i], b: srcs[j], d });
+    }
+  }
+  pairs.sort((x, y) => x.d - y.d);
+  if (pairs.length) {
+    const { a, b, d } = pairs[0];
+    note(`closest pair on this floor: ${a.evidenceId} / ${b.evidenceId} at ${d.toFixed(2)}m`);
+    /* A metre from b, and further from a. */
+    const t = 1.0 / d;
+    g.player.x = b.at[0] + (a.at[0] - b.at[0]) * t;
+    g.player.z = b.at[1] + (a.at[1] - b.at[1]) * t;
+    g.skipMs(50);
+    const act = g.contextAction();
+    ok('AH5 standing next to one of two nearby sources offers THAT one, not the earlier one in the file',
+      act && act.kind === 'evidence' && act.target.evidenceId === b.evidenceId,
+      act ? `${act.kind}: ${act.target ? act.target.evidenceId : act.text}` : 'none');
+    /* And once it is logged, the other one is still reachable rather than swallowed. */
+    g.doInteract();
+    g.player.x = a.at[0]; g.player.z = a.at[1];
+    g.skipMs(50);
+    const act2 = g.contextAction();
+    ok('AH6 and logging it does not swallow its neighbour',
+      act2 && act2.kind === 'evidence' && act2.target.evidenceId === a.evidenceId,
+      act2 ? `${act2.kind}: ${act2.target ? act2.target.evidenceId : act2.text}` : 'none');
+  } else {
+    ok('AH5 no two sources on this floor are close enough to compete', true);
+    ok('AH6 so nothing can be swallowed', true);
+  }
+
+  /* ── the cargo wager is real ──────────────────────────────────────────────── */
+  /* ⚠ `requiresEquipment` ON A SOURCE WAS VALIDATED AT LOAD AND NEVER CHECKED. The two
+   * observations meant to cost something could be logged by an operative carrying neither
+   * instrument, which quietly refunds the one loadout decision they were there to price. */
+  const fig = await loadContent({ incident: 'cold-storage-figure' });
+  const gated = fig.map.evidenceSources.find((s) => (s.requiresEquipment || []).length);
+  ok('AH7 the figure incident gates at least one observation on an instrument', !!gated,
+    gated ? `${gated.evidenceId} needs ${gated.requiresEquipment.join()}` : 'none');
+  if (gated) {
+    const g2 = new Game(fig, { seed: 'gate' });
+    g2.commitLoadout([{ itemId: 'trauma-kit', qty: 1 }]);     // deliberately not the instrument
+    g2.player.x = gated.at[0]; g2.player.z = gated.at[1];
+    g2.skipMs(50);
+    const a1 = g2.contextAction();
+    eq('AH8 without the instrument the verb is refused rather than granted',
+      a1 && a1.kind, 'blocked');
+    ok('AH9 and it says what is missing', a1 && /needs the /.test(a1.text), a1 ? a1.text : 'none');
+    g2.doInteract();
+    ok('AH10 pressing it logs nothing', !g2.ledger.has(gated.evidenceId));
+    /* ⚠ Offered-and-refused rather than hidden: §18.1 says the UI may not misrepresent what
+     * is available, and "there is something here you cannot read yet" is actionable. */
+    const g3 = new Game(fig, { seed: 'gate2' });
+    g3.commitLoadout([{ itemId: gated.requiresEquipment[0], qty: 1 }, { itemId: 'trauma-kit', qty: 1 }]);
+    g3.player.x = g3.site.cache.x; g3.player.z = g3.site.cache.z;
+    g3.skipMs(50);
+    g3.takeFromCache(gated.requiresEquipment[0]);
+    g3.player.x = gated.at[0]; g3.player.z = gated.at[1];
+    g3.skipMs(50);
+    const a2 = g3.contextAction();
+    eq('AH11 carrying it, the same spot offers the observation', a2 && a2.kind, 'evidence');
+    g3.doInteract();
+    ok('AH12 and it lands in the ledger', g3.ledger.has(gated.evidenceId));
+  }
+  emit();
+}
 /**
  * ⚠ ONE SECTION THROWING MUST NOT DELETE EVERY SECTION AFTER IT.
  *
@@ -4245,6 +4358,7 @@ async function run(name, fn) {
     await run('AE', () => sectionAE());
     await run('AF', () => sectionAF());
     await run('AG', () => sectionAG());
+    await run('AH', () => sectionAH(content));
     await run('K', () => sectionK());
     await run('L', () => sectionL());
     await run('V', () => sectionV());
