@@ -2031,6 +2031,257 @@ async function sectionT(content) {
 
   host.remove();
 }
+
+/* ══ U. somebody actually plays Ashlar House ═══════════════════════════════════
+ *
+ * Section R proves the ninth floor is geometrically sound: the fence closes, the anchors
+ * are reachable, the draught can walk to the pen. None of that proves a PERSON can run
+ * the operation, and the two are different questions — a map can be measurably correct
+ * and still contain a step nobody can physically perform, which is exactly what happens
+ * when the thing you have to reach past is the thing that hurts you.
+ *
+ * So this is section I's bot on the new floor, through the same keyboard-reachable
+ * interfaces: no teleports and no direct state writes. Dev\INDEX.md, from the emergency
+ * services build: if a dumb bot cannot finish the job, a first-time player cannot either.
+ */
+async function sectionU() {
+  lines.push('--- U. the Ashlar operation, played rather than measured ---');
+  const ash = await loadContent({ incident: 'ashlar-gallery-draught' });
+  const g = new Game(ash, { seed: 'ashlar-1' });
+
+  const slice = 50;
+  const face = (x, z) => {
+    const dx = x - g.player.x, dz = z - g.player.z;
+    const len = Math.hypot(dx, dz) || 1;
+    g.player.yaw = Math.atan2(-dx / len, -dz / len);
+  };
+  let botSprint = false;
+  const walkTo = (x, z, tol = 0.6, budgetMs = 40000) => {
+    let spent = 0, stalledMs = 0, strafe = 0, strafeMs = 0;
+    let lastX = g.player.x, lastZ = g.player.z;
+    while (dist(g.player.x, g.player.z, x, z) > tol && spent < budgetMs) {
+      face(x, z);
+      const axis = strafeMs > 0 ? { x: strafe, y: -0.4 } : { x: 0, y: -1 };
+      if (strafeMs > 0) strafeMs -= slice;
+      g.setCommand('p1', { axis, sprint: botSprint, crouch: false });
+      g.skipMs(slice);
+      spent += slice;
+      const moved = dist(lastX, lastZ, g.player.x, g.player.z);
+      lastX = g.player.x; lastZ = g.player.z;
+      if (moved < 0.02) stalledMs += slice; else stalledMs = 0;
+      if (stalledMs >= 300 && strafeMs <= 0) { strafe = strafe === 1 ? -1 : 1; strafeMs = 700; stalledMs = 0; }
+    }
+    g.setCommand('p1', { axis: { x: 0, y: 0 }, sprint: false, crouch: false });
+    g.skipMs(slice);
+    return dist(g.player.x, g.player.z, x, z) <= tol;
+  };
+  const route = (pts, tol = 0.8, budgetMs = 40000) => {
+    const failed = [];
+    for (const [wx, wz] of pts) {
+      if (!walkTo(wx, wz, tol, budgetMs)) failed.push(`(${wx},${wz}) stopped at (${g.player.x.toFixed(1)},${g.player.z.toFixed(1)})`);
+    }
+    if (failed.length) note(`legs not reached: ${failed.join(' · ')}`);
+    return failed.length === 0;
+  };
+  const wait = (ms) => { g.setCommand('p1', { axis: { x: 0, y: 0 }, sprint: false, crouch: false }); g.skipMs(ms); };
+
+  eq('U1 the manifest that works on the cold store works here', g.commitLoadout(RECOMMENDED_MANIFEST), null);
+  ok('U2 the squad reaches the cargo point on the east landing', walkTo(g.site.cache.x, g.site.cache.z, 1.4));
+  eq('U3 imager', g.takeFromCache('thermal-imager'), null);
+  eq('U4 case', g.takeFromCache('reinforced-transit-case'), null);
+  eq('U5 tripod', g.takeFromCache('floodlight-tripod'), null);
+
+  walkTo(9.6, 6.6, 1.2); face(9.6, 6.6);
+  g.doInteract();
+  ok('U6 the watchman gives a statement', g.ledger.has('survivor-account'));
+
+  /* Nine floors down, the long way round the flats. This is the leg the map is about:
+   * the draught will cross the same distance in a straight line. */
+  const DOWN = [[10.2, 5.3], [10.9, 4.1], [10.9, 2.9], [10.9, -3.9], [10.2, -5.1],
+    [10.2, -6.3], [9.4, -7.6], [9.4, -9.4], [9.4, -10.8]];
+  const tDown = g.clock.simTimeMs;
+  ok('U7 the east side of the loop gets an operative into the heating gallery', route(DOWN, 0.7));
+  note(`east landing to gallery: ${((g.clock.simTimeMs - tDown) / 1000).toFixed(0)}s on foot`);
+
+  const PEN = [1.6, -10.8];
+  const lane = g.site.doors.find((d) => d.id === 'door-gallery-lane');
+  const fire = g.site.doors.find((d) => d.id === 'door-gallery-stop');
+
+  /* ⚠ THE ORDER OF THIS WHOLE SEQUENCE IS A MAP PROPERTY, and the first version of this
+   * section got it wrong in a way worth keeping a note of.
+   *
+   * The gallery is 2.400m of clear width and a deployed transit case is 0.7m deep, so once
+   * the bait is down there is 0.85m of lane on each side of it — passable by a 0.68m body
+   * with about eight centimetres to spare, and not passable by a bot that walks by facing
+   * a point and pressing forward. It wedged itself on its own case and stood there for
+   * twenty minutes taking twenty-one contacts.
+   *
+   * The fix is not to widen anything. Ashlar is a LOOP — north corridor, west link, south
+   * corridor, east link — and the answer is to stop crossing the pen: do the west end
+   * first while the tube is empty, set the bait down with the tube behind you, and come
+   * back to the east end the long way round. That the building makes you do this is the
+   * point of the building. What it means for a player is that you cannot casually change
+   * your mind about which end of the gallery you want to be at, which is a real cost and
+   * the reason the walk is the expensive resource on this floor rather than the heat.
+   */
+  ok('U8 the empty tube can be walked end to end, west to the contractor board',
+    route([[1.6, -10.8], [-2.2, -10.8], [-9.8, -10.8]], 0.8, 60000));
+  g.doInteract();
+  ok('U9 the contractor left a day book at the board', g.ledger.has('maintenance-log'));
+  walkTo(-11.0, -10.8, 1.4);
+  const brdAct = g.contextAction();
+  ok('U10 and the temporary board itself', brdAct && brdAct.kind === 'circuit',
+    brdAct ? `${brdAct.kind}: ${brdAct.text}` : 'none');
+  ok('U11 with the circuit dead, the lane door cannot be worked at all',
+    !g.site.canOperateDoor(lane));
+  g.doInteract();
+  ok('U12 throwing it brings the gallery up', g.site.circuitOn('circuit-gallery'));
+  ok('U13 and now the doors are doors', g.site.canOperateDoor(lane) && g.site.canOperateDoor(fire));
+
+  /* The fire-stopping door, shut from the east side of it. It is worth exactly one tripod
+   * and it is the entire power puzzle. */
+  ok('U14 back east through the fire-stopping door', walkTo(-1.3, -10.8, 0.8, 40000));
+  const fireAct = g.contextAction();
+  ok('U15 which offers itself now the circuit is live', fireAct && fireAct.kind === 'door',
+    fireAct ? `${fireAct.kind}: ${fireAct.text}` : 'none');
+  g.doInteract();
+  ok('U16 and shuts', !fire.open);
+
+  /* Set the bait down with the tube behind you. `deployHeld` places an item 0.9m in FRONT
+   * of the operative, so standing east of the pen and facing it puts the case exactly on
+   * the pen and the operative on the side they need to end up. Walking onto the pen and
+   * dropping it there — the obvious move — leaves the case between you and everything. */
+  ok('U17 the operative takes station east of the pen', walkTo(2.5, -10.8, 0.15, 40000));
+  face(PEN[0], PEN[1]);
+  g.player.selectSlot(SLOTS.findIndex((s) => g.player.slots.get(s.id) === 'reinforced-transit-case'));
+  eq('U18 the case goes down in the tube, as the lure', g.deployHeld(), null);
+  const kase = g.deployables.byItem('reinforced-transit-case')[0];
+  note(`case placed at (${kase.x.toFixed(2)}, ${kase.z.toFixed(2)}), pen is (${PEN.join(', ')})`);
+  /* Inside the band the fence was measured across, rather than on one exact point: the
+   * pen holds anywhere in x = [−1.8, 4.8], which is 6.6m of it, and a procedure that only
+   * worked if you put the case down on a specific tile would not be a procedure. */
+  ok(`U19 inside the 6.6m band the fence holds across (x=${kase.x.toFixed(2)})`,
+    kase.x > -1.8 && kase.x < 4.8 && Math.abs(kase.z - PEN[1]) < 0.4);
+  ok('U20 running under the threshold, so it is bait and not a wall',
+    g.heat.temperatureAt(kase.x, kase.z) < CONFIG.heat.gradientThresholdC);
+
+  /* Out the east end, up the east side, and across the top into Flat 1 to disturb it.
+   * §15's whole point: the thing does not come to you, and the walk that wakes it is a
+   * walk you were going to have to make. */
+  botSprint = true;
+  const UP = [[5.2, -10.8], [9.4, -10.8], [9.4, -9.4], [9.4, -7.6], [10.2, -6.3], [10.2, -5.1],
+    [10.9, -3.9], [10.9, 2.9], [10.9, 4.1], [6.0, 4.1], [0.0, 4.1], [-6.0, 4.1], [-10.9, 4.1],
+    [-8.0, 5.3], [-6.8, 5.3], [-5.3, 9.4], [-8.0, 10.6]];
+  const tUp = g.clock.simTimeMs;
+  ok('U21 the loop carries an operative from the gallery to the flats without crossing the pen',
+    route(UP, 0.9, 50000));
+  note(`gallery to Flat 1 the long way: ${((g.clock.simTimeMs - tUp) / 1000).toFixed(0)}s at a run`);
+  botSprint = false;
+  g.player.selectSlot(SLOTS.findIndex((s) => g.player.slots.get(s.id) === 'thermal-imager'));
+  eq('U22 the imager comes on', g.toggleImager(), null);
+  wait(6000);
+  const woke = dist(g.player.x, g.player.z, g.anomaly.x, g.anomaly.z);
+  note(`operative ${woke.toFixed(1)}m from it in Flat 1, state ${g.anomaly.state}`);
+  ok('U23 standing in the flat with it wakes it', g.anomaly.state !== ANOMALY_STATE.LATENT);
+
+  /* Now leave, the same way, and let the case out-compete you. It crosses the plasterboard
+   * in a straight line while you go round. */
+  botSprint = true;
+  const BACK = [[-5.3, 9.4], [-6.8, 5.3], [-10.9, 4.1], [-6.0, 4.1], [0.0, 4.1], [6.0, 4.1],
+    [10.9, 4.1], [10.9, 2.9], [10.9, -3.9], [10.2, -5.1], [10.2, -6.3], [9.4, -7.6],
+    [9.4, -9.4], [9.4, -10.8]];
+  ok('U24 and back down the east side to the gallery', route(BACK, 0.9, 60000));
+  botSprint = false;
+  ok('U25 to stand off three and a half metres east of the bait', walkTo(5.2, -10.8, 0.6, 40000));
+
+  let guard = 0;
+  const track = [];
+  while (dist(g.anomaly.x, g.anomaly.z, kase.x, kase.z) > 2.0 && guard < 300000) {
+    wait(500); guard += 500;
+    if (guard % 30000 === 0) track.push(`${guard / 1000}s (${g.anomaly.x.toFixed(1)},${g.anomaly.z.toFixed(1)}) [${g.anomaly.state}]`);
+  }
+  if (track.length) note(`draught track: ${track.join(' · ')}`);
+  const arrived = dist(g.anomaly.x, g.anomaly.z, kase.x, kase.z);
+  note(`draught reached the case at ${(g.clock.simTimeMs / 60000).toFixed(1)} min, ${arrived.toFixed(1)}m from it`);
+  ok('U26 it comes the whole way down the building to the lure', arrived <= 2.0);
+  eq('U27 without the operative taking a single contact on the way', g.anomaly.contactCount, 0);
+
+  /* The one move this floor asks for that the cold store never does: reach past the thing
+   * to shut the door it came in through.
+   *
+   * ⚠ Hard against the gallery's north wall, not out in the middle of the tube. The door
+   * and the case are both ranked by distance to their CENTRES, so at (3.4, −10.2) they
+   * were 1.97m away each and the case won the tie — the verb offered was "retrieve the
+   * transit case", which at that moment would have picked the bait up out from under the
+   * thing that came for it. A metre further north puts the door 1.5m off and the case
+   * 1.7m, and puts the operative outside the 1.2m contact reach into the bargain. That
+   * this position exists at all is what makes the map's last move possible. */
+  ok('U28 an operative can get to the lane door with it sitting on the bait',
+    walkTo(3.0, -9.95, 0.25, 40000));
+  const laneAct = g.contextAction();
+  note(`at (${g.player.x.toFixed(1)},${g.player.z.toFixed(1)}): nearest verb ${laneAct ? laneAct.kind : 'none'}, draught ${dist(g.player.x, g.player.z, g.anomaly.x, g.anomaly.z).toFixed(2)}m off`);
+  ok('U29 and the nearest thing there is the door, not the case',
+    laneAct && laneAct.kind === 'door', laneAct ? `${laneAct.kind}: ${laneAct.text}` : 'none');
+  g.doInteract();
+  ok('U30 which shuts the lane', !lane.open);
+
+  ok('U31 the post goes down at the east end', walkTo(5.2, -10.8, 0.7, 30000));
+  g.player.selectSlot(SLOTS.findIndex((s) => g.player.slots.get(s.id) === 'floodlight-tripod'));
+  eq('U32 one tripod, in a 2.4m tube', g.deployHeld(), null);
+  guard = 0;
+  while (g.anomaly.state !== ANOMALY_STATE.BANKED && guard < 10000) { wait(250); guard += 250; }
+  note(`banked at ${(g.clock.simTimeMs / 60000).toFixed(1)} min; lanes open ${g.anomaly.escapes}`);
+  eq('U33 which banks it — one post and two doors', g.anomaly.state, ANOMALY_STATE.BANKED);
+
+  eq('U34 the procedure can be committed', g.commitProcedure({
+    target: 'The cold mass itself',
+    state: 'Held in the heating gallery against a gradient it cannot cross',
+    trigger: 'Transit case heater at 39C, with the gallery doors shut behind it',
+    transfer: 'Case interior stable for 30s, then carried up to the east landing',
+    maintained: ['The fire-stopping door', 'The lane door', 'One floodlight at the east end'],
+    abort: 'Any operative takes a second contact',
+  }), null);
+
+  ok('U35 the operative walks in past their own post', walkTo(kase.x + 1.1, kase.z + 0.8, 0.7, 30000));
+  const sealAct = g.contextAction();
+  ok('U36 and the verb becomes the seal', sealAct && sealAct.kind === 'seal',
+    sealAct ? `${sealAct.kind}: ${sealAct.text}` : 'none');
+  eq('U37 which takes', g.doInteract(), null);
+  wait(CONFIG.anomaly.custodyVerifySeconds * 1000 + 1200);
+  eq('U38 and thirty seconds later it is custody', g.custody, 'verified');
+
+  /* Nine floors is the extraction. The lift is out; the stair is the only way anything
+   * leaves, and that is what this map charges for a capture. */
+  /* Round to the SOUTH side of the case to lift it. North of it is a metre from the lane
+   * door, which wins on distance and offers "open the gallery door" — the one verb that
+   * would let the thing straight back out of the box it is now in. Nearest-wins is right,
+   * and it means where you stand is a decision the map keeps asking about. */
+  walkTo(kase.x, kase.z - 0.85, 0.4, 20000);
+  const lift = g.contextAction();
+  ok('U39 the sealed case can be picked up', lift && lift.kind === 'carry-case',
+    lift ? `${lift.kind}: ${lift.text}` : 'none');
+  g.doInteract();
+  const OUT = [[5.2, -10.8], [9.4, -10.8], [9.4, -9.4], [9.4, -7.6], [10.2, -6.3],
+    [10.2, -5.1], [10.9, -3.9], [10.9, 2.9], [10.9, 4.1], [10.6, 5.3], [10.8, 7.2],
+    [10.8, 9.4], [10.6, 11.0]];
+  const tOut = g.clock.simTimeMs;
+  ok('U40 and carried the whole way back up the loop',
+    route(OUT, 1.0, 90000) || !!g.result);
+  note(`carrying it out took ${((g.clock.simTimeMs - tOut) / 1000).toFixed(0)}s at 75% pace; the operation ran ${(g.clock.simTimeMs / 60000).toFixed(1)} min`);
+  wait(1500);
+  ok('U41 which ends the operation', !!g.result);
+  if (!g.result) { emit(); return; }
+  /* ⚠ "The mission ended" is not the assertion. An operation that is LOST also reaches
+   * the debrief, and the first version of this checked only the phase — it passed on a run
+   * where the fence never closed and the case was never sealed. The assertion is that the
+   * thing left the floor in a box. */
+  eq('U42 with the payload actually transferred', g.extracted, true);
+  note(`outcome: ${g.result.overall}${g.result.failReason ? ' — ' + g.result.failReason : ''}`);
+  note(`contacts ${g.mission.tally.contacts} · evidence ${g.ledger.entries.length} · peak pressure ${g.mission.tally.peakPressure.toFixed(0)} (${g.mission.stageName})`);
+  ok('U43 and an overall assessment in Foundation language',
+    ['Exemplary', 'Controlled', 'Costly', 'Compromised', 'Failed'].includes(g.result.overall));
+  emit();
+}
 (async () => {
   try {
     sectionA();
@@ -2052,6 +2303,7 @@ async function sectionT(content) {
     await sectionR();
     await sectionS(content);
     await sectionT(content);
+    await sectionU();
     await sectionK();
     await sectionL();
     emit();

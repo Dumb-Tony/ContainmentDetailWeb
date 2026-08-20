@@ -26,7 +26,7 @@
     { "evidenceId": "survivor-account", "at": [9.6, 6.6], "label": "Site watchman on the east landing", "prompt": "Take a statement", "requiresEquipment": [] },
     { "evidenceId": "maintenance-log", "at": [-9.8, -10.8], "label": "Contractor's day book at the temporary board", "prompt": "Read the day book", "requiresEquipment": [] },
     { "evidenceId": "stairwell-draught", "at": [-10.8, 9.8], "label": "Draught in the west stair", "prompt": "Note the draught", "requiresEquipment": [] },
-    { "evidenceId": "frost-boundary", "at": [1.6, -10.8], "label": "A frost line across the gallery floor", "prompt": "Follow the frost line", "requiresEquipment": [] },
+    { "evidenceId": "frost-boundary", "at": [-6.0, -10.8], "label": "A frost line across the gallery floor", "prompt": "Follow the frost line", "requiresEquipment": [] },
     { "evidenceId": "thermal-void", "at": [-0.6, 3.4], "label": "The north corridor, from the crosswall gap", "prompt": "Sweep the corridor", "requiresEquipment": ["thermal-imager"] }
   ]
 }
