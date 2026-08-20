@@ -17,7 +17,7 @@
 import { CONFIG, SLOTS } from '../src/config.js';
 import { GameClock } from '../src/core/clock.js';
 import { mulberry32, Rng, hashStr } from '../src/core/rng.js';
-import { loadContent, ContentError } from '../src/sim/content.js';
+import { loadContent, ContentError, INCIDENTS } from '../src/sim/content.js';
 import { HeatField } from '../src/sim/heat.js';
 import { Site } from '../src/sim/site.js';
 import { DeployableSet } from '../src/sim/deployables.js';
@@ -31,7 +31,7 @@ import { mixFor, Audio, BUSES, CAPTIONS, missingCaptions, formatCaption } from '
 import { Settings, PALETTES, SHAPES } from '../src/ui/settings.js';
 import { Progression, loadSite, DEPLOYMENT_COST, DEPARTMENT_IDS } from '../src/sim/progression.js';
 import { Input, DEFAULT_BINDINGS, isReservedCode } from '../src/core/input.js';
-import { segmentHitsRect, moveWithWalls, dist } from '../src/sim/geometry.js';
+import { segmentHitsRect, moveWithWalls, dist, circleHitsRect } from '../src/sim/geometry.js';
 
 /* ── harness ─────────────────────────────────────────────────────────────── */
 const lines = [];
@@ -1529,6 +1529,243 @@ async function sectionQ(content) {
 }
 
 /* ── run ─────────────────────────────────────────────────────────────────── */
+
+/* ══ R. a second building, the same anomaly ═════════════════════════════════════
+ *
+ * Section O varies the incident against a fixed building. This varies the BUILDING
+ * against a fixed incident, and it is the harder direction: the anomaly file is
+ * untouched, so every number here comes out of geometry alone.
+ *
+ * The map was authored by a subagent that could not run the game and instead ported
+ * segmentHitsRect, temperatureAt, blocksPath, isFenced and _drift into a scratch page.
+ * A faithful port is still not the engine, so every load-bearing claim it made is
+ * re-measured HERE against the real objects, and the numbers are printed rather than
+ * asserted from memory. Where its answer and the engine's disagree, the engine wins.
+ */
+/* Can a 0.34m body stand here? The engine has no canStand() — collision is resolved by
+ * moveWithWalls at the point of movement — so the sweep asks the same question the same
+ * way the mover would: does the body's circle intersect anything that blocks a person. */
+function standsAt(site, x, z) {
+  if (!site.inBounds(x, z)) return false;
+  for (const r of site.blockingRects()) if (circleHitsRect(r, x, z, 0.34)) return false;
+  return true;
+}
+
+async function sectionR() {
+  lines.push('--- R. Ashlar House: the same draught, a building that inverts it ---');
+
+  const ash = await loadContent({ incident: 'ashlar-gallery-draught' });
+  const cold = await loadContent({ incident: 'cold-storage-draught' });
+
+  eq('R1 the third incident package loads and validates', ash.map.id, 'ashlar-house-9');
+  eq('R2 it is the SAME anomaly file as the cold store', ash.anomaly.id, cold.anomaly.id);
+  ok('R3 on different geometry', ash.map.id !== cold.map.id);
+
+  /* The map is the first one that is pure geometry. It does not know what happened in it —
+   * the spawn and the evidence come from the incident, and if that binding ever breaks the
+   * map falls back to nothing rather than to somebody else's incident. */
+  const rawMap = await (await fetch('../content/maps/ashlar-house-9.json')).json();
+  ok('R4 the map file itself carries no anomalySpawn', rawMap.anomalySpawn === undefined);
+  ok('R5 and no evidence — geometry only', rawMap.evidenceSources === undefined);
+  eq('R6 the incident supplies the spawn', ash.map.anomalySpawn.join(), '-8.6,10.6');
+  eq('R7 and the evidence on the floor', ash.map.evidenceSources.length, 6);
+
+  const site = new Site(ash.map);
+  const heat = new HeatField();
+  const deps = new DeployableSet();
+  const a = new Anomaly(ash.anomaly, site, heat, deps);
+  const tripod = ash.itemsById.get('floodlight-tripod');
+
+  /* ── the claim the whole map rests on ───────────────────────────────────────
+   * Cold store aisles are 4.2m and need two posts. The gallery is 2.4m and needs one.
+   * Both numbers measured off the real field, at the real ambient. */
+  const contourWidth = () => {
+    heat.setEmitters([{ id: 't', x: 0, z: 0, peakC: tripod.heatOutputCelsius, falloffM: tripod.heatFalloffMetres, active: true }]);
+    heat.setSinks([]);
+    let r = 0;
+    for (let d = 0; d < 6; d += 0.001) { if (heat.temperatureAt(d, 0) >= 40) r = d; else break; }
+    return r * 2;
+  };
+  const w = contourWidth();
+  note(`one floodlight's 40°C contour measures ${w.toFixed(3)}m across`);
+  const gallery = ash.map.rooms.find((r) => r.id === 'heating-gallery');
+  const galleryWidth = gallery.rect[3] - gallery.rect[1];
+  ok(`R8 the gallery (${galleryWidth.toFixed(3)}m) is narrower than one contour (${w.toFixed(3)}m)`, galleryWidth < w);
+  ok('R9 a cold-store aisle (4.2m) is wider than one — the same tool, the opposite answer', 4.2 > w);
+
+  /* ── the fence, measured door by door ───────────────────────────────────────
+   * The pen is the gallery bay under the contractors' store door. Everything below runs
+   * the real isFenced(), which casts real rays at real insulation. */
+  const doorBy = (frag) => site.doors.find((d) => d.displayName.includes(frag));
+  const lane = doorBy("contractors' store");
+  const fire = doorBy('fire-stopping');
+  ok('R10 the lane door and the fire-stopping door both exist', !!lane && !!fire);
+
+  const trial = (penX, penZ, posts, shut) => {
+    for (const d of site.doors) { d.open = true; }
+    for (const d of shut) { d.open = false; }
+    site._rebuildBlocking();
+    a.reset(); a.x = penX; a.z = penZ;
+    heat.setEmitters([
+      { id: 'case', x: penX, z: penZ, peakC: 39, falloffM: 2.2, active: true },
+      ...posts.map((p, i) => ({ id: `t${i}`, x: p[0], z: p[1], peakC: tripod.heatOutputCelsius, falloffM: tripod.heatFalloffMetres, active: true })),
+    ]);
+    heat.setSinks([a.asSink()]);
+    return a.isFenced();
+  };
+
+  const PEN = [1.6, -10.8];
+  const bare = trial(PEN[0], PEN[1], [], []);
+  const laneShut = trial(PEN[0], PEN[1], [], [lane]);
+  const onePost = trial(PEN[0], PEN[1], [[5.2, -10.8]], [lane, fire]);
+  ok('R11 the pen with every door open is not a fence', !bare.fenced);
+  ok('R12 nor is it with the lane door shut and no heat at all', !laneShut.fenced);
+  ok('R13 lane shut + fire door shut + ONE tripod holds it', onePost.fenced);
+  note(`pen (${PEN.join(', ')}): bare open · lane shut · +fire +1 post → ${bare.fenced}/${laneShut.fenced}/${onePost.fenced}`);
+
+  /* The unpowered answer: no door can be shut, so the missing insulation is bought back
+   * with a second post and a pen moved east into the long unbroken wall run. That is the
+   * whole power puzzle stated as an exchange rate — one door is worth one tripod. */
+  const coldPen = [5.2, -10.8];
+  const twoPosts = trial(coldPen[0], coldPen[1], [[1.6, -10.8], [8.2, -10.8]], []);
+  const twoPostsOneShort = trial(coldPen[0], coldPen[1], [[1.6, -10.8]], []);
+  ok('R14 with no power at all, two tripods and a pen moved east still hold', twoPosts.fenced);
+  ok('R15 and one of the two is not enough — the exchange rate is exactly one door : one tripod', !twoPostsOneShort.fenced);
+
+  /* ── the fence and the bait cannot both be up at once ───────────────────────
+   * The failure this map is most likely to hide is a trap that cannot be baited. The case
+   * lures because it sits one degree UNDER the threshold; the closing post is 3.6m away
+   * and contributes about fifteen degrees, which takes the case over it, at which point
+   * chooseTarget stops seeing the case at all and nothing ever comes.
+   *
+   * So the post is not part of the fence you build — it is the lid, and it goes down last.
+   * Measured with no draught in the field, because this is the state of the floor BEFORE
+   * anything arrives; putting its own chill in the sample would measure a moment that only
+   * exists after the lure has already worked. */
+  const bait = (posts) => {
+    heat.setSinks([]);
+    heat.setEmitters([
+      { id: 'case', x: PEN[0], z: PEN[1], peakC: 39, falloffM: 2.2, active: true },
+      ...posts.map((p, i) => ({ id: `t${i}`, x: p[0], z: p[1], peakC: tripod.heatOutputCelsius, falloffM: tripod.heatFalloffMetres, active: true })),
+    ]);
+    return heat.temperatureAt(PEN[0], PEN[1]);
+  };
+  const alone = bait([]);
+  const withLid = bait([[5.2, -10.8]]);
+  note(`the case reads ${alone.toFixed(1)}°C alone, ${withLid.toFixed(1)}°C once the closing post is up`);
+  ok(`R16 the case alone is a lure — under the threshold (${alone.toFixed(1)}°C)`, alone < 40);
+  ok(`R16b and the closing post destroys it (${withLid.toFixed(1)}°C), so the lid goes down last`, withLid > 40);
+
+  /* ── it can actually get there ──────────────────────────────────────────────
+   * Not "is there a path" — run the real _drift() from the real spawn and see where the
+   * thing ends up. A pen it cannot walk into is scenery. */
+  for (const d of site.doors) { d.open = true; }
+  site._rebuildBlocking();
+  a.reset();
+  a.x = ash.map.anomalySpawn[0]; a.z = ash.map.anomalySpawn[1];
+  heat.setEmitters([{ id: 'case', x: PEN[0], z: PEN[1], peakC: 39, falloffM: 2.2, active: true }]);
+  heat.setSinks([a.asSink()]);
+  a.state = 'drawn';
+  const start = Math.hypot(a.x - PEN[0], a.z - PEN[1]);
+  /* The same context the game passes: the case is the only heat source on the floor, so
+   * the only thing it can choose is the thing we want it to choose. No operatives — this
+   * measures the geometry, not a squad's mistakes. */
+  const ctx = () => ({
+    sources: [{ id: 'case', x: PEN[0], z: PEN[1], peakC: 39 }],
+    operatives: [], pressureStage: 0, observation: null,
+  });
+  let arrivedMs = null;
+  for (let ms = 0; ms < 120000; ms += 16) {
+    a.step(16, ms, ctx());
+    heat.setSinks([a.asSink()]);
+    if (Math.hypot(a.x - PEN[0], a.z - PEN[1]) < 1.5) { arrivedMs = ms; break; }
+  }
+  const final = Math.hypot(a.x - PEN[0], a.z - PEN[1]);
+  note(`drift: ${start.toFixed(1)}m away at spawn → ${final.toFixed(2)}m from the case after ${arrivedMs === null ? '>120' : (arrivedMs / 1000).toFixed(1)}s`);
+  ok('R17 it walks from its spawn into the pen, unaided', arrivedMs !== null);
+  ok('R18 and ends inside the 1.5m seal radius', final < 1.5);
+
+  /* Then the closing post goes down and it is shut in — the actual sequence, in order,
+   * rather than teleporting it into a pre-built ring. */
+  for (const d of [lane, fire]) d.open = false;
+  site._rebuildBlocking();
+  heat.setEmitters([
+    { id: 'case', x: PEN[0], z: PEN[1], peakC: 39, falloffM: 2.2, active: true },
+    { id: 't0', x: 5.2, z: -10.8, peakC: tripod.heatOutputCelsius, falloffM: tripod.heatFalloffMetres, active: true },
+  ]);
+  heat.setSinks([a.asSink()]);
+  const shutIn = a.isFenced();
+  ok('R19 closing the doors behind it and planting one post banks it where it stands', shutIn.fenced);
+  ok('R20 with its own chill in the field, not a clean-room fence',
+    heat.temperatureAt(a.x, a.z) < heat.temperatureAt(PEN[0], PEN[1]) + 0.001);
+
+  /* ── the floor is a floor ───────────────────────────────────────────────────
+   * The same standable-cell sweep that caught fifty "Unmarked floor" doorway cells on
+   * the cold store. A new map is exactly where that regresses. */
+  let standable = 0, unnamed = 0;
+  const b = ash.map.bounds;
+  for (let x = b.minX; x <= b.maxX; x += 0.25) {
+    for (let z = b.minZ; z <= b.maxZ; z += 0.25) {
+      if (!standsAt(site, x, z)) continue;
+      standable++;
+      if (site.roomNameAt(x, z) === 'Unmarked floor') unnamed++;
+    }
+  }
+  note(`${standable} standable cells swept at 0.25m, ${unnamed} unnamed`);
+  eq('R21 every standable cell on the ninth floor has a room name', unnamed, 0);
+  ok('R22 and there is a floor to stand on at all', standable > 3000);
+
+  /* ── the anchors are reachable ──────────────────────────────────────────────
+   * Flood fill from spawn through standable cells. If the cache, the extraction point,
+   * both breakers or the pen are not in the fill, the map is unplayable and the suite is
+   * the only thing that would ever say so. */
+  const KEY = 0.25;
+  const key = (x, z) => `${Math.round(x / KEY)},${Math.round(z / KEY)}`;
+  const seen = new Set();
+  const queue = [[ash.map.spawn[0], ash.map.spawn[1]]];
+  seen.add(key(queue[0][0], queue[0][1]));
+  while (queue.length) {
+    const [x, z] = queue.pop();
+    for (const [dx, dz] of [[KEY, 0], [-KEY, 0], [0, KEY], [0, -KEY]]) {
+      const nx = x + dx, nz = z + dz;
+      if (nx < b.minX || nx > b.maxX || nz < b.minZ || nz > b.maxZ) continue;
+      const k = key(nx, nz);
+      if (seen.has(k) || !standsAt(site, nx, nz)) continue;
+      seen.add(k); queue.push([nx, nz]);
+    }
+  }
+  const near = (x, z) => {
+    for (let dx = -0.5; dx <= 0.5; dx += KEY) for (let dz = -0.5; dz <= 0.5; dz += KEY) {
+      if (seen.has(key(x + dx, z + dz))) return true;
+    }
+    return false;
+  };
+  const anchors = [
+    ['the cache', ash.map.cache.x, ash.map.cache.z],
+    ['extraction', ash.map.extraction.x, ash.map.extraction.z],
+    ['the pen', PEN[0], PEN[1]],
+    ['the anomaly spawn', ash.map.anomalySpawn[0], ash.map.anomalySpawn[1]],
+    ...ash.map.circuits.map((c) => [c.displayName, c.switch[0], c.switch[1]]),
+    ...ash.map.evidenceSources.map((s) => [s.label, s.at[0], s.at[1]]),
+  ];
+  const unreachable = anchors.filter(([, x, z]) => !near(x, z)).map(([n]) => n);
+  note(`flood fill from spawn reached ${seen.size} cells; ${anchors.length} anchors checked`);
+  eq(`R23 every anchor is walkable from the spawn${unreachable.length ? ` (missed: ${unreachable.join(', ')})` : ''}`, unreachable.length, 0);
+
+  /* ── the board tells the truth about it ─────────────────────────────────────
+   * §18.1. The third operation is above a fresh squad's clearance, and the board must say
+   * so rather than omitting the row — an absence is a lie the player cannot notice. */
+  const siteDoc = await (await fetch('../content/site.json')).json();
+  const ops = siteDoc.operations;
+  eq('R24 three operations on the board', ops.length, 3);
+  eq('R25 two of them share a floor', ops.filter((o) => o.mapId === 'cold-storage-l2').length, 2);
+  eq('R26 and two of them share an anomaly', ops.filter((o) => o.anomalyId === 'graybox-draught').length, 2);
+  ok('R27 every operation names an incident that exists',
+    ops.every((o) => INCIDENTS.includes(o.incident)));
+  ok('R28 the Ashlar contract is gated, so the board has something to be honest about',
+    ops.find((o) => o.id === 'op-ashlar-gallery').clearanceRequired > 0);
+}
+
 (async () => {
   try {
     sectionA();
@@ -1547,6 +1784,7 @@ async function sectionQ(content) {
     await sectionO();
     sectionP();
     await sectionQ(content);
+    await sectionR();
     await sectionK();
     await sectionL();
     emit();

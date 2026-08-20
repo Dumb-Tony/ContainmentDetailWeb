@@ -184,17 +184,28 @@ export class BaseScreen {
     const budget = this.items ? this.items.cargoVolumeBudget : null;
     const adjusted = budget === null ? null : budget + effects.cargoVolumeBudget + handicap.cargoVolume;
 
-    const list = this._authorisedOperations();
-    const board = list.length
-      ? list.map((o) => `
-      <div class="card-op ${o.id === (op && op.id) ? 'chosen' : ''}" data-op="${escapeHtml(o.id)}">
+    /* Every operation the site has, authorised or not, and the locked ones say why —
+     * the same shape the upgrade list uses. Filtering them out of the render was the
+     * obvious reading of "clearance gates operations" and it is the wrong one: §18.1
+     * forbids the UI misrepresenting what is available, and a board that silently omits
+     * the third contract tells the squad the region has two. A named lock is information;
+     * an absence is a lie the player cannot even notice. */
+    const all = this.site.operations || [];
+    const board = all.length
+      ? all.map((o) => {
+        const gated = (o.clearanceRequired || 0) > pr.clearance;
+        return `
+      <div class="card-op ${gated ? 'gated' : ''} ${o.id === (op && op.id) ? 'chosen' : ''}"
+           ${gated ? '' : `data-op="${escapeHtml(o.id)}"`}>
         <b>${escapeHtml(o.name)}</b>
         <p>${escapeHtml(o.mandate)}</p>
         <p class="small">${escapeHtml(o.difficulty || 'Field')} · ${escapeHtml(o.distance || '')}</p>
         <ul>${(o.conditions || []).map((c) => `<li>${escapeHtml(c)}</li>`).join('')}</ul>
         <p class="small">Optional: ${(o.optional || []).map((x) => escapeHtml(x)).join(' · ')}</p>
-      </div>`).join('')
-      : '<p class="empty">No operation is authorised at your clearance.</p>';
+        ${gated ? `<p class="small lock">Not authorised. Requires ${escapeHtml(clearanceTier(o.clearanceRequired).name)} clearance.</p>` : ''}
+      </div>`;
+      }).join('')
+      : '<p class="empty">The board is empty. Regional has nothing for this squad.</p>';
 
     const known = op ? pr.insightsFor(op.anomalyId).filter((i) => i.unlocked) : [];
     const knownHtml = known.length
@@ -216,9 +227,7 @@ export class BaseScreen {
       <section>
         <h2>Mission board</h2>
         ${board}
-        <p class="small">${list.length > 1
-          ? 'The same floor twice. Everything you learned about the building still applies; nothing you learned about the anomaly does.'
-          : 'One operation. The board carries what exists and nothing else.'}</p>
+        <p class="small">${this._boardLine(all)}</p>
         ${knownHtml}
       </section>
       <section>
@@ -521,6 +530,24 @@ export class BaseScreen {
   _authorisedOperations() {
     const pr = this.progression;
     return (this.site.operations || []).filter((o) => (o.clearanceRequired || 0) <= pr.clearance);
+  }
+
+  /**
+   * What the board is, said once, derived from the board rather than hard-coded. The line
+   * used to read "the same floor twice" whenever there was more than one contract, which
+   * was true of exactly the two operations that existed when it was written and became a
+   * lie the moment a second building arrived.
+   */
+  _boardLine(ops) {
+    if (ops.length < 2) return 'One operation. The board carries what exists and nothing else.';
+    const floors = new Set(ops.map((o) => o.mapId)).size;
+    const things = new Set(ops.map((o) => o.anomalyId)).size;
+    if (floors < ops.length && things < ops.length) {
+      return 'Two of these share a floor and two share an anomaly. Neither the building nor the thing in it is the constant — you learn both, separately, and neither answer transfers whole.';
+    }
+    if (floors < ops.length) return 'The same floor twice. Everything you learned about the building still applies; nothing you learned about the anomaly does.';
+    if (things < ops.length) return 'The same anomaly twice. Everything you learned about the thing still applies; nothing you learned about the building does.';
+    return `${ops.length} operations, no two alike.`;
   }
 
   /** The one the player has selected, defaulting to the first authorised. */

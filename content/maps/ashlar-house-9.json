@@ -3,9 +3,9 @@
   "displayName": "Ashlar House, ninth floor",
   "contentRevision": "0.1.0-web",
 
-  "_incident": "A condemned crosswall slab block, stripped back to its frame, with the dead district-heating gallery running the full width behind the store rooms. The load-bearing fact is the construction. Ashlar House is a CROSSWALL block: only nineteen of this floor's fifty-seven walls carry anything — the envelope, the two structural crosswalls, the lift core and the gallery — and every partition between them is stud and plasterboard. The squad and the draught therefore walk two different buildings over one footprint. The operatives go the long way round the flats through six doorways; the thing crosses them in a straight line; and a 6.5m escape ray fired from anywhere inside a flat leaves the building without touching a surface, so nothing up here can be fenced where it stands. Two tripods in the middle of Flat 3 still leave three lanes open. The whole map is the argument for getting it DOWN into the heating gallery — 2.4m of clear width, concrete on both faces, and exactly three doors in its north wall. The cold store's problem was that its aisles are wider than one floodlight's contour. Ashlar's is the reverse: a floodlight's 40C contour is 3.37m across and the gallery is 2.4m wide, so heat down there is cheap and only the two ends of the tube need closing. What is expensive is the journey, and the one thing you cannot buy with heat is the bait — a tripod set 3.6m from the transit case pushes the case past 40C and stops it being a lure at all, which is why the last lane has to be closed with something that is cold. That is what the doors are for, and it is why the power is worth a walk. Infrastructure here is the inverse of the cold store's: nothing is locked shut, everything is stuck OPEN. All four gallery doors start open on a dead circuit, so the fence cannot be shaped at all until somebody has walked the full length of the tube they intend to fight in and thrown the contractor's temporary board at the far west end of it. The second circuit unlocks nothing — it opens the lift lobby, the only cross-link in the middle of the plan, and its breaker sits in the west stair at the opposite corner of the floor from where the squad comes up. Buying the shortcut costs one full lap of the loop, and the shortcut is a shortcut for the draught too.",
+  "_incident": "A condemned crosswall slab block, stripped back to its frame, with the dead district-heating gallery running the full width of the floor behind the store rooms. The load-bearing fact is the construction. Ashlar House is a CROSSWALL block: nineteen of this floor's fifty-seven walls carry the building — the envelope, the two structural crosswalls, the lift core and the gallery — and the other thirty-eight are stud and plasterboard. The squad and the draught therefore walk two different buildings over one footprint. The operatives go the long way round the flats; the thing crosses them in a straight line; and a 6.5m escape ray fired from anywhere in a flat leaves the building without touching a surface, so nothing up here can be fenced where it stands. Two floodlights either side of a body in the middle of Flat 3 still leave three lanes open, and eight in the north corridor. The whole map is the argument for getting it DOWN into the heating gallery — 2.4m of clear width, concrete on both faces, and exactly three doors in its north wall. The cold store's problem was that its aisles at 4.2m are wider than one floodlight's contour. Ashlar's is the reverse: a floodlight's 40C contour is 3.375m across and the gallery is 2.400m wide, so one post closes the tube ACROSS and only the two ends are left. Down there a fence is cheap; what is expensive is the journey, and the one thing heat cannot buy is the bait. A tripod set 3.6m from the transit case lifts the case past 40C and stops it attracting anything at range, so the last lane has to be closed with something COLD. That is what the doors are for. Infrastructure here is the inverse of the cold store's: nothing is locked shut, everything is stuck open. All four gallery doors start open on a dead circuit, so the fence cannot be shaped at all until somebody has walked the full 24m of the tube they intend to fight in and thrown the contractor's temporary board at the far west end of it. The second circuit unlocks nothing at all — it opens the lift lobby, the only cross-link in the middle of the plan — and its breaker sits in the west stair, at the far corner of the loop from where the squad comes up and four metres from where the draught is sleeping. Buying the shortcut costs a full lap and wakes the thing, and the shortcut is a shortcut for it too.",
 
-  "_webNote": "Authored for the browser build against revision 0.4.0 of the anomaly file and 0.3.0 of the equipment manifest. Same bounds and ceiling order as cold-storage-l2, so the thermal floor texture resolution still suits it; same anomaly (graybox-draught); same equipment manifest; and no evidence id the anomaly file does not already define — the four static sources are the same four the cold store uses, re-sited and re-labelled for a residential block. Two circuits, six doors, twenty named rooms, four staging areas (the east landing where the squad arrives, the lift lobby, the plant store and the gallery), two entry routes (the east landing stair and the west stair), and a looped circulation path — north corridor, west link, south corridor, east link — with the lift lobby as a cross-link that starts dead. Room rects are the interior floor of each space and do not overlap; the seams between them are the wall bands, and no standable cell on this floor is further than 0.18m from the rect that names it. The intended containment site is the gallery bay directly under the contractors' store door, at (1.6, -10.8).",
+  "_webNote": "Authored for the browser build against revision 0.4.0 of the anomaly file and 0.3.0 of the equipment manifest. Same bounds and ceiling order as cold-storage-l2, so the thermal floor texture resolution still suits it; same anomaly (graybox-draught); same equipment manifest; and no evidence id the anomaly file does not already define — the four static sources are the same four the cold store uses, re-sited and re-labelled for a residential block. Two circuits, six doors, twenty named rooms, four staging areas (the east landing where the squad arrives, the lift lobby, the plant store and the gallery), two entry routes (the east landing stair and the west stair), and a looped circulation path — north corridor, west link, south corridor, east link — with the lift lobby as a cross-link that starts dead. Room rects are the interior floor of each space and do not overlap; the seams between them are the wall bands, and no standable cell on this floor is more than 0.18m from the rect that names it.\n\nMEASURED, by running the real isFenced() and _drift() against this geometry. The intended pen is the gallery bay under the contractors' store door, transit case at (1.6, -10.8). Bare, that spot has five open lanes of twenty-four: the two along the gallery and three up through the open lane door. Shutting the lane door leaves two. Shutting the lane door and the fire-stopping door leaves one, and ONE floodlight at (5.2, -10.8) closes it — that is the powered answer, and it holds anywhere in x = [-1.8, 4.8], 6.6m of pen. With no power at all the answer is TWO floodlights and a pen moved east into the 6.2m unbroken wall run: case at (5.2, -10.8), posts at 1.6 and 8.2, held with every door on the map open. The fire-stopping door is worth exactly one tripod, which is the whole of the power puzzle in one sentence. From its spawn the draught reaches the case in 11.6s at drawn pace and 23.1s at aware pace, straight down through Flat 1, the west crosswall's north-corridor gap, the tank room and the lane door, and it settles 0.03m from the case — well inside the 1.5m seal radius, and in open gallery floor rather than in the doorway.\n\nONE AUTHORED FAILURE STATE, on purpose. The lane door is the lane. Shut it before the draught is inside and the thing paces the gallery's north wall between x = -2.7 and x = 3.2 without ever finding the bin store or old laundry doors — a memoryless follower sitting in a local minimum, flipping sides every six seconds, two metres from a lure it cannot reach. That is legible on the imager and recoverable by reopening the door, and it is the clearest statement this map makes about what the thing actually is.",
 
   "bounds": { "minX": -12.0, "maxX": 12.0, "minZ": -12.0, "maxZ": 12.0 },
   "ceilingHeight": 2.45,
@@ -13,7 +13,6 @@
   "spawn": [10.2, 7.2],
   "spawnFacingRad": 4.7,
   "extraction": { "x": 10.6, "z": 11.0, "radius": 2.0 },
-  "anomalySpawn": [-8.6, 10.6],
   "cache": { "x": 9.4, "z": 9.0 },
 
   "crates": [[-7.0, 10.4], [10.8, 8.6], [-8.2, 1.4], [11.2, -7.8]],
@@ -202,36 +201,5 @@
     { "id": "plant-store", "name": "Plant store", "rect": [4.2, -9.2, 8.0, -6.4] },
     { "id": "old-laundry", "name": "Old laundry", "rect": [8.2, -9.2, 12.0, -6.4] },
     { "id": "heating-gallery", "name": "Heating gallery", "rect": [-12.0, -12.0, 12.0, -9.6] }
-  ],
-
-  "evidenceSources": [
-    {
-      "evidenceId": "frost-bloom",
-      "at": [-8.8, 11.4],
-      "label": "Frost on a radiator bracket, Flat 1",
-      "prompt": "Examine the frost",
-      "requiresEquipment": []
-    },
-    {
-      "evidenceId": "survivor-account",
-      "at": [9.6, 6.6],
-      "label": "Site watchman on the east landing",
-      "prompt": "Take a statement",
-      "requiresEquipment": []
-    },
-    {
-      "evidenceId": "maintenance-log",
-      "at": [-9.8, -10.8],
-      "label": "Contractor's day book at the temporary board",
-      "prompt": "Read the day book",
-      "requiresEquipment": []
-    },
-    {
-      "evidenceId": "stairwell-draught",
-      "at": [-10.8, 9.8],
-      "label": "Draught in the west stair",
-      "prompt": "Note the draught",
-      "requiresEquipment": []
-    }
   ]
 }

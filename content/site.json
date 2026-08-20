@@ -212,10 +212,34 @@
       ],
       "_note": "The SAME MAP as op-cold-storage-2 and a completely different operation — GDD 15.2's epistemic and operational variation. The board is the one place a player sees that the building is a constant and the incident is the variable.",
       "incident": "cold-storage-figure"
+    },
+    {
+      "id": "op-ashlar-gallery",
+      "name": "Ashlar House, ninth floor",
+      "mapId": "ashlar-house-9",
+      "anomalyId": "graybox-draught",
+      "clearanceRequired": 1,
+      "difficulty": "Field",
+      "status": "authorised",
+      "distance": "Two hours out, then nine floors on foot. The lift is out and the stair is the only way anything leaves.",
+      "mandate": "Establish custody of the anomaly on the ninth floor and transfer it to the east landing.",
+      "optional": [
+        "Recover all issued equipment",
+        "Avoid a second contact",
+        "Recover the contractor day book intact"
+      ],
+      "conditions": [
+        "Condemned crosswall block, decanted eleven months, stripped back to the frame.",
+        "Both circuits are on the contractor temporaries. Nothing is locked; everything is stuck open.",
+        "The drained district-heating gallery runs the full width of the floor behind the store rooms."
+      ],
+      "_note": "THE SAME ANOMALY as op-cold-storage-2, on different geometry — the mirror of what the aisle B operation does. GDD 15.2 varies the incident against a constant building; this varies the building against a constant incident, and a squad that arrives with the cold store playbook has brought the right tools in the wrong quantity to the wrong end of a very long walk.",
+      "incident": "ashlar-gallery-draught"
     }
   ],
 
-  "_boardNote": "One operation, and the board says so rather than padding itself with contracts that do not exist. §26.3 excludes more than one field map from the slice; a mission board showing four greyed-out operations would be a promise the build cannot keep, and §18.1 does not allow the UI to lie about what is available.",
+
+  "_boardNote": "Three operations, and every one of them is playable to custody — the board does not pad itself with contracts that do not exist. §18.1 does not allow the UI to lie about what is available, so a greyed-out fourth entry would be a promise this build cannot keep. Two of the three share a floor and two of the three share an anomaly, which is the whole of §15.2 in three rows: the building is a variable and the incident is a variable, and they vary independently.",
 
   "containmentWing": {
     "framing": "Entries record where it came from, what holding it costs, and what it has done since. They do not rank captures, do not count them as a score, and do not describe anything held here as a prize. An object in a cell is an ongoing operational commitment, not a result.",

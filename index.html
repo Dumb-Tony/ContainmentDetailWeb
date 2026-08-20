@@ -223,6 +223,9 @@
   .cd-panel .card-op:hover{border-color:#3c4a58}
   /* The chosen one is marked by colour AND a heavier border AND its own background —
      GDD 18.1 wants critical state on more than one channel. */
+  .cd-panel .card-op.gated{opacity:.55;cursor:default;border-left-color:#4a5561}
+  .cd-panel .card-op.gated:hover{border-color:var(--line)}
+  .cd-panel .card-op .lock{color:var(--amber);opacity:.9}
   .cd-panel .card-op.chosen{border-left-width:5px;background:rgba(229,161,58,.07);border-color:var(--amber)}
   .cd-panel .card-op>b{font-size:14px}
   .cd-panel .card-op p{margin:4px 0 0}

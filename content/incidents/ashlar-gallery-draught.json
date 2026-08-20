@@ -1,0 +1,32 @@
+{
+  "id": "ashlar-gallery-draught",
+  "contentRevision": "0.1.0",
+  "displayName": "The heating gallery",
+  "anomaly": "graybox-draught",
+  "map": "ashlar-house-9",
+  "difficulty": "field",
+
+  "_note": "THE THIRD PACKAGE, AND THE ONE THAT PROVES THE MODEL WORKS IN THE OTHER DIRECTION (GDD 15.1, 26.2). The first two are one anomaly each on one shared floor: same building, different thing. This is the same THING on a different building — the graybox-draught again, with every rule in its file untouched, on geometry that makes those rules mean something else.\n\nThe cold store's aisles are 4.2m and a floodlight's 40C contour is 3.375m across, so a lane needs two posts and heat is the scarce resource. Ashlar's heating gallery is 2.400m wide, so one post closes the tube across and only its two ends are left: heat is cheap here and the JOURNEY is what costs. A squad that learned 'bring four tripods' brings four tripods nine floors up a condemned block for no reason, and a squad that learned 'the fence is made of heat' has not noticed that the last lane here has to be closed with something cold, because a tripod set 3.6m from the transit case lifts the case past 40C and the bait stops working. That is what the doors are for.\n\nThis map is also the first one where the anomalySpawn and evidenceSources live ONLY here. ashlar-house-9.json is pure geometry — it does not know what happened in it.",
+
+  "anomalySpawn": [-8.6, 10.6],
+
+  "briefing": {
+    "headline": "Cold complaint, condemned block, ninth floor",
+    "report": "Ashlar House was decanted eleven months ago and is due for demolition. A strip-out contractor pulled his crew off the ninth floor after two of them 'walked into a cold that followed'. His day book is still at the temporary board in the heating gallery, where he left it.",
+    "known": [
+      { "text": "The site watchman is on the east landing and will let you up.", "confidence": "probable" },
+      { "text": "Both circuits on this floor are on the contractor's temporaries, not the mains.", "confidence": "probable" },
+      { "text": "The district-heating gallery was drained and capped four years ago and runs the full width of the floor.", "confidence": "probable" },
+      { "text": "The watchman puts the first complaint three weeks before the contractor's, in a flat on the north side.", "confidence": "disputed" }
+    ]
+  },
+
+  "evidenceSources": [
+    { "evidenceId": "frost-bloom", "at": [-8.8, 11.4], "label": "Frost on a radiator bracket, Flat 1", "prompt": "Examine the frost", "requiresEquipment": [] },
+    { "evidenceId": "survivor-account", "at": [9.6, 6.6], "label": "Site watchman on the east landing", "prompt": "Take a statement", "requiresEquipment": [] },
+    { "evidenceId": "maintenance-log", "at": [-9.8, -10.8], "label": "Contractor's day book at the temporary board", "prompt": "Read the day book", "requiresEquipment": [] },
+    { "evidenceId": "stairwell-draught", "at": [-10.8, 9.8], "label": "Draught in the west stair", "prompt": "Note the draught", "requiresEquipment": [] },
+    { "evidenceId": "frost-boundary", "at": [1.6, -10.8], "label": "A frost line across the gallery floor", "prompt": "Follow the frost line", "requiresEquipment": [] },
+    { "evidenceId": "thermal-void", "at": [-0.6, 3.4], "label": "The north corridor, from the crosswall gap", "prompt": "Sweep the corridor", "requiresEquipment": ["thermal-imager"] }
+  ]
+}

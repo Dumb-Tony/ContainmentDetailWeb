@@ -42,6 +42,55 @@ power puzzle matters — the office breaker is out on the bay wall, the storage 
 The mission ends when the case is sealed, has held for thirty seconds, and is carried up
 the stairs. It can be lost at any point in that sentence.
 
+## Two incidents, one floor
+
+The content unit is an **Incident Package**, not a map — an anomaly file holds rules and
+nothing about where; a map holds geometry and nothing about what happened;
+`content/incidents/` binds them and carries the spawn, the evidence lying about, and the
+briefing. That is the only reason two operations can share a building.
+
+**Cold that moves.** The graybox-draught: an invisible cold mass that hunts the warmest
+thing it can reach and cannot cross a sustained 40 °C gradient. You fence it, bait it with
+a case running one degree under the threshold, and seal it while it is held.
+
+**The figure in aisle B.** The stillwater-figure does not move while it is observed. That
+is the entire rule and the entire containment: you never fence it, you never stop looking
+at it, and the difficulty is that looking is a resource you also need for carrying,
+placing, powering and sealing. It reads at ambient on thermal, the breakers are
+irrelevant, and its own capability browns out the cameras holding it — the fence you built
+is the thing it feeds on.
+
+A squad that arrives with the first playbook finds every instinct wrong. That is the point
+(GDD §15.2: the building is the constant, the incident is the variable).
+
+**The engine does not know what either of them is called.** States, triggers, capabilities
+and field disturbance are all read from content, through a closed vocabulary of senses and
+effect verbs in `src/sim/senses.js`. A JSON key may name a *quantity*, never an *operator*.
+The suite proves it by renaming every state in the shipped anomaly to `q0`–`q4` and running
+the whole sequence through anyway.
+
+## The site
+
+Between operations you are at Regional Site 19: a mission board, an armory counter, an
+archive, a research station and a containment corridor that lists what you are holding by
+its operational history rather than as a trophy. Progression grants **options, context and
+efficiency** — never damage, never immunity (GDD §12.1). Equipment upgrades are sidegrades;
+a new variant never makes the old tool irrelevant.
+
+Failure is recoverable and never profitable. A failed operation still yields research for
+valid observations, and the site can always fund one more attempt — but leaving your kit on
+the floor costs you, with the departments that care about kit.
+
+## Accessibility
+
+Full remapping with browser-reserved keys refused, hold-vs-toggle resolved at the source,
+captions for every audio cue, colour-vision presets with shape redundancy, adjustable
+FOV/shake/bob/blur/grain/distortion, photosensitivity-safe mode that clamps rather than
+recording a preference, five volume sliders, UI scale, and difficulty assists. `O` opens it.
+
+GDD §19.2 is the design constraint, not the menu: no required rule may depend on fine
+colour discrimination, stereo hearing, a microphone, small text or flashing imagery.
+
 ## One to five operatives
 
 Host a room, share the five-character code, and everyone connects browser to browser over
@@ -109,7 +158,7 @@ There is no Node.js here, so the harness is a browser.
 powershell -ExecutionPolicy Bypass -File tools/smoketest.ps1 -Tests tools/m0-tests.js
 ```
 
-**214 assertions, all headless.** Section I is the one that matters: it plays a complete
+**298 assertions, all headless.** Section I is the one that matters: it plays a complete
 solo containment through the same interfaces a keyboard reaches — walks to the vehicle,
 takes kit, throws breakers, opens doors, baits, fences, seals, waits out custody and
 carries the case to the stairs. No teleports and no direct state writes, because testing
@@ -131,9 +180,10 @@ photographs it.
 ```
 index.html            the page; loads the vendored r128 and src/main.js
 GAME_BIBLE/GDD.md     the design authority, imported verbatim
-content/              the anomaly, the map and the equipment, as validated JSON
+content/              incidents, anomalies, maps, equipment and the site — all validated JSON
 src/sim/              the rules. No renderer, no DOM, no wall clock — enforced by the suite
 src/net/              protocol.js is pure; net.js is the only file that touches Peer
+src/ui/settings.js    the accessibility model (DOM-free) and its panel
 src/render/           three.js: the eye's view, and the imager's second pass
 src/ui/               HUD and panels, plain DOM
 tools/                dev server, headless test harness, screenshot harness
