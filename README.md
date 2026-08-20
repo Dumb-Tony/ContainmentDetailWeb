@@ -42,6 +42,37 @@ power puzzle matters — the office breaker is out on the bay wall, the storage 
 The mission ends when the case is sealed, has held for thirty seconds, and is carried up
 the stairs. It can be lost at any point in that sentence.
 
+## One to five operatives
+
+Host a room, share the five-character code, and everyone connects browser to browser over
+WebRTC. No account, no server, no lobby list. A public broker introduces the two machines
+and then carries nothing — every command and every snapshot goes peer to peer.
+
+**The host's browser is the mission.** A client sends intent and draws snapshots and steps
+nothing at all, so it cannot disagree about whether custody was established. It predicts
+its own feet for responsiveness and blends toward the host's answer; past 1.2 m it snaps,
+because smoothing that far is a slow lie. A client that teleports itself is simply
+overwritten on the next snapshot.
+
+A second operative changes the simulation, not just the roster:
+
+- **Every one of them is a heat source**, so a squad is several lures. The draught takes
+  whichever it can actually reach — not whoever happens to be player one.
+- **A second serious contact puts you down, not dead**, on a ninety-second clock. A
+  teammate with a trauma kit gets the rescue prompt above everything but the seal. Alone,
+  nobody comes.
+- **A tripod is a long item**, so each of you carries one at a time. A fence that takes
+  three trips solo takes one with three people.
+- **Two on the case** move it at 95% pace; one drags it at 75%. Never gated — solo works.
+- Somebody can watch the imager while somebody else has both hands full. There is one
+  imager in the cargo budget, so that is a decision.
+
+Joining is open until the squad commits to a procedure. After that the operation is
+running and the door is shut. Lose your connection and your seat is held: your kit stays
+yours, your operative stands still rather than wandering off, and a resume token puts you
+back in the same body. If you were carrying custody when your radio died, the case is set
+down where you stood rather than leaving the floor with you.
+
 ## Controls
 
 | | |
@@ -78,12 +109,19 @@ There is no Node.js here, so the harness is a browser.
 powershell -ExecutionPolicy Bypass -File tools/smoketest.ps1 -Tests tools/m0-tests.js
 ```
 
-**159 assertions, all headless.** Section I is the one that matters: it plays a complete
+**214 assertions, all headless.** Section I is the one that matters: it plays a complete
 solo containment through the same interfaces a keyboard reaches — walks to the vehicle,
 takes kit, throws breakers, opens doors, baits, fences, seals, waits out custody and
 carries the case to the stairs. No teleports and no direct state writes, because testing
 the simulation is not testing the game. Sections C and E print measured numbers rather
 than asserting remembered ones.
+
+Section M runs a whole three-operative session through the real encode/decode over a
+loopback link — join, intent, snapshot, refusal, the squad cap, a version mismatch, a
+drop, a reconnect, the join gate, custody being put down rather than carried offline by
+somebody whose radio died — with no WebRTC in sight. What a loopback *cannot* prove was
+checked in two real browsers on the real broker, and that is where the notice-feed bug
+was found: a refusal the host sent and the client's next snapshot destroyed.
 
 `tools/shot.ps1 -Setup tools/_shot-fence.js -Out docs/m0-fence.png` poses a scene and
 photographs it.
@@ -95,6 +133,7 @@ index.html            the page; loads the vendored r128 and src/main.js
 GAME_BIBLE/GDD.md     the design authority, imported verbatim
 content/              the anomaly, the map and the equipment, as validated JSON
 src/sim/              the rules. No renderer, no DOM, no wall clock — enforced by the suite
+src/net/              protocol.js is pure; net.js is the only file that touches Peer
 src/render/           three.js: the eye's view, and the imager's second pass
 src/ui/               HUD and panels, plain DOM
 tools/                dev server, headless test harness, screenshot harness
@@ -124,4 +163,8 @@ whole discovery-to-custody loop can be built and tested while that stays open, a
 been.
 
 Third-party code is vendored and credited in [`assets/lib/NOTICE.md`](assets/lib/NOTICE.md).
-The page makes **zero external requests** at runtime.
+
+A solo operation makes **zero external requests**. Hosting or joining contacts exactly one
+network host — a signalling broker that introduces two browsers and then carries no game
+traffic. That exception lives in one named file, and the suite asserts it rather than
+letting it pass by accident: section K fails if any *other* source file grows a hostname.
