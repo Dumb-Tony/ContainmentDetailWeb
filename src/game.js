@@ -31,8 +31,17 @@ import {
 import { Mission, PHASE } from './sim/mission.js';
 import { dist } from './sim/geometry.js';
 
+/** A command is what one operative is asking for this step, whoever is asking. */
+export const EMPTY_COMMAND = Object.freeze({
+  axis: { x: 0, y: 0 }, sprint: false, crouch: false,
+});
+
 export const EVENTS = Object.freeze({
   PHASE_CHANGED: 'PHASE_CHANGED',
+  SQUAD_CHANGED: 'SQUAD_CHANGED',
+  OPERATIVE_DOWNED: 'OPERATIVE_DOWNED',
+  OPERATIVE_REVIVED: 'OPERATIVE_REVIVED',
+  OPERATIVE_LOST: 'OPERATIVE_LOST',
   ANOMALY_STATE_CHANGED: 'ANOMALY_STATE_CHANGED',
   EVIDENCE_LOGGED: 'EVIDENCE_LOGGED',
   CONTACT: 'CONTACT',
@@ -71,9 +80,23 @@ export class Game {
     this.heat = new HeatField();
     this.deployables = new DeployableSet();
     this.anomaly = new Anomaly(content.anomaly, this.site, this.heat, this.deployables);
-    this.player = new Player(this.site);
     this.ledger = new EvidenceLedger(content.anomaly);
     this.mission = new Mission();
+
+    /**
+     * THE SQUAD IS A LIST, AND `player` IS THE SAME OBJECT AS `players[0]` — not a copy.
+     * Taken from SmallTownEmergencyServices `createInitialState` (Dev/INDEX.md → local
+     * co-op): it keeps every single-player call site working and, because it is an alias
+     * rather than a duplicate, the two cannot drift apart the way a copy silently would.
+     *
+     * Every operative — local, second-on-the-couch, or on another continent — is driven
+     * by a COMMAND in `this.commands`. From `step()` down, the simulation cannot tell
+     * which is which, and that is the whole reason netcode is a seam here rather than a
+     * rewrite.
+     */
+    this.players = [];
+    this.player = null;
+    this.commands = new Map();
 
     this.reset(seed);
   }
@@ -86,20 +109,139 @@ export class Game {
     this.heat.reset();
     this.deployables.reset();
     this.anomaly.reset();
-    this.player.reset();
     this.ledger.reset();
     this.mission.reset();
+
+    this.players.length = 0;
+    this.commands.clear();
+    this.players.push(new Player(this.site, 'p1', 'Operative 1'));
+    this.localId = this.localId || 'p1';
+    this.player = this.players[0];
+    this._nextPlayerN = 2;
 
     /** itemId -> remaining count sitting in the cargo cache at the command point. */
     this.cache = new Map();
     this.cargoIssued = 0;
-    this.imagerBatteryMs = (this.itemsById.get('thermal-imager').batteryMinutes || 0) * 60000;
-    this.imagerOn = false;
-    this.imagerHoldMs = 0;
+    /** Batteries follow the ITEM, not the carrier — hand the imager over and its charge
+     *  goes with it, which is the only behaviour a squad can reason about. */
+    this.itemBattery = new Map();
+    this.imagerHold = new Map();   // playerId -> ms the mass has been held in view
+    this.imagerOnIds = new Set();
+    /** playerId -> the custody state of the case in their hands, so putting it down (or
+     *  dropping it because they went down) restores exactly what they picked up. */
+    this._carried = new Map();
     this.notices = [];
     this.result = null;
     this.custody = 'none';        // none | sealed | verified
     this.extracted = false;
+  }
+
+  /* ── the squad ───────────────────────────────────────────────────────────── */
+
+  playerById(id) { return this.players.find((p) => p.id === id) || null; }
+
+  /**
+   * Whose eyes the renderer and the HUD are behind. On the host that is operative one; on
+   * a client it is whichever seat the host handed them. Everything presentational reads
+   * THIS rather than `player`, so the same renderer serves both without a branch.
+   */
+  get viewPlayer() { return this.playerById(this.localId) || this.players[0]; }
+
+  /** @returns {Player} */
+  addPlayer(name) {
+    const id = `p${this._nextPlayerN++}`;
+    const p = new Player(this.site, id, name || `Operative ${this.players.length + 1}`);
+    this.players.push(p);
+    this.bus.emit(EVENTS.SQUAD_CHANGED, { id, joined: true }, this.clock.simTimeMs);
+    return p;
+  }
+
+  /**
+   * Take an operative off the roster entirely (they said goodbye, rather than dropping).
+   *
+   * GDD §11.5: "intentional departure transfers unique mission items to a recoverable
+   * field crate". Nothing they were holding may vanish with them, because some of it is
+   * the only one on the floor and the operation cannot be finished without it.
+   */
+  removePlayer(id) {
+    const i = this.players.findIndex((p) => p.id === id);
+    if (i <= 0) return false;          // p1 is the host's own operative and never leaves
+    const p = this.players[i];
+    this._returnEverything(p);
+    this.players.splice(i, 1);
+    this.commands.delete(id);
+    this.imagerOnIds.delete(id);
+    this.imagerHold.delete(id);
+    this.bus.emit(EVENTS.SQUAD_CHANGED, { id, joined: false }, this.clock.simTimeMs);
+    return true;
+  }
+
+  /** Everything in their slots and hands goes back to the cargo point, recoverable. */
+  _returnEverything(p) {
+    for (const slot of SLOTS) {
+      const itemId = p.slots.get(slot.id);
+      if (!itemId) continue;
+      p.slots.set(slot.id, null);
+      this.cache.set(itemId, (this.cache.get(itemId) || 0) + 1);
+    }
+    if (p.hands) {
+      /* A SEALED case is not cargo — putting custody in a crate at the far end of the
+       * floor would be a quiet mission failure. It goes down where they stood. */
+      if (p.hands === 'reinforced-transit-case' && this._carried.get(p.id)) {
+        this._putDownCase(p);
+      } else {
+        this.cache.set(p.hands, (this.cache.get(p.hands) || 0) + 1);
+        p.hands = null;
+      }
+    }
+  }
+
+  /** The command a given operative is issuing this step. Absent reads as "standing still". */
+  setCommand(playerId, cmd) {
+    if (cmd === null) this.commands.delete(playerId);
+    else this.commands.set(playerId, cmd);
+  }
+
+  commandFor(playerId) { return this.commands.get(playerId) || EMPTY_COMMAND; }
+
+  /** Back-compatible single-player hook: main.js and the suite drive operative one. */
+  setAxis(axis) {
+    const c = this.commands.get('p1') || { ...EMPTY_COMMAND };
+    this.commands.set('p1', { ...c, axis });
+  }
+
+  /* ── client-side prediction (GDD §20.4) ──────────────────────────────────
+   * A client never steps the mission — the host owns all of it. But waiting 80ms to see
+   * your own feet move is intolerable, so a client integrates its OWN operative locally
+   * and blends toward the host's answer as snapshots land.
+   *
+   * ⚠ Predict POSITION only. Predicting anything the host arbitrates — a seal, an
+   * evidence entry, a battery — would mean showing the player an outcome the host may
+   * refuse, which is worse than latency. Movement is safe to predict precisely because
+   * it is the one thing the host recomputes from the same axis the client sent.
+   */
+  predictLocal(playerId, stepMs) {
+    const p = this.playerById(playerId);
+    if (!p || p.incapacitated) return;
+    const blockers = this.site.blockingRects().concat(this.deployables.blockingRects());
+    const cmd = this.commandFor(playerId);
+    p.sprinting = !!cmd.sprint;
+    p.crouching = !!cmd.crouch;
+    p.step(stepMs, cmd.axis || { x: 0, y: 0 }, blockers, {
+      onIce: this.anomaly.iceAt(p.x, p.z),
+      assisted: !!p.hands && this._assistFor(p) !== null,
+    });
+  }
+
+  /** @returns {number} the correction distance in metres, for the netgraph. */
+  reconcileLocal(playerId) {
+    const p = this.playerById(playerId);
+    if (!p || p.netX === undefined) return 0;
+    const err = dist(p.x, p.z, p.netX, p.netZ);
+    if (err > CONFIG.net.snapErrorM) { p.x = p.netX; p.z = p.netZ; return err; }
+    p.x += (p.netX - p.x) * CONFIG.net.blend;
+    p.z += (p.netZ - p.z) * CONFIG.net.blend;
+    return err;
   }
 
   /* ── phase B: the wager ──────────────────────────────────────────────────── */
@@ -151,24 +293,53 @@ export class Game {
     const m = this.mission;
     if (m.phase === PHASE.BRIEFING || m.phase === PHASE.LOADOUT || m.phase === PHASE.DEBRIEF) return;
 
-    /* 1. the field, rebuilt from the world */
+    /* 1. the field, rebuilt from the world. EVERY warm body is a lure, including a downed
+     *    one — an operative on the floor is still the warmest thing in the room, which is
+     *    what makes leaving them there a decision rather than an inconvenience. */
     const emitters = this.deployables.heatEmitters();
-    if (this.player.alive) emitters.push({ ...this.player.heatSource(), active: true });
+    for (const p of this.players) if (p.alive) emitters.push({ ...p.heatSource(), active: true });
     this.heat.setEmitters(emitters);
     const sink = this.anomaly.asSink();
     this.heat.setSinks(sink ? [sink] : []);
     this.heat.drift(stepMs, this.anomaly.isLoose);
 
-    /* 2. the operative */
+    /* 2. the squad. One pass per operative, each reading its own command — there is no
+     *    branch anywhere below here for "is this one local". */
     const blockers = this.site.blockingRects().concat(this.deployables.blockingRects());
-    const onIce = this.anomaly.iceAt(this.player.x, this.player.z);
-    if (this.player.alive) {
-      this.player.step(stepMs, this._axis || { x: 0, y: 0 }, blockers, { onIce });
-      this.player.stepStress(stepMs, {
-        lightLevel: this.lightAt(this.player.x, this.player.z),
-        anomalyDistance: dist(this.player.x, this.player.z, this.anomaly.x, this.anomaly.z),
+    for (const p of this.players) {
+      if (!p.alive) continue;
+      const cmd = this.commandFor(p.id);
+      p.sprinting = !!cmd.sprint;
+      p.crouching = !!cmd.crouch;
+
+      const lost = p.stepDowned(stepMs, CONFIG.player.bleedOutMs);
+      if (lost) {
+        this.notice(`${p.name} stopped answering.`);
+        this.bus.emit(EVENTS.OPERATIVE_LOST, { id: p.id }, simTimeMs);
+      }
+
+      if (!p.incapacitated) {
+        const dragged = this.players.find((q) => q.draggedBy === p.id) || null;
+        p.step(stepMs, cmd.axis || { x: 0, y: 0 }, blockers, {
+          onIce: this.anomaly.iceAt(p.x, p.z),
+          assisted: !!p.hands && this._assistFor(p) !== null,
+          dragging: !!dragged,
+        });
+        /* A dragged casualty is towed a metre behind, not teleported onto the carrier. */
+        if (dragged) {
+          dragged.x = p.x + Math.sin(p.yaw) * 0.9;
+          dragged.z = p.z + Math.cos(p.yaw) * 0.9;
+        }
+      }
+      p.stepStress(stepMs, {
+        lightLevel: this.lightAt(p.x, p.z),
+        anomalyDistance: dist(p.x, p.z, this.anomaly.x, this.anomaly.z),
         anomalyLoose: this.anomaly.isLoose,
       });
+    }
+    if (this.players.every((p) => !p.alive)) {
+      this.endMission('The squad was lost on the floor.', simTimeMs);
+      return;
     }
 
     /* 3. power. Batteries after movement so "in range of the draught" is this step's truth. */
@@ -177,22 +348,28 @@ export class Game {
     this.deployables.list.forEach((d, i) => {
       if (before[i] && !d.hasPower) this.bus.emit(EVENTS.BATTERY_DEAD, { itemId: d.itemId, uid: d.uid }, simTimeMs);
     });
-    if (this.imagerOn) {
-      this.imagerBatteryMs = Math.max(0, this.imagerBatteryMs - stepMs *
-        (this.anomaly.isAwake && dist(this.player.x, this.player.z, this.anomaly.x, this.anomaly.z) <= CONFIG.anomaly.batteryDrainRadiusM
-          ? CONFIG.anomaly.batteryDrainMultiplier : 1));
-      if (this.imagerBatteryMs === 0) { this.imagerOn = false; this.notice('The imager screen goes dark. Battery flat.'); }
+    for (const id of this.imagerOnIds) {
+      const p = this.playerById(id);
+      if (!p) continue;
+      const near = this.anomaly.isAwake && dist(p.x, p.z, this.anomaly.x, this.anomaly.z) <= CONFIG.anomaly.batteryDrainRadiusM;
+      const left = Math.max(0, this.batteryFor('thermal-imager') - stepMs * (near ? CONFIG.anomaly.batteryDrainMultiplier : 1));
+      this.itemBattery.set('thermal-imager', left);
+      if (left === 0) { this.imagerOnIds.delete(id); this.notice('The imager screen goes dark. Battery flat.'); }
     }
 
-    /* 4. the anomaly, reading the field built in step 1 */
+    /* 4. the anomaly, reading the field built in step 1. Every operative is a candidate
+     *    meal; `chooseTarget` picks the strongest it can reach, so a squad that spreads
+     *    out is choosing which of them is the bait. */
     const sources = [];
-    if (this.player.alive) sources.push({ id: 'operative', x: this.player.x, z: this.player.z, peakC: CONFIG.player.bodyHeatC });
+    for (const p of this.players) {
+      if (p.alive) sources.push({ id: p.id, x: p.x, z: p.z, peakC: CONFIG.player.bodyHeatC });
+    }
     for (const d of this.deployables.list) {
       if (d.isEmitter && d.active) sources.push({ id: d.uid, x: d.x, z: d.z, peakC: d.item.heatOutputCelsius });
     }
     const prevState = this.anomaly.state;
     const res = this.anomaly.step(stepMs, simTimeMs, {
-      sources, operatives: this.player.alive ? [this.player] : [], pressureStage: m.stage,
+      sources, operatives: this.players.filter((p) => p.alive), pressureStage: m.stage,
     });
     if (this.anomaly.state !== prevState) {
       const t = this.anomaly.transitions[this.anomaly.transitions.length - 1];
@@ -202,12 +379,21 @@ export class Game {
     }
     for (const c of res.contacts) {
       m.tally.contacts++;
-      for (const a of c.applies) this.player.applyCondition(a.condition, a.severity);
-      this.bus.emit(EVENTS.CONTACT, { count: c.count }, simTimeMs);
-      this.notice(c.count === 1
-        ? 'Contact. The cold goes through you and your leg stops answering.'
-        : 'Second contact. You are not going to survive a third.');
-      if (!this.player.alive) this.endMission('Operative lost to repeated exposure.', simTimeMs);
+      const victim = c.operative;
+      const wasDown = victim.downed;
+      for (const a of c.applies) victim.applyCondition(a.condition, a.severity);
+      this.bus.emit(EVENTS.CONTACT, { count: c.count, id: victim.id }, simTimeMs);
+      if (victim.downed && !wasDown) {
+        this.notice(this.players.length > 1
+          ? `${victim.name} is down. Somebody get to them.`
+          : `${victim.name} is down, and there is nobody else on this floor.`);
+        this.bus.emit(EVENTS.OPERATIVE_DOWNED, { id: victim.id }, simTimeMs);
+        /* Whatever they were carrying hits the floor where they fell — including, if it
+         * comes to that, custody itself. */
+        if (victim.hands) this._putDownCase(victim);
+      } else {
+        this.notice(`${victim.name}: contact. The cold goes through you and your leg stops answering.`);
+      }
     }
 
     /* 5. custody, evidence, pressure, phase */
@@ -226,26 +412,35 @@ export class Game {
 
     this._stepEvidence(stepMs, simTimeMs);
 
+    /* Withdrawal is judged on the NEAREST operative. A squad has not backed off while one
+     * of them is still standing over it, however far away the other four are. */
+    let nearest = Infinity;
+    for (const p of this.players) if (p.alive) nearest = Math.min(nearest, dist(p.x, p.z, this.anomaly.x, this.anomaly.z));
     m.stepPressure(stepMs, {
       anomalyLoose: this.anomaly.isLoose,
       anomalyAwake: this.anomaly.isAwake,
-      operativeDistance: dist(this.player.x, this.player.z, this.anomaly.x, this.anomaly.z),
+      operativeDistance: nearest,
       activeEmitters: this.deployables.list.filter((d) => d.isEmitter && d.active).length,
     });
 
     /* Arrival ends when the squad leaves the command point, not after N metres of
      * walking — otherwise pacing back and forth at the vehicle counts as investigating. */
-    if (m.phase === PHASE.ARRIVAL && dist(this.player.x, this.player.z, this.site.cache.x, this.site.cache.z) > 6) {
+    if (m.phase === PHASE.ARRIVAL
+      && this.players.some((p) => dist(p.x, p.z, this.site.cache.x, this.site.cache.z) > 6)) {
       m.setPhase(PHASE.INVESTIGATION, simTimeMs);
       this.bus.emit(EVENTS.PHASE_CHANGED, { phase: m.phase }, simTimeMs);
     }
-    if (m.phase !== PHASE.EXTRACTION && this.custody === 'verified' && this.player.hands) {
+    const carrier = this.players.find((p) => p.hands === 'reinforced-transit-case');
+    if (m.phase !== PHASE.EXTRACTION && this.custody === 'verified' && carrier) {
       m.setPhase(PHASE.EXTRACTION, simTimeMs);
       this.bus.emit(EVENTS.PHASE_CHANGED, { phase: m.phase }, simTimeMs);
     }
 
-    /* Extraction: custody is not complete until the payload reaches transfer (§6.1 G). */
-    if (this.site.inExtraction(this.player.x, this.player.z) && this.player.hands === 'reinforced-transit-case' && this.custody === 'verified') {
+    /* Extraction: custody is not complete until the payload reaches transfer (§6.1 G).
+     * Who is standing on the stair when it does is recorded per operative, because the
+     * debrief has to be able to say that the case came up and somebody did not. */
+    if (carrier && this.custody === 'verified' && this.site.inExtraction(carrier.x, carrier.z)) {
+      for (const p of this.players) p.extracted = this.site.inExtraction(p.x, p.z);
       this.extracted = true;
       this.endMission(null, simTimeMs);
     }
@@ -258,22 +453,54 @@ export class Game {
     }
   }
 
+  /**
+   * Evidence is squad-wide, and the entry names WHO saw it. GDD §7.2 wants provenance on
+   * every observation — with five operatives, "who was holding the imager" is exactly the
+   * sort of thing the debrief and the board have to be able to answer.
+   */
   _stepEvidence(stepMs, simTimeMs) {
-    const p = this.player;
-    const prov = () => ({
-      simTimeMs, x: p.x, z: p.z, room: this.site.roomNameAt(p.x, p.z),
-      source: 'operative', integrity: 'clean',
-    });
+    for (const p of this.players) {
+      if (!p.alive) continue;
+      const prov = (source = p.name) => ({
+        simTimeMs, x: p.x, z: p.z, room: this.site.roomNameAt(p.x, p.z),
+        source, integrity: 'clean',
+      });
 
-    if (this.imagerOn && this.anomaly.isLoose && dist(p.x, p.z, this.anomaly.x, this.anomaly.z) <= 16) {
-      this.imagerHoldMs += stepMs;
-    } else this.imagerHoldMs = 0;
+      const on = this.imagerOnIds.has(p.id);
+      const held = (on && this.anomaly.isLoose && dist(p.x, p.z, this.anomaly.x, this.anomaly.z) <= 16)
+        ? (this.imagerHold.get(p.id) || 0) + stepMs : 0;
+      this.imagerHold.set(p.id, held);
 
-    if (thermalVoidObserved(this.imagerOn, this.anomaly, p, this.imagerHoldMs)) {
-      this._log('thermal-void', { ...prov(), source: 'thermal-imager' });
+      if (thermalVoidObserved(on, this.anomaly, p, held)) {
+        this._log('thermal-void', prov(`${p.name} · thermal imager`));
+      }
+      if (frostBoundaryObserved(this.anomaly, p)) this._log('frost-boundary', prov());
     }
-    if (frostBoundaryObserved(this.anomaly, p)) this._log('frost-boundary', prov());
-    if (batteryDrainObserved(this.deployables, this.anomaly)) this._log('battery-drain', prov());
+    if (batteryDrainObserved(this.deployables, this.anomaly)) {
+      const p = this.player;
+      this._log('battery-drain', {
+        simTimeMs, x: p.x, z: p.z, room: this.site.roomNameAt(p.x, p.z),
+        source: 'equipment telemetry', integrity: 'clean',
+      });
+    }
+  }
+
+  /** The imager's remaining charge, in ms. Follows the item across a handover. */
+  batteryFor(itemId) {
+    if (!this.itemBattery.has(itemId)) {
+      const it = this.itemsById.get(itemId);
+      this.itemBattery.set(itemId, (it && it.batteryMinutes ? it.batteryMinutes : 0) * 60000);
+    }
+    return this.itemBattery.get(itemId);
+  }
+
+  /** A free-handed teammate close enough to take some of the weight (GDD §11.2). */
+  _assistFor(carrier) {
+    for (const q of this.players) {
+      if (q === carrier || q.incapacitated || q.hands) continue;
+      if (dist(carrier.x, carrier.z, q.x, q.z) <= CONFIG.player.assistReachM) return q;
+    }
+    return null;
   }
 
   _log(evidenceId, provenance) {
@@ -298,14 +525,29 @@ export class Game {
    * reading the plant log, and one keypress undoes the procedure. The only thing that
    * jumps the queue is the seal, because when the seal is available nothing else matters.
    *
+   * @param {string} [playerId]  whose reach to resolve. Defaults to operative one, so
+   *                             every single-player call site is unchanged.
    * @returns {{kind:string, text:string, target?:any}|null}
    */
-  contextAction() {
-    const p = this.player;
-    if (!p.alive) return null;
+  contextAction(playerId = 'p1') {
+    const p = this.playerById(playerId);
+    if (!p || !p.alive) return null;
     const reach = CONFIG.player.reachMetres;
 
+    /* A downed operative has one verb, and it is not theirs to press. */
+    if (p.downed) return null;
+
     if (p.hands) return { kind: 'put-down', text: `Put down the ${this.itemsById.get(p.hands).displayName}` };
+
+    /* A teammate on the floor outranks everything except a seal. GDD §9.5 — the rescue
+     * decision is the point, so it must never be buried under "retrieve the tripod". */
+    const casualty = this.players.find((q) => q !== p && q.alive && q.downed
+      && dist(p.x, p.z, q.x, q.z) <= reach + 0.6);
+    if (casualty) {
+      if (p.carrying('trauma-kit')) return { kind: 'revive', text: `Stabilise ${casualty.name}`, target: casualty };
+      if (casualty.draggedBy === p.id) return { kind: 'release', text: `Let go of ${casualty.name}`, target: casualty };
+      return { kind: 'drag', text: `Drag ${casualty.name} clear`, target: casualty };
+    }
 
     /* The seal comes first: when it is available it is the only thing that matters. */
     const caseDep = this.deployables.byItem('reinforced-transit-case')
@@ -347,15 +589,34 @@ export class Game {
     return cands[0];
   }
 
-  doInteract() {
-    const a = this.contextAction();
+  /** Put a carried case back on the floor, keeping its custody state with it. */
+  _putDownCase(p) {
+    const item = this.itemsById.get(p.hands);
+    if (!item) { p.hands = null; return null; }
+    const d = this.deployables.place(item, p.x, p.z, p.yaw);
+    const was = this._carried.get(p.id);
+    if (was) {
+      d.sealed = was.sealed;
+      d.custodyHeldMs = was.custodyHeldMs;
+      d.batteryMs = was.batteryMs;
+      if (d.sealed) this.anomaly.sealedIn = d;
+      this._carried.delete(p.id);
+    }
+    p.hands = null;
+    return d;
+  }
+
+  doInteract(playerId = 'p1') {
+    const p = this.playerById(playerId);
+    if (!p) return 'No such operative.';
+    const a = this.contextAction(playerId);
     if (!a) return 'Nothing in reach.';
     const t = this.clock.simTimeMs;
     switch (a.kind) {
       case 'seal': {
         this.mission.tally.sealAttempts++;
         const err = this.anomaly.trySeal(a.target, t);
-        this.bus.emit(EVENTS.SEAL_ATTEMPT, { ok: !err, err }, t);
+        this.bus.emit(EVENTS.SEAL_ATTEMPT, { ok: !err, err, id: p.id }, t);
         if (err) { this.notice(err); return err; }
         this.custody = 'sealed';
         this.mission.setPhase(PHASE.CONTAINMENT_ACTIVE, t);
@@ -363,23 +624,39 @@ export class Game {
         return null;
       }
       case 'carry-case':
-        this.player.hands = a.target.itemId;
-        this._carriedCase = a.target;
+        p.hands = a.target.itemId;
+        this._carried.set(p.id, { sealed: a.target.sealed, custodyHeldMs: a.target.custodyHeldMs, batteryMs: a.target.batteryMs });
         this.deployables.remove(a.target);
-        this.notice('You have it. It is heavier than it looks and it is still cold.');
+        this.notice(`${p.name} has it. It is heavier than it looks and it is still cold.`);
         return null;
-      case 'put-down': {
-        const item = this.itemsById.get(this.player.hands);
-        const d = this.deployables.place(item, this.player.x, this.player.z, this.player.yaw);
-        if (this._carriedCase) { d.sealed = this._carriedCase.sealed; d.custodyHeldMs = this._carriedCase.custodyHeldMs; d.batteryMs = this._carriedCase.batteryMs; this.anomaly.sealedIn = d; this._carriedCase = null; }
-        this.player.hands = null;
+      case 'put-down':
+        this._putDownCase(p);
         return null;
-      }
       case 'retrieve': {
         const item = a.target.item;
-        if (!this.player.take(item)) { this.notice('No slot free for that.'); return 'No slot free.'; }
+        if (!p.take(item)) { this.notice('No slot free for that.'); return 'No slot free.'; }
         this.deployables.remove(a.target);
-        this.bus.emit(EVENTS.RETRIEVED, { itemId: item.id }, t);
+        this.bus.emit(EVENTS.RETRIEVED, { itemId: item.id, id: p.id }, t);
+        return null;
+      }
+      case 'drag': {
+        /* One carrier at a time — contention as a property, not a rule. The field simply
+         * cannot hold two draggers (the SmallTownEmergencyServices pattern). */
+        if (a.target.draggedBy) return `${a.target.name} is already being moved.`;
+        a.target.draggedBy = p.id;
+        this.notice(`${p.name} has hold of ${a.target.name}.`);
+        return null;
+      }
+      case 'release':
+        a.target.draggedBy = null;
+        return null;
+      case 'revive': {
+        if (!a.target.revive()) return 'Nothing to do for them.';
+        for (const s of SLOTS) if (p.slots.get(s.id) === 'trauma-kit') { p.slots.set(s.id, null); break; }
+        this.mission.tally.treatments++;
+        this.mission.tally.rescues++;
+        this.bus.emit(EVENTS.OPERATIVE_REVIVED, { id: a.target.id, by: p.id }, t);
+        this.notice(`${a.target.name} is back on their feet. Stabilised, not fixed.`);
         return null;
       }
       case 'circuit': {
@@ -397,9 +674,9 @@ export class Game {
       }
       case 'evidence':
         this._log(a.target.evidenceId, {
-          simTimeMs: t, x: this.player.x, z: this.player.z,
-          room: this.site.roomNameAt(this.player.x, this.player.z),
-          source: 'operative', integrity: 'clean',
+          simTimeMs: t, x: p.x, z: p.z,
+          room: this.site.roomNameAt(p.x, p.z),
+          source: p.name, integrity: 'clean',
         });
         return null;
       case 'cache':
@@ -411,64 +688,79 @@ export class Game {
   }
 
   /** Take one unit of an item from the cargo cache into a slot. */
-  takeFromCache(itemId) {
+  takeFromCache(itemId, playerId = 'p1') {
+    const p = this.playerById(playerId);
+    if (!p || p.incapacitated) return 'Not right now.';
     const n = this.cache.get(itemId) || 0;
     if (n <= 0) return 'None left in cargo.';
-    if (dist(this.player.x, this.player.z, this.site.cache.x, this.site.cache.z) > CONFIG.player.reachMetres + 1.2) {
+    if (dist(p.x, p.z, this.site.cache.x, this.site.cache.z) > CONFIG.player.reachMetres + 1.2) {
       return 'Too far from the cargo point.';
     }
     const item = this.itemsById.get(itemId);
-    if (!this.player.take(item)) return `No free slot takes a ${item.bulk} item.`;
+    if (!p.take(item)) return `No free slot takes a ${item.bulk} item.`;
     this.cache.set(itemId, n - 1);
     return null;
   }
 
   /** Put the held item back into cargo. Recoverable mistakes, GDD Pillar 4. */
-  returnToCache() {
-    const id = this.player.heldItemId;
+  returnToCache(playerId = 'p1') {
+    const p = this.playerById(playerId);
+    if (!p) return 'No such operative.';
+    const id = p.heldItemId;
     if (!id) return 'Nothing in hand.';
-    if (dist(this.player.x, this.player.z, this.site.cache.x, this.site.cache.z) > CONFIG.player.reachMetres + 1.2) {
+    if (dist(p.x, p.z, this.site.cache.x, this.site.cache.z) > CONFIG.player.reachMetres + 1.2) {
       return 'Too far from the cargo point.';
     }
-    this.player.drop(this.player.heldSlot);
+    p.drop(p.heldSlot);
     this.cache.set(id, (this.cache.get(id) || 0) + 1);
     return null;
   }
 
   /** Deploy the held item where the operative is standing. */
-  deployHeld() {
-    const id = this.player.heldItemId;
+  deployHeld(playerId = 'p1') {
+    const p = this.playerById(playerId);
+    if (!p || p.incapacitated) return 'Not right now.';
+    const id = p.heldItemId;
     if (!id) return 'Nothing in hand.';
     const item = this.itemsById.get(id);
     if (!item.deployable) return `The ${item.displayName.toLowerCase()} is not something you set down.`;
     /* Refuse a placement inside geometry rather than letting it clip — a fence post inside
      * a wall is a fence post the player thinks they have. */
-    const p = this.player;
     const fx = p.x - Math.sin(p.yaw) * 0.9, fz = p.z - Math.cos(p.yaw) * 0.9;
     for (const r of this.site.blockingRects()) {
       if (fx > r[0] - 0.2 && fx < r[2] + 0.2 && fz > r[1] - 0.2 && fz < r[3] + 0.2) return 'No room to set that down here.';
     }
-    this.player.drop(this.player.heldSlot);
+    p.drop(p.heldSlot);
     const d = this.deployables.place(item, fx, fz, p.yaw);
     this.mission.tally.deployablesPlaced++;
-    this.bus.emit(EVENTS.DEPLOYED, { itemId: id, uid: d.uid }, this.clock.simTimeMs);
+    this.bus.emit(EVENTS.DEPLOYED, { itemId: id, uid: d.uid, by: p.id }, this.clock.simTimeMs);
     return null;
   }
 
   /** The imager is a held instrument, not a mode: it costs a hand and a battery. */
-  toggleImager() {
-    if (!this.player.carrying('thermal-imager')) return 'You did not bring the imager.';
-    if (this.imagerBatteryMs <= 0) return 'The imager battery is flat.';
-    this.imagerOn = !this.imagerOn;
+  toggleImager(playerId = 'p1') {
+    const p = this.playerById(playerId);
+    if (!p || !p.carrying('thermal-imager')) return 'You did not bring the imager.';
+    if (this.batteryFor('thermal-imager') <= 0) return 'The imager battery is flat.';
+    if (this.imagerOnIds.has(p.id)) this.imagerOnIds.delete(p.id);
+    else this.imagerOnIds.add(p.id);
     return null;
   }
 
-  useHeld() {
-    const id = this.player.heldItemId;
-    if (id === 'thermal-imager') return this.toggleImager();
+  /** Back-compatible reader: is operative one looking at the thermal screen? */
+  get imagerOn() { return this.imagerOnIds.has('p1'); }
+  set imagerOn(v) { if (v) this.imagerOnIds.add('p1'); else this.imagerOnIds.delete('p1'); }
+  get imagerHoldMs() { return this.imagerHold.get('p1') || 0; }
+  get imagerBatteryMs() { return this.batteryFor('thermal-imager'); }
+
+  useHeld(playerId = 'p1') {
+    const p = this.playerById(playerId);
+    if (!p || p.incapacitated) return 'Not right now.';
+    const id = p.heldItemId;
+    if (id === 'thermal-imager') return this.toggleImager(playerId);
     if (id === 'trauma-kit') {
-      if (!this.player.treat()) return 'Nothing to stabilise.';
-      this.player.drop(this.player.heldSlot);
+      if (!p.treat()) return 'Nothing to stabilise.';
+      p.drop(p.heldSlot);
       this.mission.tally.treatments++;
       this.notice('Stabilised. It will not get worse; it is not going to get better here either.');
       return null;
@@ -476,10 +768,10 @@ export class Game {
     if (id === 'sample-kit') {
       if (!this.anomaly.icePatches.length && this.anomaly.state !== ANOMALY_STATE.BANKED) return 'No frost worth taking.';
       this.notice('Frost sample sealed. Research will want this.');
-      this.player.drop(this.player.heldSlot);
+      p.drop(p.heldSlot);
       return null;
     }
-    if (id) return this.deployHeld();
+    if (id) return this.deployHeld(playerId);
     return 'Nothing in hand.';
   }
 
@@ -531,12 +823,14 @@ export class Game {
     if (this.result) return this.result;
     this.mission.failReason = failReason;
     this.mission.endedMs = simTimeMs;
-    const cargoRecovered = Array.from(this.cache.values()).reduce((a, b) => a + b, 0)
-      + Array.from(this.player.slots.values()).filter(Boolean).length
-      + (this.player.hands ? 1 : 0);
+    let cargoRecovered = Array.from(this.cache.values()).reduce((a, b) => a + b, 0);
+    for (const p of this.players) {
+      cargoRecovered += Array.from(p.slots.values()).filter(Boolean).length + (p.hands ? 1 : 0);
+    }
     this.mission.tally.deployablesLost = this.deployables.list.length;
     this.result = this.mission.grade({
-      custody: this.custody, extracted: this.extracted, player: this.player,
+      custody: this.custody, extracted: this.extracted,
+      players: this.players, player: this.player,
       ledger: this.ledger, deployables: this.deployables, simTimeMs,
       cargoIssued: this.cargoIssued, cargoRecovered,
     });
@@ -545,9 +839,6 @@ export class Game {
     this.bus.emit(EVENTS.MISSION_ENDED, { result: this.result }, simTimeMs);
     return this.result;
   }
-
-  /** main.js writes the movement axis here once per frame; the sim reads it per step. */
-  setAxis(axis) { this._axis = axis; }
 }
 
 export { PHASE, ANOMALY_STATE, CLAIMS, SLOTS };

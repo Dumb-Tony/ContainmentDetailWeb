@@ -23,8 +23,10 @@ import { Site } from '../src/sim/site.js';
 import { DeployableSet } from '../src/sim/deployables.js';
 import { Anomaly, ANOMALY_STATE } from '../src/sim/anomaly.js';
 import { EvidenceLedger, CLAIMS } from '../src/sim/evidence.js';
-import { Game, RECOMMENDED_MANIFEST } from '../src/game.js';
+import { Game, RECOMMENDED_MANIFEST, EMPTY_COMMAND } from '../src/game.js';
 import { PHASE } from '../src/sim/mission.js';
+import { NetSession, loopbackPair, ROLE } from '../src/net/net.js';
+import { MSG, ACT, PROTOCOL_VERSION, MAX_SQUAD, encodeSnapshot, applySnapshot } from '../src/net/protocol.js';
 import { mixFor } from '../src/audio/audio.js';
 import { segmentHitsRect, moveWithWalls, dist } from '../src/sim/geometry.js';
 
@@ -535,13 +537,18 @@ async function sectionI(content) {
    * every assertion after it failed for a reason that had nothing to do with the fence.
    * Stall detection plus a sidestep is what a player does, so it is what this does.
    */
+  /* ⚠ Sprint rides in the COMMAND, not on the player object. Since the squad refactor,
+   * step() sets sprinting from each operative's command every step, so a bot that pokes
+   * `player.sprinting = true` is overwritten on the next tick and silently walks. */
+  let botSprint = false;
   const walkTo = (x, z, tol = 0.6, budgetMs = 40000) => {
     let spent = 0, stalledMs = 0, strafe = 0, strafeMs = 0;
     let lastX = g.player.x, lastZ = g.player.z;
     while (dist(g.player.x, g.player.z, x, z) > tol && spent < budgetMs) {
       face(x, z);
-      if (strafeMs > 0) { g.setAxis({ x: strafe, y: -0.4 }); strafeMs -= slice; }
-      else g.setAxis({ x: 0, y: -1 });
+      const axis = strafeMs > 0 ? { x: strafe, y: -0.4 } : { x: 0, y: -1 };
+      if (strafeMs > 0) strafeMs -= slice;
+      g.setCommand('p1', { axis, sprint: botSprint, crouch: false });
       g.skipMs(slice);
       spent += slice;
 
@@ -554,7 +561,7 @@ async function sectionI(content) {
         stalledMs = 0;
       }
     }
-    g.setAxis({ x: 0, y: 0 });
+    g.setCommand('p1', { axis: { x: 0, y: 0 }, sprint: false, crouch: false });
     g.skipMs(slice);
     return dist(g.player.x, g.player.z, x, z) <= tol;
   };
@@ -570,7 +577,7 @@ async function sectionI(content) {
     if (failed.length) note(`route legs not reached: ${failed.join(' · ')}`);
     return failed.length === 0;
   };
-  const wait = (ms) => { g.setAxis({ x: 0, y: 0 }); g.skipMs(ms); };
+  const wait = (ms) => { g.setCommand('p1', { axis: { x: 0, y: 0 }, sprint: false, crouch: false }); g.skipMs(ms); };
 
   eq('I1 the mission starts on the operation card', g.mission.phase, PHASE.BRIEFING);
   ok('I2 an over-budget manifest is refused',
@@ -663,13 +670,13 @@ async function sectionI(content) {
    * job now is to be somewhere else while it makes the walk. An operative who backs off
    * has to be able to actually back off — a hunter you cannot outpace is not a rule the
    * squad can plan around, it is a countdown. */
-  g.player.sprinting = true;
+  botSprint = true;
   walkTo(-8.0, -4.0, 0.5, 30000);
   const opened = dist(g.player.x, g.player.z, g.anomaly.x, g.anomaly.z);
   note(`after one leg of withdrawal: ${woke.toFixed(1)}m -> ${opened.toFixed(1)}m`);
   ok('I28 a sprinting operative opens the gap on it', opened > woke, `${woke.toFixed(1)} -> ${opened.toFixed(1)}`);
   route([[-8.0, -5.9], [-8.2, -6.6], [-6.6, -6.8], [-4.0, -8.4], [4.0, -8.4], [10.5, -6.8]], 0.6, 90000);
-  g.player.sprinting = false;
+  botSprint = false;
   let guard = 0;
   const track = [];
   while (dist(g.anomaly.x, g.anomaly.z, kase.x, kase.z) > 2.5 && guard < 240000) {
@@ -776,6 +783,7 @@ async function sectionK() {
     'src/sim/geometry.js', 'src/sim/site.js', 'src/sim/heat.js', 'src/sim/anomaly.js',
     'src/sim/deployables.js', 'src/sim/evidence.js', 'src/sim/player.js',
     'src/sim/mission.js', 'src/sim/content.js',
+    'src/net/protocol.js', 'src/net/net.js',
     'src/render/scene.js', 'src/render/renderer.js', 'src/render/thermalFloor.js',
     'src/ui/hud.js', 'src/ui/panels.js', 'src/audio/audio.js',
   ];
@@ -813,12 +821,28 @@ async function sectionK() {
   ok('K5 nothing but the boot loop reads wall-clock time', timeLeaks.length === 0, timeLeaks.join(', '));
 
   /* No external requests at runtime: the whole point of vendoring r128. */
-  const cdn = files.filter((f) => /https?:\/\//.test(src.get(f)));
-  ok('K6 no source file reaches a network host', cdn.length === 0, cdn.join(', '));
+  /* ⚠ THIS RULE CHANGED WHEN MULTIPLAYER LANDED, and saying so is the point of the test.
+   * The build used to reach no network host at all. It now contacts exactly one — a
+   * signalling broker that introduces two browsers and then carries no game traffic — and
+   * that exception lives in ONE named file. Asserting "no host anywhere" would now pass by
+   * luck (the broker is a bare hostname with no scheme) while being false, which is worse
+   * than having no rule. So: name the file, and fail if any other one grows a host. */
+  const NET_EXCEPTION = 'src/net/net.js';
+  const hostish = files.filter((f) => /https?:\/\/|peerjs\.com|\.com['"]|\.net['"]|\.io['"]/.test(src.get(f)));
+  ok('K6 exactly one file contacts a network host, and it is the signalling broker',
+    hostish.length === 1 && hostish[0] === NET_EXCEPTION, hostish.join(', ') || 'none');
+  ok('K7 and the broker is signalling only — no game state is sent to it',
+    !/PEER_OPTS[\s\S]{0,400}(snapshot|encodeSnapshot|game\.)/.test(src.get(NET_EXCEPTION)));
+
+  /* The wire format must stay pure, or the suite cannot round-trip a mission through it. */
+  const proto = src.get('src/net/protocol.js');
+  ok('K8 the protocol module is pure — no transport, no Peer, no DOM',
+    !/\bPeer\b|WebSocket|RTCPeer|\bdocument\.[A-Za-z_$]/.test(proto));
 
   const html = await (await fetch(new URL('../index.html', import.meta.url).href, { cache: 'no-store' })).text();
-  ok('K7 index.html loads three.js from the vendored copy', /assets\/lib\/r128\/three\.min\.js/.test(html));
-  ok('K8 and from nowhere else', !/https?:\/\/[^"']*three/.test(html));
+  ok('K9 index.html loads three.js from the vendored copy', /assets\/lib\/r128\/three\.min\.js/.test(html));
+  ok('K10 and peerjs from the vendored copy', /assets\/lib\/peerjs-1\.5\.4\/peerjs\.min\.js/.test(html));
+  ok('K11 and neither from a CDN', !/https?:\/\/[^"']*(three|peerjs)/.test(html));
   emit();
 }
 
@@ -829,7 +853,7 @@ async function sectionL() {
   ok('L1 main.js published its debug handle', !!cd);
   if (!cd) { emit(); return; }
   ok('L2 the renderer built a scene from the site', !!cd.renderer && cd.renderer.scene.children.length > 10);
-  ok('L3 the loadout panel is what the player sees first', cd.panels.open === 'loadout');
+  ok('L3 the squad room is what the player sees first', cd.panels.open === 'squad');
   ok('L4 and the clock is paused behind it', cd.game.clock.paused || cd.game.clock.simTimeMs === 0);
   emit();
 
@@ -864,6 +888,219 @@ async function sectionL() {
   emit();
 }
 
+/* ── M. a squad, over a real protocol ────────────────────────────────────── */
+async function sectionM(content) {
+  lines.push('--- M. host authority, over the wire, with no wire ---');
+
+  const mkHost = () => { const g = new Game(content, { seed: 'net' }); const n = new NetSession(g, { snapshotHz: 12 }); n.host(); return { g, n }; };
+  const mkClient = () => { const g = new Game(content, { seed: 'net' }); const n = new NetSession(g); return { g, n }; };
+
+  /* Two Games and a loopback pair: the whole session runs in this tab, through the same
+   * encode/decode and the same validated verbs a WebRTC connection would use. */
+  const host = mkHost();
+  const c1 = mkClient();
+  let [hl, cl] = loopbackPair();
+  host.n.accept(hl);
+  c1.n.join(cl, { name: 'Vasquez' });
+
+  eq('M1 a client that says hello is given a seat', c1.n.localPlayerId, 'p2');
+  eq('M2 and the host now has a squad of two', host.g.players.length, 2);
+  eq('M3 with the name they asked for', host.g.playerById('p2').name, 'Vasquez');
+  ok('M4 the client is handed a resume token', typeof c1.n.token === 'string' && c1.n.token.length > 3);
+  eq('M5 and the whole floor arrives with the welcome', c1.g.site.id, host.g.site.id);
+  ok('M6 the client sees itself as p2, not as the host', c1.g.localId === 'p2' && c1.g.viewPlayer.id === 'p2');
+
+  /* Deploy, then drive the client's operative purely by sending intent. */
+  host.g.commitLoadout(RECOMMENDED_MANIFEST);
+  const before = { ...host.g.playerById('p2') };
+  const startX = host.g.playerById('p2').x;
+  c1.g.playerById('p2').yaw = Math.PI;                       // face south
+  for (let i = 0; i < 30; i++) {
+    c1.n.pump(16, { axis: { x: 0, y: -1 }, sprint: false, crouch: false, yaw: Math.PI, pitch: 0 });
+    host.g.skipMs(50);
+  }
+  const moved = Math.abs(host.g.playerById('p2').x - startX) + Math.abs(host.g.playerById('p2').z - before.z);
+  note(`client intent moved the host's copy of p2 by ${moved.toFixed(2)}m over ${host.n.cmdsReceived} commands`);
+  ok('M7 a command from a client moves that operative ON THE HOST', moved > 0.5);
+  ok('M8 and the host counted every one of them', host.n.cmdsReceived >= 30);
+
+  /* The snapshot is the client's whole world. */
+  host.n.pump(1000, null);
+  const hp = host.g.playerById('p2'), cp = c1.g.playerById('p2');
+  near('M9 the snapshot puts the operative where the host has them', cp.netX, hp.x, 0.02);
+  eq('M10 and tells the client what phase the mission is in', c1.g.mission.phase, host.g.mission.phase);
+  eq('M11 the cargo manifest crossed intact', c1.g.cache.get('floodlight-tripod'), host.g.cache.get('floodlight-tripod'));
+  note(`one snapshot of a two-operative floor: ${hl.bytes} bytes total over ${hl.sent} sends`);
+
+  /* THE AUTHORITY RULE. A client asking for something it cannot have gets nothing. */
+  const cheat = c1.g.playerById('p2');
+  cheat.x = 99; cheat.z = 99;                                 // a modified client teleports
+  host.n.pump(1000, null);
+  ok('M12 a client cannot move itself — the host overwrote the lie on the next snapshot',
+    Math.abs(c1.g.playerById('p2').netX - hp.x) < 0.02);
+
+  const evBefore = host.g.ledger.entries.length;
+  c1.n.act(ACT.INTERACT);                                     // nothing in reach
+  eq('M13 an action with nothing in reach changes nothing', host.g.ledger.entries.length, evBefore);
+  ok('M14 and the host told them why rather than silently dropping it', host.n.actsRefused >= 1);
+
+  /* Discrete actions go through the same verbs the host's own keyboard uses. */
+  const p2 = host.g.playerById('p2');
+  p2.x = host.g.site.cache.x; p2.z = host.g.site.cache.z;
+  c1.n.act(ACT.TAKE, { id: 'thermal-imager' });
+  ok('M15 a client can take from cargo, validated by the host', p2.carrying('thermal-imager'));
+  c1.n.act(ACT.IMAGER);
+  ok('M16 and switch it on', host.g.imagerOnIds.has('p2'));
+  ok('M17 which the host tells everyone about', (host.n.pump(1000, null), c1.g.imagerOnIds.has('p2')));
+
+  /* A third operative, and the squad cap. */
+  const c2 = mkClient();
+  const [hl2, cl2] = loopbackPair();
+  host.n.accept(hl2); c2.n.join(cl2, { name: 'Drake' });
+  eq('M18 a third operative joins', host.g.players.length, 3);
+  eq('M19 and lands in their own seat', c2.n.localPlayerId, 'p3');
+  const extras = [];
+  for (let i = 0; i < 3; i++) {
+    const c = mkClient(); const [a, b] = loopbackPair();
+    host.n.accept(a); c.n.join(b, { name: `Extra${i}` });
+    extras.push(c);
+  }
+  eq(`M20 the squad caps at ${MAX_SQUAD} (GDD 11.1)`, host.g.players.length, MAX_SQUAD);
+  ok('M21 and the one over the cap is told why', /full/i.test(extras[extras.length - 1].n.status), extras[extras.length - 1].n.status);
+
+  /* A version mismatch is refused with a sentence a human can act on. */
+  const oldClient = mkClient();
+  const [ho, co] = loopbackPair();
+  host.n.accept(ho);
+  co.onMessage = (m) => { oldClient.n.status = m.why || m.t; };
+  co.send({ t: MSG.HELLO, v: PROTOCOL_VERSION + 99, name: 'Stale' });
+  ok('M22 a protocol mismatch is refused, in words', /reload/i.test(oldClient.n.status), oldClient.n.status);
+
+  /* ── the drop, the reserved slot, and the reconnect (GDD 11.5) ── */
+  const drakeSeat = host.n.seats.get('p3');
+  const drakeToken = drakeSeat.token;
+  host.g.playerById('p3').take(content.itemsById.get('floodlight-tripod'));
+  hl2.close();
+  eq('M23 a dropped operative keeps their seat on the roster', host.g.players.length, MAX_SQUAD);
+  eq('M24 and is marked off the radio rather than deleted', host.g.playerById('p3').connected, false);
+  ok('M25 their kit is still theirs', host.g.playerById('p3').carrying('floodlight-tripod'));
+  ok('M26 and they stand still rather than running off — safe autopilot',
+    host.g.commandFor('p3') === EMPTY_COMMAND || !host.g.commands.has('p3'));
+
+  const back = mkClient();
+  const [hb, cb] = loopbackPair();
+  host.n.accept(hb);
+  back.n.join(cb, { name: 'Drake', token: drakeToken });
+  eq('M27 a resume token buys back the same seat', back.n.localPlayerId, 'p3');
+  eq('M28 with the squad unchanged in size', host.g.players.length, MAX_SQUAD);
+  eq('M29 and the kit still in their hands (11.5: "restores character state and inventory")',
+    host.g.playerById('p3').carrying('floodlight-tripod'), true);
+  eq('M30 back on the radio', host.g.playerById('p3').connected, true);
+
+  /* ── the join-in-progress gate ── */
+  host.g.commitProcedure({ target: 'The cold mass itself' });
+  const late = mkClient();
+  const [hlate, clate] = loopbackPair();
+  host.n.accept(hlate); late.n.join(clate, { name: 'Late' });
+  ok('M31 nobody joins after the squad commits to a procedure', /committed/i.test(late.n.status), late.n.status);
+  eq('M32 and the roster did not grow', host.g.players.length, MAX_SQUAD);
+
+  /* ── custody cannot leave with somebody who lost their radio ── */
+  host.g.mission.setPhase(PHASE.CONTAINMENT_ACTIVE, host.g.clock.simTimeMs);
+  const carrier = host.g.playerById('p2');
+  const kase = host.g.deployables.place(content.itemsById.get('reinforced-transit-case'), carrier.x, carrier.z, 0);
+  kase.sealed = true;
+  carrier.hands = 'reinforced-transit-case';
+  host.g._carried.set('p2', { sealed: true, custodyHeldMs: 5000, batteryMs: kase.batteryMs });
+  host.g.deployables.remove(kase);
+  hl.close();
+  eq('M33 a dropped carrier puts custody down rather than taking it offline with them',
+    host.g.playerById('p2').hands, null);
+  ok('M34 and the case is on the floor, still sealed',
+    host.g.deployables.byItem('reinforced-transit-case').some((d) => d.sealed));
+
+  /* ── prediction and reconciliation (GDD 20.4) ── */
+  const pred = mkClient();
+  const [hp2, cp2] = loopbackPair();
+  const host2 = mkHost();
+  host2.g.commitLoadout(RECOMMENDED_MANIFEST);
+  host2.n.accept(hp2); pred.n.join(cp2, { name: 'Hicks' });
+  const mine = pred.g.playerById(pred.n.localPlayerId);
+  mine.yaw = 0;
+  pred.g.setCommand(pred.n.localPlayerId, { axis: { x: 0, y: -1 }, sprint: false, crouch: false });
+  const x0 = mine.x, z0 = mine.z;
+  for (let i = 0; i < 20; i++) pred.g.predictLocal(pred.n.localPlayerId, 16);
+  const predicted = dist(x0, z0, mine.x, mine.z);
+  ok('M35 a client predicts its own feet rather than waiting for a snapshot', predicted > 0.3, `${predicted.toFixed(2)}m`);
+  mine.netX = mine.x + 0.2; mine.netZ = mine.z;
+  const err = pred.g.reconcileLocal(pred.n.localPlayerId);
+  ok('M36 a small disagreement is blended, not snapped', err < CONFIG.net.snapErrorM && Math.abs(mine.x - mine.netX) > 0.01);
+  mine.netX = mine.x + 5;
+  pred.g.reconcileLocal(pred.n.localPlayerId);
+  near('M37 a large one is snapped, because smoothing that far is just a slow lie', mine.x, mine.netX, 0.001);
+
+  /* ── the squad changes the SIMULATION, not just the roster ── */
+  const two = new Game(content, { seed: 'two' });
+  two.commitLoadout(RECOMMENDED_MANIFEST);
+  const b = two.addPlayer('Second');
+  two.player.x = -10; two.player.z = 10;
+  b.x = 6; b.z = 6;
+  two.skipMs(120);
+  const em = two.heat.emitters.filter((e) => e.peakC === CONFIG.player.bodyHeatC);
+  eq('M38 every operative is a heat source, so a squad is several lures', em.length, 2);
+
+  two.anomaly.x = 5.4; two.anomaly.z = 6.0;
+  two.anomaly.state = 'drawn';
+  two.skipMs(400);
+  ok('M39 the draught takes the operative it can reach, not the one with seat one',
+    two.anomaly.targetId === b.id, `targeted ${two.anomaly.targetId}`);
+
+  /* ── down, and rescued (GDD 9.5) — the reason a second operative exists ── */
+  const med = new Game(content, { seed: 'med' });
+  med.commitLoadout(RECOMMENDED_MANIFEST);
+  const mate = med.addPlayer('Corpsman');
+  const hurt = med.player;
+  hurt.applyCondition('exposure', 'serious');
+  hurt.applyCondition('exposure', 'serious');
+  ok('M40 a second serious contact puts an operative DOWN, not dead', hurt.downed && hurt.alive);
+  med.skipMs(4000);
+  ok('M41 and a bleed-out clock starts', hurt.downedMs > 3000, `${hurt.downedMs.toFixed(0)}ms`);
+
+  mate.x = hurt.x + 0.8; mate.z = hurt.z;
+  mate.take(content.itemsById.get('trauma-kit'));
+  const rescue = med.contextAction(mate.id);
+  ok('M42 a teammate with a trauma kit is offered the rescue above everything else',
+    rescue && rescue.kind === 'revive', rescue ? `${rescue.kind}: ${rescue.text}` : 'none');
+  med.doInteract(mate.id);
+  ok('M43 which puts them back on their feet, stabilised rather than healed',
+    !hurt.downed && hurt.alive && hurt.conditions.exposure.stabilised && hurt.conditions.exposure.severity > 0);
+  eq('M44 and the debrief counts it', med.mission.tally.rescues, 1);
+
+  const solo = new Game(content, { seed: 'solo' });
+  solo.commitLoadout(RECOMMENDED_MANIFEST);
+  solo.player.applyCondition('exposure', 'serious');
+  solo.player.applyCondition('exposure', 'serious');
+  solo.skipMs(CONFIG.player.bleedOutMs + 1000);
+  ok('M45 alone, nobody comes, and the floor takes them', !solo.player.alive);
+  ok('M46 which ends the operation', !!solo.result && solo.result.overall === 'Failed', solo.result && solo.result.overall);
+
+  /* ── two on the case (GDD 9.2, 11.2) ── */
+  const carry = new Game(content, { seed: 'carry' });
+  carry.commitLoadout(RECOMMENDED_MANIFEST);
+  const helper = carry.addPlayer('Helper');
+  carry.player.hands = 'reinforced-transit-case';
+  helper.x = carry.player.x + 8; helper.z = carry.player.z;
+  const alone = carry.player.speedFactor(false, { assisted: false });
+  helper.x = carry.player.x + 1.0;
+  const together = carry.player.speedFactor(false, { assisted: !!carry._assistFor(carry.player) });
+  note(`carrying the case: ${(alone * 100).toFixed(0)}% alone, ${(together * 100).toFixed(0)}% with a second pair of hands`);
+  ok('M47 a second pair of hands on the case is worth having', together > alone);
+  ok('M48 but solo is never gated on it', alone > 0.5);
+
+  await yieldToLoop();
+  emit();
+}
+
 /* ── run ─────────────────────────────────────────────────────────────────── */
 (async () => {
   try {
@@ -878,6 +1115,7 @@ async function sectionL() {
     sectionH(content);
     await sectionI(content);
     sectionJ();
+    await sectionM(content);
     await sectionK();
     await sectionL();
     emit();

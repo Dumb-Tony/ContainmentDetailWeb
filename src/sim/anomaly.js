@@ -67,6 +67,9 @@ export class Anomaly {
     this.transitions = [];       // append-only, for the debrief
     this.sealedIn = null;        // the transit case Deployable once custody starts
     this._slideSign = 0;         // which way round an obstacle it is currently going
+    this._progressTarget = null; // and how long that has been getting it nowhere
+    this._bestDist = Infinity;
+    this._stuckMs = 0;
   }
 
   get isAwake() { return this.state === STATE.AWARE || this.state === STATE.DRAWN; }
@@ -214,6 +217,26 @@ export class Anomaly {
       go(want, 'direct');
       if (clear(want, probe * 2.5)) this._slideSign = 0;
       return;
+    }
+
+    /* 1b. A hand on the wall can be the WRONG hand. A memoryless follower that commits to
+     *     one direction will happily take the long way round — that is fine, and the
+     *     design says so — but it will also walk into a dead end and stay there. Measured:
+     *     four and a half minutes wedged in the south-west corner of the West run, target
+     *     six metres away through a doorway in the other direction, while the squad stood
+     *     around waiting for a lure that was working perfectly.
+     *
+     *     So: if it has not got any closer to what it wants for a while, it tries the
+     *     other way. This is one bit and one timer, not a map — a fence still holds it,
+     *     because inside a fence NEITHER direction makes progress and flipping just walks
+     *     it around its own cage. */
+    const d = dist(this.x, this.z, target.x, target.z);
+    if (target.id !== this._progressTarget) { this._progressTarget = target.id; this._bestDist = d; this._stuckMs = 0; }
+    if (d < this._bestDist - 0.25) { this._bestDist = d; this._stuckMs = 0; } else this._stuckMs += stepMs;
+    if (this._stuckMs >= CONFIG.anomaly.reroundMs) {
+      this._slideSign = -(this._slideSign || 1);
+      this._stuckMs = 0;
+      this._bestDist = d;
     }
 
     /* 2. Otherwise follow the surface, one-handed. The side is chosen once — whichever

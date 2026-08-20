@@ -51,7 +51,7 @@ export class Mission {
     this.tally = {
       contacts: 0, treatments: 0, deployablesPlaced: 0, deployablesLost: 0,
       custodyLosses: 0, doorsOpened: 0, circuitsRestored: 0, sealAttempts: 0,
-      peakPressure: 0, timeInBreachMs: 0,
+      peakPressure: 0, timeInBreachMs: 0, rescues: 0,
     };
   }
 
@@ -106,7 +106,12 @@ export class Mission {
    * Nine dimensions, each with a word and a one-line reason. The overall assessment is
    * derived from them — Exemplary / Controlled / Costly / Compromised / Failed (§6.4).
    */
-  grade({ custody, extracted, player, ledger, deployables, simTimeMs, cargoIssued, cargoRecovered }) {
+  grade({ custody, extracted, players, player, ledger, deployables, simTimeMs, cargoIssued, cargoRecovered }) {
+    const squad = players && players.length ? players : [player];
+    const lostPeople = squad.filter((p) => !p.alive);
+    const downed = squad.filter((p) => p.alive && p.downed);
+    const injured = squad.filter((p) => p.alive && p.injured);
+    const leftBehind = extracted ? squad.filter((p) => p.alive && !p.extracted) : [];
     const claims = ledger.scoreClaims();
     const dims = [];
     const add = (name, word, why) => dims.push({ name, word, why });
@@ -119,12 +124,25 @@ export class Mission {
           ? 'The case was sealed but custody was never verified.'
           : 'The anomaly was still loose when the operation ended.');
 
+    /* Reported for the SQUAD, and it names who — a debrief that says "Injured" when one
+     * of four is on a stretcher and three walked out is not a debrief. */
     add('Personnel survival',
-      !player.alive ? 'Lost' : player.injured ? 'Injured' : 'Intact',
-      !player.alive ? 'One operative did not come back.'
-        : player.injured
-          ? `Exposure ${player.conditions.exposure.severity}, mobility ${player.conditions.mobility.severity}${player.conditions.exposure.stabilised || player.conditions.mobility.stabilised ? ', stabilised in the field' : ', untreated'}.`
-          : 'No operative took a contact.');
+      lostPeople.length ? 'Lost' : downed.length ? 'Critical' : injured.length ? 'Injured' : 'Intact',
+      lostPeople.length
+        ? `${lostPeople.map((p) => p.name).join(', ')} did not come back. ${squad.length - lostPeople.length} of ${squad.length} extracted.`
+        : downed.length
+          ? `${downed.map((p) => p.name).join(', ')} came out on a stretcher.`
+          : injured.length
+            ? `${injured.map((p) => `${p.name} (exposure ${p.conditions.exposure.severity}, mobility ${p.conditions.mobility.severity}${p.conditions.exposure.stabilised || p.conditions.mobility.stabilised ? ', stabilised' : ', untreated'})`).join(' · ')}`
+            : `All ${squad.length} clear. Nobody took a contact.`);
+
+    if (this.tally.rescues || leftBehind.length) {
+      add('Squad conduct',
+        leftBehind.length ? 'Incomplete' : 'Sound',
+        leftBehind.length
+          ? `${leftBehind.map((p) => p.name).join(', ')} was still on the floor when the case went up the stairs.`
+          : `${this.tally.rescues} casualt${this.tally.rescues === 1 ? 'y' : 'ies'} recovered under pressure.`);
+    }
 
     add('Civilian outcome', 'Not applicable', 'The floor was already cleared before deployment.');
 
@@ -153,11 +171,14 @@ export class Mission {
 
     /* The overall word. Custody is necessary but not sufficient for the top grade — GDD
      * §6.4: "a Costly success remains progress but generates consequences". */
+    const everyoneOut = lostPeople.length === 0 && leftBehind.length === 0;
     let overall;
-    if (custody === 'verified' && extracted && player.alive && !player.injured && lost === 0 && claims.wrong === 0) overall = 'Exemplary';
-    else if (custody === 'verified' && extracted && player.alive) overall = (player.injured || lost > 0) ? 'Costly' : 'Controlled';
-    else if (custody === 'verified' && !extracted) overall = 'Compromised';
-    else if (!player.alive) overall = 'Failed';
+    if (custody === 'verified' && extracted && everyoneOut && injured.length === 0 && downed.length === 0
+      && lost === 0 && claims.wrong === 0) overall = 'Exemplary';
+    else if (custody === 'verified' && extracted && lostPeople.length === 0) {
+      overall = (injured.length || downed.length || lost > 0 || leftBehind.length) ? 'Costly' : 'Controlled';
+    } else if (custody === 'verified' && !extracted) overall = 'Compromised';
+    else if (lostPeople.length) overall = 'Failed';
     else overall = 'Compromised';
 
     return { overall, dims, claims };

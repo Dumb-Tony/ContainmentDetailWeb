@@ -12,12 +12,16 @@
 
 import { loadContent, ContentError } from './sim/content.js';
 import { Game, EVENTS, PHASE } from './game.js';
+import { NetSession, ROLE, ACT } from './net/net.js';
 import { Renderer } from './render/renderer.js';
 import { Hud } from './ui/hud.js';
 import { Panels } from './ui/panels.js';
 import { Audio, mixFor } from './audio/audio.js';
 import { Input } from './core/input.js';
 import { dist } from './sim/geometry.js';
+import { CONFIG } from './config.js';
+
+const CONFIG_NET_HZ = CONFIG.net.snapshotHz;
 
 const BINDINGS = Object.freeze({
   moveUp: ['KeyW', 'ArrowUp'],
@@ -71,6 +75,7 @@ async function boot() {
   const audio = new Audio();
 
   const input = new Input(window, BINDINGS).attach();
+  const net = new NetSession(game, { snapshotHz: CONFIG_NET_HZ });
   let pointerLocked = false;
 
   /* Pointer lock can only be requested from a user gesture, and the request REJECTS rather
@@ -82,7 +87,7 @@ async function boot() {
   };
 
   const panels = new Panels(document.body, game, {
-    onDeploy: () => { document.body.classList.remove('free'); grabPointer(); },
+    onDeploy: () => { document.body.classList.remove("free"); grabPointer(); },
     onResume: () => { if (game.mission.phase !== PHASE.DEBRIEF) grabPointer(); },
   });
 
@@ -106,13 +111,13 @@ async function boot() {
     document.body.classList.toggle('free', !pointerLocked);
   });
   document.addEventListener('mousemove', (e) => {
-    if (pointerLocked && !panels.isOpen) game.player.look(e.movementX || 0, e.movementY || 0);
+    if (pointerLocked && !panels.isOpen && game.viewPlayer) game.viewPlayer.look(e.movementX || 0, e.movementY || 0);
   });
   input.onBlur = () => { game.clock.setPaused(true); };
 
   /* ── the loop ────────────────────────────────────────────────────────── */
 
-  let last = performance.now();
+  let lastFrameAt = 0;
   function frame(now) {
     requestAnimationFrame(frame);
 
@@ -121,23 +126,61 @@ async function boot() {
     const paused = panels.isOpen || !pointerLocked;
     game.clock.setPaused(paused);
 
+    const me = game.playerById(net.localPlayerId);
+    let cmd = null;
     if (!paused) {
-      game.player.sprinting = input.isDown('sprint');
-      game.player.crouching = input.isDown('crouch');
-      game.setAxis(input.moveAxis());
+      /* One command object per frame, exactly the shape a remote operative's arrives in.
+       * From here down the simulation cannot tell a keyboard from a network packet. */
+      cmd = {
+        axis: input.moveAxis(),
+        sprint: input.isDown('sprint'),
+        crouch: input.isDown('crouch'),
+        yaw: me ? me.yaw : 0,
+        pitch: me ? me.pitch : 0,
+      };
+      game.setCommand(net.localPlayerId, cmd);
 
+      /* A client ASKS; the host DOES. Both go through the same verbs, so there is exactly
+       * one implementation of every action in the game (GDD §20.9). */
+      const client = net.role === ROLE.CLIENT;
       if (input.wasPressed('interact')) {
-        const r = game.doInteract();
-        if (r === 'OPEN_CACHE') { document.exitPointerLock(); panels.showCache(); }
+        if (client) net.act(ACT.INTERACT);
+        else {
+          const r = game.doInteract(net.localPlayerId);
+          if (r === 'OPEN_CACHE') { document.exitPointerLock(); panels.showCache(); }
+        }
       }
-      if (input.wasPressed('use')) { const e = game.useHeld(); if (e) game.notice(e); }
-      if (input.wasPressed('imager')) { const e = game.toggleImager(); if (e) game.notice(e); }
-      if (input.wasPressed('abort') && game.mission.procedure) game.abortProcedure();
-      for (let i = 1; i <= 5; i++) if (input.wasPressed(`slot${i}`)) game.player.selectSlot(i - 1);
+      if (input.wasPressed('use')) {
+        if (client) net.act(ACT.USE);
+        else { const e = game.useHeld(net.localPlayerId); if (e) game.notice(e); }
+      }
+      if (input.wasPressed('imager')) {
+        if (client) net.act(ACT.IMAGER);
+        else { const e = game.toggleImager(net.localPlayerId); if (e) game.notice(e); }
+      }
+      if (input.wasPressed('abort') && game.mission.procedure) {
+        if (client) net.act(ACT.ABORT); else game.abortProcedure();
+      }
+      for (let i = 1; i <= 5; i++) {
+        if (!input.wasPressed(`slot${i}`)) continue;
+        if (client) net.act(ACT.SLOT, { n: i - 1 });
+        else if (me) me.selectSlot(i - 1);
+      }
       if (input.wasPressed('tablet')) { document.exitPointerLock(); panels.showTablet(); }
     }
 
-    game.frame(now);
+    /* THE AUTHORITY RULE, in three lines. A host (or a solo operative, which is a host
+     * with nobody connected) steps the mission. A client steps nothing at all — it
+     * predicts its own feet and draws what the host last told it. */
+    if (net.role === ROLE.CLIENT) {
+      const dt = Math.min(now - (lastFrameAt || now), CONFIG.sim.maxFrameMs);
+      if (!paused) game.predictLocal(net.localPlayerId, dt);
+      game.reconcileLocal(net.localPlayerId);
+    } else {
+      game.frame(now);
+    }
+    net.pump(Math.min(now - (lastFrameAt || now), 250), cmd);
+    lastFrameAt = now;
     input.endStep();
 
     renderer.render();
@@ -155,18 +198,21 @@ async function boot() {
         activeEmitters: game.deployables.list.filter((d) => d.isEmitter && d.active).length,
       }));
     }
-    last = now;
   }
 
   window.addEventListener('resize', () => renderer.resize());
   bootNode.remove();
   document.body.classList.add('free');
-  panels.showLoadout();
+  panels.showSquad(net);
   requestAnimationFrame(frame);
 
   /* The debug handle. The suite and any console probe drive the game through THIS, so
    * everything they exercise is the shipped object graph and not a parallel one. */
-  window.__CD = { game, renderer, hud, panels, audio, input, content, mixFor,
+  net.onStatus = () => { if (panels.open === 'squad') panels._renderSquad(); };
+  net.onRoster = () => { if (panels.open === 'squad') panels._renderSquad(); };
+  game.localId = net.localPlayerId;
+
+  window.__CD = { game, renderer, hud, panels, audio, input, content, mixFor, net, ROLE, ACT,
     get paused() { return game.clock.paused; } };
   window.dispatchEvent(new CustomEvent('cd-ready', { detail: window.__CD }));
 }

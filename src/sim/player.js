@@ -16,14 +16,30 @@ import { CONFIG, SLOTS } from '../config.js';
 import { moveWithWalls, pushOutOfRects, dist } from './geometry.js';
 
 export class Player {
-  constructor(site) {
+  /**
+   * @param {Site} site
+   * @param {string} id     stable across a reconnect — it is what a resume token buys back
+   * @param {string} name
+   */
+  constructor(site, id = 'p1', name = 'Operative') {
     this.site = site;
+    this.id = id;
+    this.name = name;
+    /** True when a network client drives this one. The simulation never asks. */
+    this.remote = false;
+    /** False while the operator is disconnected but the slot is still theirs (GDD §11.5). */
+    this.connected = true;
     this.reset();
   }
 
   reset() {
-    this.x = this.site.spawn.x;
-    this.z = this.site.spawn.z;
+    /* Fan out around the spawn so two operatives do not start inside each other. The
+     * offset is derived from the id, not drawn, so a reconnecting player lands where the
+     * squad expects them rather than somewhere new. */
+    const n = Number(String(this.id).replace(/\D/g, '')) || 1;
+    const a = (n - 1) * 1.1;
+    this.x = this.site.spawn.x + Math.sin(a) * (n > 1 ? 1.1 : 0);
+    this.z = this.site.spawn.z + Math.cos(a) * (n > 1 ? 1.1 : 0);
     this.yaw = this.site.spawn.facing;
     this.pitch = 0;
     this.vx = 0; this.vz = 0;
@@ -42,8 +58,15 @@ export class Player {
       mobility: { severity: 0, stabilised: false },
     };
     this.stress = 0;
+    /* GDD §9.5. Down is not dead: a downed operative can still talk, and a teammate can
+     * stabilise or drag them. The bleed-out clock is what makes that a decision under
+     * pressure rather than an errand. Solo there is nobody to come, which is exactly the
+     * asymmetry that makes a second operative worth having. */
+    this.downed = false;
     this.downedMs = 0;
+    this.draggedBy = null;
     this.alive = true;
+    this.extracted = false;
     this.distanceWalked = 0;
   }
 
@@ -106,8 +129,21 @@ export class Player {
     /* Compounding: a second serious contact is worse than the first (content says so). */
     c.severity = Math.min(3, Math.max(c.severity, sev) + (c.severity >= sev ? 1 : 0));
     c.stabilised = false;
-    if (c.severity >= 3) this.alive = false;
+    if (c.severity >= 3 && !this.downed) { this.downed = true; this.downedMs = 0; }
     return true;
+  }
+
+  /**
+   * Bleed out, or don't. A downed operative who is being dragged or has been stabilised
+   * holds; one lying alone in the dark does not.
+   * @returns {'lost'|null}
+   */
+  stepDowned(stepMs, bleedOutMs) {
+    if (!this.downed || !this.alive) return null;
+    const held = this.draggedBy || this.conditions.exposure.stabilised;
+    this.downedMs += held ? stepMs * 0.25 : stepMs;
+    if (this.downedMs >= bleedOutMs) { this.alive = false; return 'lost'; }
+    return null;
   }
 
   treat() {
@@ -117,6 +153,21 @@ export class Player {
     }
     return did;
   }
+
+  /** Bring a downed operative back to their feet. Stabilised, not healed (GDD §9.3). */
+  revive() {
+    if (!this.downed || !this.alive) return false;
+    this.downed = false;
+    this.downedMs = 0;
+    this.draggedBy = null;
+    this.conditions.exposure.severity = Math.min(2, this.conditions.exposure.severity);
+    this.conditions.mobility.severity = Math.min(2, this.conditions.mobility.severity);
+    this.conditions.exposure.stabilised = true;
+    this.conditions.mobility.stabilised = true;
+    return true;
+  }
+
+  get incapacitated() { return !this.alive || this.downed; }
 
   get injured() { return this.conditions.exposure.severity > 0 || this.conditions.mobility.severity > 0; }
 
@@ -129,10 +180,19 @@ export class Player {
 
   /* ── movement ───────────────────────────────────────────────────────────── */
 
-  speedFactor(onIce) {
+  /**
+   * @param {boolean} onIce
+   * @param {object}  [opts]  `assisted` — a second operative has a hand on the load;
+   *                          `dragging` — this one is hauling a downed teammate.
+   */
+  speedFactor(onIce, { assisted = false, dragging = false } = {}) {
     let f = 1;
     if (this.conditions.mobility.severity > 0) f = Math.min(f, CONFIG.player.injuredSpeedFactor);
-    if (this.hands) f = Math.min(f, CONFIG.player.carrySpeedFactor);
+    /* A two-person carry is most of the reason to bring a second operative to the
+     * extraction (GDD §9.2, §11.2). It does not GATE the carry — solo has to remain
+     * possible — it just costs a third of your pace to do it alone. */
+    if (this.hands) f = Math.min(f, assisted ? CONFIG.player.assistedCarryFactor : CONFIG.player.carrySpeedFactor);
+    if (dragging) f = Math.min(f, CONFIG.player.dragSpeedFactor);
     if (onIce) f = Math.min(f, 0.8);
     return f;
   }
@@ -150,11 +210,12 @@ export class Player {
    * @param {{x:number,y:number}} axis  -1..1, from Input.moveAxis(); y is forward-negative
    * @param {number[][]} blockers       every rect that stops a person, this step
    */
-  step(stepMs, axis, blockers, { onIce = false } = {}) {
+  step(stepMs, axis, blockers, { onIce = false, assisted = false, dragging = false } = {}) {
+    if (this.incapacitated) { this.vx = 0; this.vz = 0; return; }
     const dt = stepMs / 1000;
     const base = this.crouching ? CONFIG.player.crouchSpeed
       : this.sprinting ? CONFIG.player.sprintSpeed : CONFIG.player.walkSpeed;
-    const target = base * this.speedFactor(onIce);
+    const target = base * this.speedFactor(onIce, { assisted, dragging });
 
     /* Camera-relative: forward is -y on the input axis, which is the same convention every
      * other project on this machine uses. Ice reduces the accel, not the top speed — you

@@ -63,6 +63,12 @@ export class Renderer {
      * room's colour would have no edge, and the bezel is what tells you the view is narrow. */
     this._thermalBg = new THREE.Color(0x04060b);
 
+    /* Teammates. A body is a silhouette plus a headlamp, because in a dark cold store the
+     * thing you actually track is somebody else's light — and on the imager they are the
+     * second-warmest thing on the floor, which is exactly what makes standing next to the
+     * bait a bad idea. */
+    this._mateMeshes = new Map();  // playerId -> {group, lamp}
+
     this._depMeshes = new Map();   // uid -> {group, light}
     this._iceMeshes = [];
     this._iceGeo = new THREE.CircleGeometry(1, 18);
@@ -198,6 +204,61 @@ export class Renderer {
     }
   }
 
+  _syncMates() {
+    const THREE = this.THREE;
+    const me = this.game.viewPlayer;
+    const seen = new Set();
+    for (const p of this.game.players) {
+      if (p === me) continue;
+      seen.add(p.id);
+      let rec = this._mateMeshes.get(p.id);
+      if (!rec) {
+        const g = new THREE.Group();
+        const body = new THREE.Mesh(new THREE.CapsuleGeometry
+          ? new THREE.CapsuleGeometry(0.28, 1.0, 4, 8)
+          : new THREE.CylinderGeometry(0.28, 0.28, 1.5, 8),
+        new THREE.MeshLambertMaterial({ color: 0x3f4d5a }));
+        body.position.y = 0.85;
+        g.add(body);
+        const head = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.26, 0.26), new THREE.MeshLambertMaterial({ color: 0x6d7a86 }));
+        head.position.y = 1.6;
+        g.add(head);
+        const vest = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.16, 0.34), new THREE.MeshLambertMaterial({ color: 0xd8a13a }));
+        vest.position.y = 1.15;
+        g.add(vest);
+        /* Warm on the imager — an operative is 37C and the second-brightest thing here. */
+        g.traverse((o) => {
+          o.layers.enable(1);
+          if (!o.isMesh) return;
+          o.userData.thermalMat = new THREE.MeshBasicMaterial({ color: 0xc2703a });
+          this.thermalSwap.push(o);
+        });
+        this.scene.add(g);
+        const lamp = new THREE.PointLight(0xffeedd, 0.9, 7, 1.6);
+        this.scene.add(lamp);
+        rec = { group: g, lamp };
+        this._mateMeshes.set(p.id, rec);
+      }
+      const y = p.downed ? -0.55 : 0;
+      rec.group.position.set(p.x, y, p.z);
+      rec.group.rotation.y = p.yaw;
+      rec.group.rotation.x = p.downed ? Math.PI / 2.2 : 0;
+      rec.lamp.position.set(p.x - Math.sin(p.yaw) * 0.4, p.downed ? 0.4 : 1.6, p.z - Math.cos(p.yaw) * 0.4);
+      rec.lamp.intensity = p.alive && p.connected ? 0.9 : 0.15;
+      rec.group.visible = p.alive;
+    }
+    for (const [id, rec] of this._mateMeshes) {
+      if (seen.has(id)) continue;
+      rec.group.traverse((o) => {
+        const i = this.thermalSwap.indexOf(o);
+        if (i >= 0) this.thermalSwap.splice(i, 1);
+      });
+      this.scene.remove(rec.group);
+      this.scene.remove(rec.lamp);
+      this._mateMeshes.delete(id);
+    }
+  }
+
   _syncIce() {
     const patches = this.game.anomaly.icePatches;
     while (this._iceMeshes.length < patches.length) {
@@ -240,7 +301,7 @@ export class Renderer {
   }
 
   render() {
-    const g = this.game, THREE = this.THREE, p = g.player;
+    const g = this.game, THREE = this.THREE, p = g.viewPlayer;
     const t = g.clock.simTimeMs;
 
     /* Camera. Stress adds a small breath sway — GDD §9.4 allows breathing and steadiness
@@ -261,6 +322,7 @@ export class Renderer {
     this._syncDeployables();
     this._syncLights();
     this._syncIce();
+    this._syncMates();
 
     const a = g.anomaly;
     const show = a.isLoose;

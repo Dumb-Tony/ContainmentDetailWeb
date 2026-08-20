@@ -85,6 +85,8 @@ export class Panels {
     this.tab = 'briefing';
     this.manifest = new Map();
     this.plan = { target: '', state: '', trigger: '', transfer: '', maintained: new Set(), abort: ABORTS[0] };
+    this.callsign = 'Operative';
+    this.net = null;
   }
 
   get isOpen() { return this.open !== null; }
@@ -99,6 +101,83 @@ export class Panels {
         <div class="body">${body}</div>
         <footer>${footer}</footer>
       </div>`;
+  }
+
+  /* ── the squad room ──────────────────────────────────────────────────────
+   * Before the operation card, because who is coming changes what you bring. GDD §11.4
+   * wants friends-only and invite-code lobbies; an invite code over WebRTC is exactly
+   * that and needs no account, no server and no lobby list.
+   */
+
+  showSquad(net) {
+    this.open = 'squad';
+    this.net = net;
+    this._renderSquad();
+  }
+
+  _renderSquad() {
+    const net = this.net;
+    const g = this.game;
+    const roster = g.players.map((p) => `<li class="${p.connected ? '' : 'off'}">
+      <b>${escapeHtml(p.name)}</b>
+      <span>${p.id === net.localPlayerId ? 'you' : p.connected ? 'ready' : 'no radio'}</span></li>`).join('');
+
+    const hosting = net.role === 'host';
+    const joined = net.role === 'client';
+
+    this._shell('Squad', 'Foundation regional response · 1–5 operatives', `
+      <div class="cols">
+        <section>
+          <h2>Deploy alone</h2>
+          <p>The whole operation is possible solo. It is simply slower, and there is nobody
+             to come and get you off the floor.</p>
+          <button class="go wide" data-solo ${net.online ? 'disabled' : ''}>Deploy solo</button>
+
+          <h2>Host an operation</h2>
+          <p>Your machine runs the mission. Everyone else connects to you with the code.</p>
+          <button class="wide" data-host ${net.online ? 'disabled' : ''}>Open a room</button>
+          ${net.code ? `<div class="code">${net.code}</div>` : ''}
+
+          <h2>Join one</h2>
+          <div class="joiner">
+            <input data-code placeholder="CODE" maxlength="5" ${net.online ? 'disabled' : ''}>
+            <button data-join ${net.online ? 'disabled' : ''}>Join</button>
+          </div>
+          <p class="small">Callsign <input data-name value="${escapeHtml(this.callsign)}" maxlength="14" class="inline"></p>
+        </section>
+        <section>
+          <h2>On the roster</h2>
+          <ul class="roster">${roster}</ul>
+          <p class="small status">${escapeHtml(net.status)}</p>
+          <h2>What a second operative changes</h2>
+          <ul>
+            <li>A fence goes up in a fraction of the time — a tripod is a long item, so each
+                of you can only carry one at a time.</li>
+            <li>Somebody can watch the imager while somebody else has both hands on the case.</li>
+            <li>A contact that puts you on the floor is survivable. Alone it is not.</li>
+            <li>Two on the case move it at nearly full pace; one drags it at three quarters.</li>
+          </ul>
+          <p class="small">Joining is open until the squad commits to a procedure. After
+             that the operation is running and the door is shut.</p>
+        </section>
+      </div>`,
+      hosting
+        ? `<button class="go" data-deploy>Everyone is here — brief us</button>`
+        : joined
+          ? `<span class="waiting">Waiting for the host to brief the squad…</span>`
+          : '');
+
+    const q = (s) => this.node.querySelector(s);
+    const nameField = q('[data-name]');
+    if (nameField) nameField.onchange = () => { this.callsign = nameField.value.trim().slice(0, 14) || 'Operative'; };
+    const solo = q('[data-solo]');
+    if (solo) solo.onclick = () => { this.open = null; this.node.style.display = 'none'; this.showLoadout(); };
+    const hostBtn = q('[data-host]');
+    if (hostBtn) hostBtn.onclick = () => { net.hostPeer(); this._renderSquad(); };
+    const joinBtn = q('[data-join]');
+    if (joinBtn) joinBtn.onclick = () => { net.joinPeer(q('[data-code]').value, this.callsign); this._renderSquad(); };
+    const dep = q('[data-deploy]');
+    if (dep) dep.onclick = () => { this.open = null; this.node.style.display = 'none'; this.showLoadout(); };
   }
 
   /* ── phase A + B: the operation card and the wager ───────────────────────── */

@@ -35,6 +35,15 @@ export const CONFIG = Object.freeze({
      * causes, so no two systems can each claim to own the player's speed. */
     injuredSpeedFactor: 0.62,
     carrySpeedFactor: 0.75,
+    /* A second pair of hands on the case. It does not gate the carry — solo must stay
+     * possible — it just costs you a third of your pace to do it alone (GDD §11.2). */
+    assistedCarryFactor: 0.95,
+    assistReachM: 2.2,
+    dragSpeedFactor: 0.5,
+    /* GDD §9.5: down is not dead. Ninety seconds is long enough to be a decision and
+     * short enough to be a crisis. Being dragged or stabilised slows the clock to a
+     * quarter rather than stopping it — help has to keep arriving. */
+    bleedOutMs: 90000,
     reachMetres: 2.2,
     lookSensitivity: 0.0022,
     pitchLimit: 1.45,
@@ -84,6 +93,10 @@ export const CONFIG = Object.freeze({
     /* Retreat pace once banked and being sealed — it does not move, but the fence is
      * re-tested every step and this is how fast it resumes if the fence drops. */
     reacquireGraceMs: 3000,
+    /* How long a wall-follower may make no headway before it tries the other way round.
+     * Long enough that it is not indecisive, short enough that a squad does not stand
+     * about waiting for a lure that is already working. */
+    reroundMs: 6000,
   },
 
   pressure: {
@@ -134,6 +147,20 @@ export const CONFIG = Object.freeze({
 
   audio: {
     masterGain: 0.5,
+  },
+
+  net: {
+    /* GDD §20.4 wants "local movement prediction with correction smoothing". A client
+     * integrates its OWN operative every step and blends toward the host's answer as
+     * snapshots land; past `snapErrorM` it gives up and teleports, because at that point
+     * smoothing would just be a long slow lie. */
+    snapshotHz: 12,
+    snapErrorM: 1.2,
+    blend: 0.25,
+    /* §8.2 "fair under latency": no anomaly rule may be decided on an exact frame. The
+     * content file carries a `latencyToleranceMs` per trigger for the same reason; this
+     * is the budget the transport is allowed to spend against it. */
+    assumedRttMs: 120,
   },
 });
 

@@ -15,6 +15,7 @@
 import { CONFIG, SLOTS } from '../config.js';
 import { GameClock } from '../core/clock.js';
 import { ANOMALY_STATE } from '../sim/anomaly.js';
+import { dist } from '../sim/geometry.js';
 
 const el = (tag, cls, parent) => {
   const n = document.createElement(tag);
@@ -39,6 +40,7 @@ export class Hud {
     this.notices = el('div', 'cd-notices', root);
     this.bezel = el('div', 'cd-bezel', root);
     this.bezelLabel = el('div', 'cd-bezel-label', this.bezel);
+    this.squad = el('div', 'cd-squad', root);
   }
 
   _set(key, node, html) {
@@ -48,7 +50,7 @@ export class Hud {
   }
 
   update() {
-    const g = this.game, p = g.player, m = g.mission, a = g.anomaly;
+    const g = this.game, p = g.viewPlayer, m = g.mission, a = g.anomaly;
     const t = g.clock.simTimeMs;
 
     /* ── top left: where, when, how bad ── */
@@ -65,8 +67,12 @@ export class Hud {
     const obj = this._objective();
     this._set('tr', this.topRight, `<div class="obj-title">Primary</div><div class="obj">${obj}</div>`);
 
+    /* Everything below is about the LOCAL operative — the one whose eyes these are. On a
+     * client that is not operative one, so nothing here may read `g.player`. */
+    const on = g.imagerOnIds.has(p.id);
+
     /* ── the context verb ── */
-    const act = g.contextAction();
+    const act = g.contextAction(p.id);
     const key = act && act.kind === 'blocked' ? '' : '<kbd>F</kbd>';
     this._set('prompt', this.prompt, act
       ? `<span class="${act.kind === 'seal' ? 'seal' : act.kind === 'blocked' ? 'blocked' : ''}">${key} ${act.text}</span>`
@@ -79,8 +85,8 @@ export class Hud {
       const held = p.heldSlot === s.id;
       let sub = '';
       if (id === 'thermal-imager') {
-        const mins = g.imagerBatteryMs / 60000;
-        sub = `<em class="${mins < 2 ? 'warn' : ''}">${mins.toFixed(1)}m${g.imagerOn ? ' · ON' : ''}</em>`;
+        const mins = g.batteryFor('thermal-imager') / 60000;
+        sub = `<em class="${mins < 2 ? 'warn' : ''}">${mins.toFixed(1)}m${on ? ' · ON' : ''}</em>`;
       }
       return `<div class="slot ${held ? 'held' : ''} ${item ? '' : 'empty'}">
         <b>${i + 1}</b><span>${item ? item.displayName : '—'}</span>${sub}</div>`;
@@ -97,12 +103,34 @@ export class Hud {
     if (st > 0.35) cond.push(`<div class="cond stress">${st > 0.75 ? 'Breathing hard' : 'Unsteady'}</div>`);
     this._set('cond', this.conditions, cond.join(''));
 
+    /* ── the squad (GDD §18.2 "squad status indicators", §11.2 split information) ──
+     * Solo shows nothing: a roster of one is clutter. The moment there are two, where
+     * everybody is and what state they are in becomes the most important thing on screen,
+     * because the whole design is that you cannot do this alone and cannot see it all. */
+    if (g.players.length > 1) {
+      const rows = g.players.map((q) => {
+        const d = dist(p.x, p.z, q.x, q.z);
+        const state = !q.alive ? 'lost' : q.downed ? 'down' : !q.connected ? 'off' : q.injured ? 'hurt' : 'ok';
+        const word = !q.alive ? 'lost' : q.downed ? `DOWN ${Math.max(0, Math.ceil((CONFIG.player.bleedOutMs - q.downedMs) / 1000))}s`
+          : !q.connected ? 'no radio' : q.injured ? 'injured' : 'ok';
+        return `<div class="mate ${state} ${q === p ? 'self' : ''}">
+          <b>${escapeHtml(q.name)}</b>
+          <span class="w">${word}</span>
+          <span class="d">${q === p ? '' : `${d.toFixed(0)}m · ${escapeHtml(g.site.roomNameAt(q.x, q.z))}`}</span>
+        </div>`;
+      }).join('');
+      this._set('squad', this.squad, rows);
+      this.squad.style.display = 'flex';
+    } else {
+      this.squad.style.display = 'none';
+    }
+
     /* ── notices ── */
     this._set('notice', this.notices,
       g.recentNotices().map((n) => `<div class="notice">${escapeHtml(n.text)}</div>`).join(''));
 
     /* ── the imager bezel ── */
-    if (g.imagerOn) {
+    if (on) {
       const r = this.renderer.imagerRectCss();
       this.bezel.style.display = 'block';
       this.bezel.style.left = `${r.left}px`;
@@ -123,7 +151,13 @@ export class Hud {
 
   _objective() {
     const g = this.game;
-    if (g.custody === 'verified') return g.player.hands ? 'Carry the case to the stair head.' : 'Lift the case and get it to the stair head.';
+    const me = g.viewPlayer;
+    if (g.custody === 'verified') {
+      const carrier = g.players.find((q) => q.hands === 'reinforced-transit-case');
+      if (carrier === me) return 'Carry the case to the stair head.';
+      if (carrier) return `${carrier.name} has the case. Cover them to the stairs.`;
+      return 'Lift the case and get it to the stair head.';
+    }
     if (g.custody === 'sealed') {
       const held = g.anomaly.sealedIn ? g.anomaly.sealedIn.custodyHeldMs / 1000 : 0;
       return `Hold custody — ${held.toFixed(0)}s of ${CONFIG.anomaly.custodyVerifySeconds}s. Keep the case powered.`;
