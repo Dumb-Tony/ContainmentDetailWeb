@@ -42,7 +42,7 @@ power puzzle matters — the office breaker is out on the bay wall, the storage 
 The mission ends when the case is sealed, has held for thirty seconds, and is carried up
 the stairs. It can be lost at any point in that sentence.
 
-## Two incidents, one floor
+## Three incidents, two buildings
 
 The content unit is an **Incident Package**, not a map — an anomaly file holds rules and
 nothing about where; a map holds geometry and nothing about what happened;
@@ -62,6 +62,27 @@ is the thing it feeds on.
 
 A squad that arrives with the first playbook finds every instinct wrong. That is the point
 (GDD §15.2: the building is the constant, the incident is the variable).
+
+**Ashlar House, ninth floor.** The mirror of that: the same draught, on a condemned
+crosswall block with a drained district-heating gallery running its full width. Nineteen
+of its fifty-seven walls carry the building and the other thirty-eight are plasterboard,
+so the squad and the thing walk two different buildings over one footprint — you go the
+long way round the flats while it crosses them in a straight line.
+
+One floodlight's 40 °C contour measures **3.374 m** across. The cold store's aisles are
+4.2 m, so a lane costs two posts and heat is the scarce thing. The gallery is **2.400 m**,
+so one post closes the tube *across* and only its two ends are left: heat is cheap here
+and the journey is what costs. A squad that learned "bring four tripods" has carried four
+tripods up nine floors for nothing.
+
+And the last lane cannot be closed with heat at all. The case reads 39.0 °C alone and
+53.7 °C once the closing post is up, which takes the bait past the threshold and stops it
+attracting anything — so the post is the *lid*, not the fence, and it goes down last. The
+fire-stopping door is worth exactly one tripod. That exchange rate is the whole power
+puzzle.
+
+Neither the building nor the thing in it is the constant. You learn both, separately, and
+neither answer transfers whole.
 
 **The engine does not know what either of them is called.** States, triggers, capabilities
 and field disturbance are all read from content, through a closed vocabulary of senses and
@@ -90,6 +111,25 @@ recording a preference, five volume sliders, UI scale, and difficulty assists. `
 
 GDD §19.2 is the design constraint, not the menu: no required rule may depend on fine
 colour discrimination, stereo hearing, a microphone, small text or flashing imagery.
+
+Two rules the suite enforces rather than trusting:
+
+**An assist widens a window; it never moves a rule.** `procedureTiming` stretches the gap
+between one contact and the next, and the ninety seconds you have while down. Reach, what
+a contact applies, the 40 °C threshold and the thirty seconds of custody read *identically*
+at 1.0 and at 2.0. It is also scoped to the operative, not the session — the host
+simulates everybody's clock, so the obvious build would take the assist away from anyone
+who joins a friend's game.
+
+**The navigation aid draws the building, never the incident.** Walls, open doors, the
+extraction, your squad. Not the anomaly: finding it is most of the game and the imager is
+how you find it. The test reads the canvas pixels — nothing at all where the anomaly
+stands, and the extraction drawn in the same pass so the test can prove it is looking at
+an image rather than a blank.
+
+An accessibility control that silently does nothing is worse than one that is absent,
+because a player who needs it will believe they have already tried it. So consumption is
+asserted, not presence.
 
 ## One to five operatives
 
@@ -158,7 +198,7 @@ There is no Node.js here, so the harness is a browser.
 powershell -ExecutionPolicy Bypass -File tools/smoketest.ps1 -Tests tools/m0-tests.js
 ```
 
-**298 assertions, all headless.** Section I is the one that matters: it plays a complete
+**358 assertions, all headless.** Section I is the one that matters: it plays a complete
 solo containment through the same interfaces a keyboard reaches — walks to the vehicle,
 takes kit, throws breakers, opens doors, baits, fences, seals, waits out custody and
 carries the case to the stairs. No teleports and no direct state writes, because testing
@@ -172,8 +212,19 @@ somebody whose radio died — with no WebRTC in sight. What a loopback *cannot* 
 checked in two real browsers on the real broker, and that is where the notice-feed bug
 was found: a refusal the host sent and the client's next snapshot destroyed.
 
+Section K is the hygiene pass, and one of its rules earns its keep more than the others:
+**a CONFIG value that nothing reads fails the build.** It found ten dead constants in a
+single run — three engine rules left over from the Unity port that are content here, five
+battery lives sitting beside the real ones in `items.json` and quietly disagreeing with
+them, a `lightReliefRadiusM: 4.5` next to a hard-coded 6.5 for the same radius, and an RTT
+budget under a correct comment about a rule the content already enforces per trigger. A
+number in a config file is a promise that changing it changes the game, and ten of them
+were lying.
+
 `tools/shot.ps1 -Setup tools/_shot-fence.js -Out docs/m0-fence.png` poses a scene and
-photographs it.
+photographs it. `tools/verify-live.ps1` asks whether GitHub Pages is actually serving the
+current commit — by git blob hash, because the working copy is CRLF and Pages serves LF,
+so a byte comparison is off by one per line and never matches.
 
 ## Structure
 
