@@ -124,7 +124,7 @@ export const CONFIG = Object.freeze({
 
   render: {
     fov: 74,
-    thermalFov: 42,          // the imager's narrow view is a real cost (GDD §10.2)
+    thermalFov: 50,          // the imager's narrow view is a real cost (GDD §10.2)
     near: 0.05,
     far: 90,
     /* The imager screen, as a fraction of the viewport. Deliberately small. */

@@ -40,7 +40,7 @@ export class Renderer {
 
     /* The headlamp. No battery: darkness is a mechanic, but being unable to see your own
      * hands is not one, and a torch that dies mid-procedure would punish the wrong thing. */
-    this.lamp = new THREE.SpotLight(0xffeedd, 1.35, 17, 0.62, 0.45, 1.4);
+    this.lamp = new THREE.SpotLight(0xffeedd, 1.7, 21, 0.66, 0.42, 1.3);
     this.lamp.position.set(0, 0, 0);
     this.lampTarget = new THREE.Object3D();
     this.scene.add(this.lamp, this.lampTarget);
@@ -142,7 +142,21 @@ export class Renderer {
           const stalk = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.5, 5), new THREE.MeshLambertMaterial({ color: 0x777d85 }));
           stalk.position.y = 0.62; g.add(stalk);
         }
-        g.traverse((o) => o.layers.enable(1));
+        /* On the imager a fence post is the brightest thing on the floor and the bait is
+         * a warm smudge — which is the entire read the operator needs, and it comes from
+         * the same table that decides the item's shape. */
+        const thermal = {
+          'floodlight-tripod': 0xfff2c8,
+          'portable-heater': 0xffd08a,
+          'reinforced-transit-case': 0xd8903a,
+          'portable-barrier': 0x22303e,
+        }[d.itemId] || 0x1c2833;
+        g.traverse((o) => {
+          o.layers.enable(1);
+          if (!o.isMesh) return;
+          o.userData.thermalMat = new THREE.MeshBasicMaterial({ color: thermal });
+          this.thermalSwap.push(o);
+        });
         g.position.set(d.x, 0, d.z);
         g.rotation.y = d.yaw;
         this.scene.add(g);
@@ -172,6 +186,12 @@ export class Renderer {
     }
     for (const [uid, rec] of this._depMeshes) {
       if (seen.has(uid)) continue;
+      /* Drop it out of the swap list too, or a retrieved tripod leaves a dead mesh that
+       * the thermal pass keeps reassigning materials to forever. */
+      rec.group.traverse((o) => {
+        const i = this.thermalSwap.indexOf(o);
+        if (i >= 0) this.thermalSwap.splice(i, 1);
+      });
       this.scene.remove(rec.group);
       if (rec.light) this.scene.remove(rec.light);
       this._depMeshes.delete(uid);
@@ -201,7 +221,21 @@ export class Renderer {
     }
     for (const dr of this.game.site.doors) {
       const rec = this.doorMeshes.get(dr.id);
-      if (rec) rec.mesh.position.y = dr.open ? rec.closedY + this.game.site.ceilingHeight : rec.closedY;
+      /* ⚠ Lift an open door CLEAR of the ceiling, not level with it. At exactly the ceiling
+       * height the door's underside and the ceiling plane are coplanar, and the z-fight
+       * paints a gold stripe across the ceiling of the whole bay. */
+      if (rec) rec.mesh.position.y = dr.open ? rec.closedY + this.game.site.ceilingHeight + 0.5 : rec.closedY;
+    }
+  }
+
+  /** Swap every structural mesh to its unlit thermal material, and back. The list is built
+   *  once at scene build time and appended to as deployables appear, so this is a walk of
+   *  a flat array rather than a scene traversal at 60Hz. */
+  _setThermalMaterials(on) {
+    for (const m of this.thermalSwap) {
+      if (!m.userData.thermalMat) continue;
+      if (on) { m.userData.eyeMat = m.material; m.material = m.userData.thermalMat; }
+      else if (m.userData.eyeMat) { m.material = m.userData.eyeMat; }
     }
   }
 
@@ -248,7 +282,8 @@ export class Renderer {
     this.renderer.clear();
     this.renderer.render(this.scene, this.camera);
 
-    /* Pass 2: the imager, if it is switched on and in hand.
+    /* Pass 2: the imager, if it is switched on and in hand. Structure swaps to unlit cold
+     * silhouettes for the duration, so what the operator reads is the heat and only the heat.
      *
      * The clear that empties this rectangle is the one `render()` performs because the
      * scene has a Color background — and gl.clear obeys the scissor box, so it wipes the
@@ -262,11 +297,14 @@ export class Renderer {
       this.renderer.setViewport(r.x, r.y, r.w, r.h);
       const fog = this.scene.fog;
       const bg = this.scene.background;
-      /* The imager does not see through fog: it measures. Restoring both afterwards
-       * matters — a frame left with fog null renders the room at twice its real size. */
+      /* The imager does not see through fog: it measures. Restoring all three afterwards
+       * matters — a frame left with fog null renders the room at twice its real size, and
+       * a frame left with the thermal materials on turns the whole level into flat blocks. */
       this.scene.fog = null;
       this.scene.background = this._thermalBg;
+      this._setThermalMaterials(true);
       this.renderer.render(this.scene, this.thermalCam);
+      this._setThermalMaterials(false);
       this.scene.fog = fog;
       this.scene.background = bg;
       this.renderer.setScissorTest(false);

@@ -73,9 +73,17 @@ async function boot() {
   const input = new Input(window, BINDINGS).attach();
   let pointerLocked = false;
 
+  /* Pointer lock can only be requested from a user gesture, and the request REJECTS rather
+   * than returning false when it is not. An unguarded call therefore paints the crash
+   * banner over the game the first time anything closes a panel programmatically — a pose
+   * script, a test, a debrief. Ask, and accept no for an answer. */
+  const grabPointer = () => {
+    try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch { /* no gesture */ }
+  };
+
   const panels = new Panels(document.body, game, {
-    onDeploy: () => { document.body.classList.remove('free'); canvas.requestPointerLock(); },
-    onResume: () => { if (game.mission.phase !== PHASE.DEBRIEF) canvas.requestPointerLock(); },
+    onDeploy: () => { document.body.classList.remove('free'); grabPointer(); },
+    onResume: () => { if (game.mission.phase !== PHASE.DEBRIEF) grabPointer(); },
   });
 
   /* Cues are a table lookup, so a new simulation event is a new row in audio.js and never
@@ -91,7 +99,7 @@ async function boot() {
 
   canvas.addEventListener('click', () => {
     audio.start();
-    if (!panels.isOpen && game.mission.phase !== PHASE.DEBRIEF) canvas.requestPointerLock();
+    if (!panels.isOpen && game.mission.phase !== PHASE.DEBRIEF) grabPointer();
   });
   document.addEventListener('pointerlockchange', () => {
     pointerLocked = document.pointerLockElement === canvas;

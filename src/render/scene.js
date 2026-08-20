@@ -37,14 +37,30 @@ export function buildScene(THREE, site, { thermalFloorTexture }) {
   /* Exponential fog does most of the work of "a big dark cold room": it hides the far
    * wall without a hard clip plane, and it makes a headlamp feel like the only thing you
    * own. Density is tuned so a 24m floor reads as unknowable from its own doorway. */
-  scene.fog = new THREE.FogExp2(0x05070a, 0.075);
+  scene.fog = new THREE.FogExp2(0x05070a, 0.052);
 
   const b = site.bounds;
   const w = b.maxX - b.minX, d = b.maxZ - b.minZ;
   const h = site.ceilingHeight;
 
   const mat = (color, extra = {}) => new THREE.MeshLambertMaterial({ color, ...extra });
-  const both = (o) => { o.layers.enable(L_THERMAL); return o; };
+
+  /* THE IMAGER IS NOT A COLOUR FILTER. Structure is at ambient, so on a thermal screen it
+   * is a silhouette and nothing else. Rendering the same lit Lambert materials through the
+   * second camera produced a picture that looked exactly like the eye's view with the fog
+   * off — the mass and the contours vanished into a normally-lit room. So every mesh gets
+   * a second, unlit material, and the thermal pass swaps them in.
+   *
+   * Anything hot names its own thermal colour; everything else is cold structure. */
+  const thermalSwap = [];
+  const both = (o, thermalColor = 0x101c26) => {
+    o.layers.enable(L_THERMAL);
+    if (o.isMesh) {
+      o.userData.thermalMat = new THREE.MeshBasicMaterial({ color: thermalColor });
+      thermalSwap.push(o);
+    }
+    return o;
+  };
 
   /* Floor. Two of them: the visible concrete, and a thermal-only plane carrying the
    * sampled temperature field. The second is why the imager is an instrument rather
@@ -134,7 +150,7 @@ export function buildScene(THREE, site, { thermalFloorTexture }) {
   lid.position.y = 0.94;
   cache.add(lid);
   cache.position.set(site.cache.x, 0, site.cache.z);
-  cache.traverse(both);
+  cache.traverse((o) => both(o, 0x16232e));
   scene.add(cache);
 
   const stair = new THREE.Mesh(
@@ -159,13 +175,13 @@ export function buildScene(THREE, site, { thermalFloorTexture }) {
     g.add(tag);
     g.position.set(s.at[0], 0, s.at[1]);
     g.userData.evidenceId = s.evidenceId;
-    g.traverse(both);
+    g.traverse((o) => both(o, 0x1a2530));
     scene.add(g);
   }
 
   /* Lights. Deliberately few: GDD §16.6 caps dynamic lights, and darkness is a mechanic. */
-  scene.add(new THREE.AmbientLight(0x35404a, 0.30));
-  scene.add(new THREE.HemisphereLight(0x223040, 0x0a0c0f, 0.35));
+  scene.add(new THREE.AmbientLight(0x35404a, 0.40));
+  scene.add(new THREE.HemisphereLight(0x2a3a4c, 0x0d1014, 0.48));
 
   const luminaireLights = site.luminaires.map((l) => {
     const light = new THREE.PointLight(l.emergency ? 0xff9a5a : 0xcfe4ff, 0, l.emergency ? 7 : 9, 1.6);
@@ -181,5 +197,5 @@ export function buildScene(THREE, site, { thermalFloorTexture }) {
    * object over itself, and a key called `thermalFloor` silently overwrote the
    * ThermalFloor INSTANCE with this mesh — the imager then rendered a texture that was
    * never updated again, and the only symptom was a floor image frozen at boot. */
-  return { scene, doorMeshes, luminaireLights, thermalFloorMesh, L_WORLD, L_THERMAL, COL };
+  return { scene, doorMeshes, luminaireLights, thermalFloorMesh, thermalSwap, L_WORLD, L_THERMAL, COL };
 }
