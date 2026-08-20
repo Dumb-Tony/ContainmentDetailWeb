@@ -1,0 +1,55 @@
+{
+  "contentRevision": "0.2.0",
+  "items": [
+    {
+      "id": "motion-sensor",
+      "displayName": "Motion sensor",
+      "bulk": "compact",
+      "role": "detection",
+      "deployable": true
+    },
+    {
+      "id": "remote-camera",
+      "displayName": "Remote camera",
+      "bulk": "compact",
+      "role": "detection",
+      "deployable": true
+    },
+    {
+      "id": "floodlight-tripod",
+      "displayName": "Floodlight tripod",
+      "bulk": "long",
+      "role": "containment",
+      "deployable": true,
+      "heatOutputCelsius": 60
+    },
+    {
+      "id": "thermal-imager",
+      "displayName": "Thermal imager",
+      "bulk": "general",
+      "role": "detection",
+      "deployable": false
+    },
+    {
+      "id": "trauma-kit",
+      "displayName": "Trauma kit",
+      "bulk": "compact",
+      "role": "support",
+      "deployable": false
+    },
+    {
+      "id": "portable-barrier",
+      "displayName": "Portable barrier",
+      "bulk": "general",
+      "role": "containment",
+      "deployable": true
+    },
+    {
+      "id": "reinforced-transit-case",
+      "displayName": "Reinforced transit case",
+      "bulk": "general",
+      "role": "containment",
+      "deployable": true
+    }
+  ]
+}

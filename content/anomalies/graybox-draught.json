@@ -1,0 +1,372 @@
+{
+  "id": "graybox-draught",
+  "contentRevision": "0.3.0",
+  "licensingRecordId": null,
+  "incidentPremise": "A maintenance crew sealed a basement plant room after reporting 'cold that moves'. Two of the three came back. The site has been without mains power for six days and the anomaly has spread as far as the stairwell.",
+
+  "perception": {
+    "channels": ["instrument-only", "thermal", "physical-trace"],
+    "recordingInterference": "None. It is invisible to the eye and to cameras in the visible spectrum, but thermal imaging and frost traces record it faithfully. Deliberately consistent: an anomaly that also corrupted recordings would give players no reliable channel at all.",
+    "accessibilityAlternatives": [
+      "The thermal imager announces contact with a distinct rising tone as well as the visual gradient, so the presence cue does not require reading a colour ramp.",
+      "Frost traces carry a shape tell (radial cracking) in addition to colour, readable without fine colour discrimination."
+    ]
+  },
+
+  "states": [
+    {
+      "id": "latent",
+      "kind": "latent",
+      "description": "Settled in the coldest reachable volume. Does not move. Leaves a slowly growing frost bloom.",
+      "presentation": {
+        "visualTell": "Frost bloom on the nearest metal surface, radial cracking pattern",
+        "audioCue": "Low steady draught, no directionality",
+        "environmentalTell": "Ambient temperature falls by roughly one degree per minute within the room"
+      }
+    },
+    {
+      "id": "aware",
+      "kind": "active",
+      "speedMps": 1.0,
+      "description": "Has registered a heat source and begins drifting toward it at walking pace. Still avoidable.",
+      "presentation": {
+        "visualTell": "Frost trail extends along the floor toward the heat source",
+        "audioCue": "Draught acquires direction and a faint whistle",
+        "environmentalTell": "Loose paper and dust move against the building's airflow"
+      }
+    },
+    {
+      "id": "drawn",
+      "kind": "hunting",
+      "speedMps": 2.0,
+      "description": "Locked onto the strongest heat source in range and closing. Contact causes rapid heat loss and mobility injury.",
+      "presentation": {
+        "visualTell": "Continuous frost path, breath fogs heavily",
+        "audioCue": "Whistle sharpens to a sustained note",
+        "environmentalTell": "Standing water skins over with ice"
+      }
+    },
+    {
+      "id": "banked",
+      "kind": "vulnerable",
+      "description": "Held against a heat gradient it cannot cross. Stationary and enclosable for as long as the gradient holds.",
+      "presentation": {
+        "visualTell": "Frost edge stops dead in a straight line at the heat boundary",
+        "audioCue": "Whistle drops to a flutter",
+        "environmentalTell": "Temperature on the warm side stops falling"
+      }
+    },
+    {
+      "id": "contained",
+      "kind": "contained",
+      "description": "Sealed inside an insulated transit case with its internal heater cycling. Custody established.",
+      "presentation": {
+        "visualTell": "Case exterior frosts at the seams under load",
+        "audioCue": "Heater cycling audibly, roughly every twenty seconds",
+        "environmentalTell": "Room temperature begins recovering"
+      }
+    }
+  ],
+
+  "triggers": [
+    {
+      "id": "heat-detected",
+      "from": "latent",
+      "to": "aware",
+      "when": { "sense": "heat-within", "radiusMetres": 12, "sustainSeconds": 4 },
+      "condition": "any player or powered heat source within 12m for longer than 4s",
+      "telegraph": "The steady draught acquires direction and the frost bloom elongates toward the source before any movement begins.",
+      "pressureDelta": 1,
+      "latencyToleranceMs": 1200
+    },
+    {
+      "id": "lock-on",
+      "from": "aware",
+      "to": "drawn",
+      "when": { "sense": "strongest-heat-within", "radiusMetres": 6 },
+      "condition": "strongest heat source within 6m and unobstructed by a thermal barrier",
+      "telegraph": "Whistle sharpens for roughly two seconds before the drift accelerates.",
+      "pressureDelta": 2,
+      "latencyToleranceMs": 1200
+    },
+    {
+      "id": "heat-wall",
+      "from": "*",
+      "to": "banked",
+      "when": { "sense": "path-blocked-by-gradient", "thresholdCelsius": 40 },
+      "condition": "a continuous heat gradient above 40C spans the anomaly's approach path",
+      "telegraph": "Frost edge halts visibly at the gradient before the state settles.",
+      "pressureDelta": -2,
+      "latencyToleranceMs": 2000
+    },
+    {
+      "id": "gradient-lost",
+      "from": "banked",
+      "to": "drawn",
+      "when": { "sense": "gradient-below", "thresholdCelsius": 40, "sustainSeconds": 3 },
+      "condition": "heat gradient falls below 40C or is breached for longer than 3s",
+      "telegraph": "Flutter returns to a sustained note; frost resumes crossing the old boundary.",
+      "pressureDelta": 3,
+      "latencyToleranceMs": 2000
+    },
+    {
+      "id": "sealed",
+      "from": "banked",
+      "to": "contained",
+      "when": { "sense": "enclosed-by", "itemId": "reinforced-transit-case", "radiusMetres": 1.5 },
+      "condition": "insulated transit case closed around the anomaly with heater active",
+      "telegraph": "Case seams frost as load transfers.",
+      "pressureDelta": -4,
+      "latencyToleranceMs": 2500
+    }
+  ],
+
+  "capabilities": [
+    {
+      "id": "chill-contact",
+      "availableInStates": ["drawn"],
+      "effect": "Rapid heat loss on contact: exposure condition plus mobility injury. Survivable once; compounding on repeat.",
+      "rangeMetres": 1.2,
+      "cooldownMs": 3000,
+      "latencyToleranceMs": 250,
+      "compounding": true,
+      "applies": [
+        { "condition": "exposure", "severity": "serious" },
+        { "condition": "mobility-injury", "severity": "serious" }
+      ],
+      "counterableBy": ["heat-gradient", "insulated-barrier"]
+    },
+    {
+      "id": "drain-battery",
+      "availableInStates": ["aware", "drawn"],
+      "effect": "Battery-powered equipment within range loses charge at roughly four times the normal rate.",
+      "rangeMetres": 5,
+      "cooldownMs": 0,
+      "counterableBy": ["insulated-barrier"]
+    },
+    {
+      "id": "ice-surface",
+      "availableInStates": ["drawn"],
+      "effect": "Freezes standing water into a slip hazard that persists after the anomaly moves on.",
+      "rangeMetres": 3,
+      "cooldownMs": 8000,
+      "counterableBy": ["heat-gradient"]
+    }
+  ],
+
+  "constraints": [
+    {
+      "id": "heat-gradient",
+      "effect": "blocks",
+      "description": "Cannot cross a sustained heat gradient above 40C. This is the whole procedure: the squad does not fight it, they fence it.",
+      "requiredEquipment": ["floodlight-tripod", "portable-heater", "power-pack"]
+    },
+    {
+      "id": "insulated-barrier",
+      "effect": "blocks",
+      "description": "Cannot pass through closed-cell insulation. Portable barrier panels work; sheet metal and plasterboard do not.",
+      "requiredEquipment": ["portable-barrier"]
+    },
+    {
+      "id": "still-air",
+      "effect": "weakens",
+      "description": "Moves at roughly half pace where airflow is dead. Killing the ventilation buys the team time and is a legitimate alternative to spending heaters.",
+      "requiredEquipment": []
+    },
+    {
+      "id": "thermal-visibility",
+      "effect": "reveals",
+      "description": "Always visible on thermal imaging regardless of state. There is no stealth phase; the difficulty is coverage, not detection.",
+      "requiredEquipment": ["thermal-imager"]
+    }
+  ],
+
+  "evidenceRules": [
+    {
+      "id": "frost-bloom",
+      "type": "environmental",
+      "dimension": "presence",
+      "rawObservation": "Radial frost cracking on a metal surface, growing measurably over two minutes, with no condensation source nearby.",
+      "reliability": "confirmed",
+      "revealsRule": "heat-detected",
+      "requiredEquipment": [],
+      "isFalseLead": false
+    },
+    {
+      "id": "thermal-void",
+      "type": "instrumental",
+      "dimension": "form",
+      "rawObservation": "Thermal imager shows a coherent sub-ambient mass roughly 1.5m across holding its shape while it moves.",
+      "reliability": "confirmed",
+      "revealsRule": "thermal-visibility",
+      "requiredEquipment": ["thermal-imager"],
+      "isFalseLead": false
+    },
+    {
+      "id": "battery-drain",
+      "type": "instrumental",
+      "dimension": "capability",
+      "rawObservation": "Two separate battery-powered tools lost charge four times faster than rated while in the same room.",
+      "reliability": "probable",
+      "revealsRule": "drain-battery",
+      "requiredEquipment": [],
+      "isFalseLead": false
+    },
+    {
+      "id": "frost-boundary",
+      "type": "environmental",
+      "dimension": "constraint",
+      "rawObservation": "Frost stops in a straight line two metres from a still-warm boiler, and does not resume on the far side.",
+      "reliability": "confirmed",
+      "revealsRule": "heat-wall",
+      "requiredEquipment": [],
+      "isFalseLead": false
+    },
+    {
+      "id": "survivor-account",
+      "type": "testimonial",
+      "dimension": "trigger",
+      "rawObservation": "Surviving crew member states it 'came for the warm one first' and that the man carrying the lamp was taken.",
+      "reliability": "probable",
+      "revealsRule": "lock-on",
+      "requiredEquipment": [],
+      "isFalseLead": false
+    },
+    {
+      "id": "maintenance-log",
+      "type": "documentary",
+      "dimension": "anchor",
+      "rawObservation": "Plant room log records the chiller running continuously for eleven days before the incident, against a four-hour duty cycle.",
+      "reliability": "disputed",
+      "revealsRule": "",
+      "requiredEquipment": [],
+      "isFalseLead": true
+    },
+    {
+      "id": "stairwell-draught",
+      "type": "environmental",
+      "dimension": "presence",
+      "rawObservation": "Sustained cold draught in the stairwell moving against the building's designed airflow.",
+      "reliability": "unreliable",
+      "revealsRule": "",
+      "requiredEquipment": [],
+      "isFalseLead": true
+    }
+  ],
+
+  "containment": {
+    "goal": "The anomaly sealed inside an insulated transit case with its heater cycling, verified by a stable case interior temperature for 30 seconds and no frost propagation beyond the seams.",
+
+    "procedures": [
+      {
+        "id": "heat-fence-minimum",
+        "grade": "minimum",
+        "verbs": ["detect", "lure", "enclose", "verify"],
+        "concurrentRoles": 2,
+        "requiredEquipment": [
+          "thermal-imager",
+          "portable-heater",
+          "power-pack",
+          "reinforced-transit-case"
+        ],
+        "abortConditions": [
+          "Heater output falls below the gradient threshold with the anomaly inside the fence",
+          "Any operative takes a second chill-contact"
+        ]
+      },
+      {
+        "id": "heat-fence-safe",
+        "grade": "safe",
+        "verbs": ["detect", "isolate", "stabilize", "lure", "enclose", "verify"],
+        "concurrentRoles": 3,
+        "requiredEquipment": [
+          "thermal-imager",
+          "portable-heater",
+          "power-pack",
+          "portable-barrier",
+          "reinforced-transit-case",
+          "remote-camera"
+        ],
+        "abortConditions": [
+          "Ventilation restarts and the anomaly reaches walking pace before the fence is complete",
+          "Power pack drops below the reserve needed to hold the gradient through the seal",
+          "Thermal coverage of the approach path is lost for longer than 5s"
+        ]
+      },
+      {
+        "id": "heat-fence-research",
+        "grade": "research-grade",
+        "verbs": [
+          "detect",
+          "isolate",
+          "observe",
+          "stabilize",
+          "enclose",
+          "verify"
+        ],
+        "concurrentRoles": 4,
+        "requiredEquipment": [
+          "thermal-imager",
+          "portable-heater",
+          "power-pack",
+          "portable-barrier",
+          "reinforced-transit-case",
+          "remote-camera",
+          "sample-kit",
+          "dosimeter"
+        ],
+        "abortConditions": [
+          "Frost sample compromised before the case is sealed",
+          "Any condition from the safe procedure"
+        ]
+      }
+    ],
+
+    "integrityConditions": [
+      {
+        "id": "case-heater",
+        "measure": "temperature",
+        "failureSignal": "Heater cycle audibly lengthens, then frost creeps outward from the case seams.",
+        "recoveryWindowMs": 20000
+      },
+      {
+        "id": "fence-power",
+        "measure": "power",
+        "failureSignal": "Floodlight tripods dim in sequence as the pack sheds load; the frost edge starts advancing again.",
+        "recoveryWindowMs": 12000
+      },
+      {
+        "id": "approach-coverage",
+        "measure": "observation-coverage",
+        "failureSignal": "Thermal feed drops to static on one lane, and the operator loses the mass mid-approach.",
+        "recoveryWindowMs": 8000
+      }
+    ]
+  },
+
+  "difficultyProfiles": [
+    {
+      "preset": "orientation",
+      "squadSize": { "min": 1, "max": 4 },
+      "timingScale": 1.6,
+      "evidenceAvailability": "generous",
+      "automationAllowed": ["remote-heater-switch", "automated-observation-unit"]
+    },
+    {
+      "preset": "field",
+      "squadSize": { "min": 2, "max": 5 },
+      "timingScale": 1,
+      "evidenceAvailability": "standard",
+      "automationAllowed": ["automated-observation-unit"]
+    },
+    {
+      "preset": "severe",
+      "squadSize": { "min": 3, "max": 5 },
+      "timingScale": 0.8,
+      "evidenceAvailability": "sparse",
+      "automationAllowed": []
+    }
+  ],
+
+  "behaviourModule": null
+}

@@ -1,0 +1,7 @@
+# Scratch from the headless test harness
+_smoketest.html
+_shot*.html
+# Editor / OS
+.DS_Store
+Thumbs.db
+*.swp
