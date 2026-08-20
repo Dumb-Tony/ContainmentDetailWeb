@@ -27,7 +27,9 @@ import { Game, RECOMMENDED_MANIFEST, EMPTY_COMMAND } from '../src/game.js';
 import { PHASE } from '../src/sim/mission.js';
 import { NetSession, loopbackPair, ROLE } from '../src/net/net.js';
 import { MSG, ACT, PROTOCOL_VERSION, MAX_SQUAD, encodeSnapshot, applySnapshot } from '../src/net/protocol.js';
-import { mixFor } from '../src/audio/audio.js';
+import { mixFor, Audio, BUSES, CAPTIONS, missingCaptions, formatCaption } from '../src/audio/audio.js';
+import { Settings, PALETTES, SHAPES } from '../src/ui/settings.js';
+import { Input, DEFAULT_BINDINGS, isReservedCode } from '../src/core/input.js';
 import { segmentHitsRect, moveWithWalls, dist } from '../src/sim/geometry.js';
 
 /* ── harness ─────────────────────────────────────────────────────────────── */
@@ -787,7 +789,7 @@ async function sectionK() {
     'src/sim/mission.js', 'src/sim/content.js', 'src/sim/senses.js', 'src/sim/perception.js',
     'src/net/protocol.js', 'src/net/net.js',
     'src/render/scene.js', 'src/render/renderer.js', 'src/render/thermalFloor.js',
-    'src/ui/hud.js', 'src/ui/panels.js', 'src/audio/audio.js',
+    'src/ui/hud.js', 'src/ui/panels.js', 'src/ui/settings.js', 'src/audio/audio.js',
   ];
   /* ⚠ Strip comments FIRST. Every rule below is about what the code DOES, and a raw grep
    * tests what the file SAYS: rng.js explains at length that nothing may call
@@ -1321,6 +1323,100 @@ async function sectionO() {
   emit();
 }
 
+/* ── P. accessibility (GDD §19) ──────────────────────────────────────────── */
+function sectionP() {
+  lines.push('--- P. the accessibility baseline is real, not a menu ---');
+
+  /* The MODEL has to be DOM-free, or none of it can be asserted headless and none of it
+   * can be trusted. §19 is a design requirement, not a settings screen. */
+  const s = new Settings();
+  ok('P1 the settings model works with no DOM at all', typeof s.get('captions.enabled') === 'boolean');
+  s.set('volume.master', 0.4);
+  near('P2 a value round-trips', s.get('volume.master'), 0.4, 1e-9);
+  s.set('volume.master', 99);
+  ok('P3 and an out-of-range value is clamped rather than accepted', s.get('volume.master') <= 1, String(s.get('volume.master')));
+  const json = s.toJSON();
+  const back = Settings.fromJSON(JSON.parse(JSON.stringify(json)));
+  near('P4 it serialises and comes back', back.get('volume.master'), s.get('volume.master'), 1e-9);
+  ok('P5 an unknown stored version falls back to defaults rather than throwing',
+    !!Settings.fromJSON({ version: 999, values: { nonsense: true } }));
+
+  /* ⚠ §19.2: no required rule may depend on hearing. The check is not "is there a caption
+   * table" — it is that EVERY cue has one, which is a thing that rots the moment somebody
+   * adds a cue. missingCaptions() is that check, and it belongs in the suite. */
+  const missing = missingCaptions();
+  ok('P6 every audio cue has a caption', missing.length === 0, missing.join(', '));
+  const cap = formatCaption(CAPTIONS.CONTACT, { direction: 'north' });
+  ok('P7 a non-speech caption is bracketed, as every player already expects', /^\[.*\]$/.test(cap), cap);
+  ok('P8 and a directional one can carry a bearing, so stereo hearing is never required',
+    /north/i.test(cap), cap);
+
+  /* THE SEAM. §19.1 wants five sliders; the obvious implementation scales the mix and
+   * destroys mixFor's purity, which section J asserts. The sliders are gain buses
+   * downstream instead, so the same world state still gives the same mix. */
+  const base = { anomalyState: 'drawn', distance: 4, imagerOn: false, imagerLockMs: 0, custodyHeldMs: 0, stressNorm: 0, pressureStage: 0, activeEmitters: 0 };
+  const a1 = JSON.stringify(mixFor(base));
+  const audio = new Audio();
+  audio.setVolumes({ master: 0.1, anomaly: 0, voice: 0.5 });
+  const a2 = JSON.stringify(mixFor(base));
+  eq('P9 turning every slider down does not change what mixFor returns', a1, a2);
+  eq('P10 because the sliders are buses, not a multiplier on the mix', audio.busGain('anomaly'), 0);
+  ok('P11 and there is one bus per slider §19.1 names', BUSES.length >= 6);
+
+  /* Rebinding. §19.1 asks for full remapping; the trap is a table the game does not read. */
+  const inp = new Input({ addEventListener() {}, removeEventListener() {} }, undefined, undefined);
+  ok('P12 the default table is the one the game actually plays with',
+    !!DEFAULT_BINDINGS.interact && !!DEFAULT_BINDINGS.imager && !!DEFAULT_BINDINGS.tablet,
+    Object.keys(DEFAULT_BINDINGS).join(','));
+  inp.rebind('interact', 'KeyG');
+  ok('P13 an action can be rebound', inp.bindings.interact.includes('KeyG'));
+  inp._debugPress('KeyG');
+  ok('P14 and the new key actually fires it', inp.wasPressed('interact'));
+  inp.endStep();
+  ok('P15 a key the browser needs is refused', isReservedCode('F5') && isReservedCode('F12'));
+  const refused = inp.rebind('interact', 'F5');
+  ok('P16 so rebinding onto one does not take', refused === false || !inp.bindings.interact.includes('F5'));
+  inp.resetBindings();
+  ok('P17 and reset returns the real defaults, not another game’s',
+    inp.bindings.interact.join() === DEFAULT_BINDINGS.interact.join());
+
+  /* Hold vs toggle resolved AT THE SOURCE, so no gameplay system knows which mode is on. */
+  const held = new Input({ addEventListener() {}, removeEventListener() {} });
+  held.setHoldMode('sprint', 'toggle');
+  held._debugPress('ShiftLeft');
+  held.endStep();
+  held._debugRelease('ShiftLeft');
+  ok('P18 in toggle mode a released key stays on', held.isDown('sprint'));
+  held._debugPress('ShiftLeft');
+  held.endStep();
+  ok('P19 and pressing again turns it off', !held.isDown('sprint'));
+  held.setHoldMode('sprint', 'hold');
+  held._debugPress('ShiftLeft');
+  ok('P20 in hold mode it is on while down', held.isDown('sprint'));
+  held._debugRelease('ShiftLeft');
+  ok('P21 and off when released', !held.isDown('sprint'));
+
+  /* Colour vision and shape redundancy — §19.1, and §18.1's "must function without colour". */
+  const names = Object.keys(PALETTES);
+  ok('P22 there are colour-vision presets', names.length >= 4, names.join(','));
+  const def = PALETTES[names[0]], alt = PALETTES[names[1]];
+  ok('P23 and they are genuinely different palettes', JSON.stringify(def) !== JSON.stringify(alt));
+  s.set('vision.shapes', true);
+  ok('P24 shape redundancy is available so colour is never the only channel',
+    Object.keys(SHAPES).length > 0);
+
+  /* Photosensitivity-safe mode has to CLAMP, not merely record a preference. */
+  const ps = new Settings();
+  ps.set('camera.shake', 1);
+  ps.set('safety.photosensitive', true);
+  ok('P25 safe mode clamps what the renderer is allowed to read',
+    ps.effective.camera.shake < 1, JSON.stringify(ps.effective.camera));
+  ok('P26 and the raw preference is preserved, so turning it off restores the choice',
+    ps.get('camera.shake') === 1);
+
+  emit();
+}
+
 /* ── run ─────────────────────────────────────────────────────────────────── */
 (async () => {
   try {
@@ -1338,6 +1434,7 @@ async function sectionO() {
     await sectionM(content);
     await sectionN(content);
     await sectionO();
+    sectionP();
     await sectionK();
     await sectionL();
     emit();

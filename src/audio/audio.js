@@ -10,6 +10,19 @@
  * a steady draught with no direction (latent), direction and a faint whistle (aware), a
  * sustained note (drawn), a flutter (banked), a heater cycling every twenty seconds
  * (contained). Every one of them also has a visual channel, per GDD §17.3.
+ *
+ * ⚠ THE VOLUME SLIDERS DO NOT TOUCH mixFor, AND MUST NOT. GDD §19.1 wants five separate
+ * sliders; the obvious implementation is to scale the mix, and it would destroy the seam —
+ * `mixFor` would stop being a function of the world and start being a function of the
+ * world plus a menu, and section J of the suite ("the same state gives the same mix")
+ * would be asserting the settings screen. So the sliders are GAIN BUSES in the graph
+ * below, downstream of everything mixFor decides. mixFor never learns they exist.
+ *
+ * CAPTIONS ARE THE SAME SHAPE. §17.3 requires a visual alternative for every critical audio
+ * cue, and §19.2 forbids a required rule from depending on hearing at all. So the caption
+ * table is keyed by the same simulation event names as CUES, and the continuous voices get
+ * captions from `captionsForMixChange`, which is pure and compares two mixes. A player with
+ * the sound off reads exactly what a player with headphones hears.
  */
 
 import { CONFIG } from '../config.js';
@@ -51,26 +64,224 @@ export function mixFor(s) {
   return { drone, whistle, whistleHz, flutterHz, heater, imager, imagerHz, breath, hum };
 }
 
+/* ── the buses (GDD §19.1: separate sliders) ──────────────────────────────────
+ *
+ * Five named buses plus a master, matching §19.1's list word for word so a settings label
+ * and a gain node cannot drift apart. Every voice and every cue names the bus it belongs
+ * to; nothing connects to the master directly except the buses themselves.
+ */
+export const BUSES = Object.freeze(['master', 'voice', 'anomaly', 'instruments', 'ambience', 'music']);
+
+/** 0..1 per bus. `music` exists with nothing on it yet — §17.5's sparse score connects
+ *  here when it lands, and the slider is real from the day it does. */
+export const DEFAULT_VOLUMES = Object.freeze({
+  master: 1, voice: 1, anomaly: 1, instruments: 1, ambience: 1, music: 1,
+});
+
+/* Which bus each continuous voice sings on.
+ * ⚠ `breath` is on `voice` rather than on its own channel. §19.1's slider is named "voice",
+ * and the operative's own breathing is the only voice in the build until proximity chat
+ * exists — a player who turns voice down to hear the room expects the panting to go with
+ * it. `hum` is the squad's own powered kit, so it is an instrument, not ambience. */
+export const VOICE_BUSES = Object.freeze({
+  drone: 'ambience',
+  whistle: 'anomaly',
+  imager: 'instruments',
+  hum: 'instruments',
+  breath: 'voice',
+});
+
 /** One-shot cues, as a data table keyed by simulation event. A new event is a new row; an
  *  event with no row is silent rather than fatal. */
 export const CUES = Object.freeze({
-  CONTACT: { hz: 90, dur: 0.9, type: 'sawtooth', gain: 0.5, sweep: -40 },
-  SEAL_ATTEMPT: { hz: 240, dur: 0.35, type: 'square', gain: 0.3, sweep: 120 },
-  CUSTODY_VERIFIED: { hz: 520, dur: 0.7, type: 'triangle', gain: 0.32, sweep: 180 },
-  CUSTODY_LOST: { hz: 300, dur: 1.1, type: 'sawtooth', gain: 0.4, sweep: -220 },
-  DEPLOYED: { hz: 180, dur: 0.14, type: 'square', gain: 0.16, sweep: 0 },
-  RETRIEVED: { hz: 260, dur: 0.11, type: 'square', gain: 0.13, sweep: 0 },
-  CIRCUIT_CHANGED: { hz: 70, dur: 0.5, type: 'sawtooth', gain: 0.26, sweep: 30 },
-  DOOR_CHANGED: { hz: 120, dur: 0.4, type: 'triangle', gain: 0.2, sweep: -30 },
-  BATTERY_DEAD: { hz: 420, dur: 0.5, type: 'sine', gain: 0.24, sweep: -260 },
-  EVIDENCE_LOGGED: { hz: 880, dur: 0.09, type: 'sine', gain: 0.12, sweep: 0 },
+  CONTACT: { hz: 90, dur: 0.9, type: 'sawtooth', gain: 0.5, sweep: -40, bus: 'anomaly' },
+  SEAL_ATTEMPT: { hz: 240, dur: 0.35, type: 'square', gain: 0.3, sweep: 120, bus: 'instruments' },
+  CUSTODY_VERIFIED: { hz: 520, dur: 0.7, type: 'triangle', gain: 0.32, sweep: 180, bus: 'instruments' },
+  CUSTODY_LOST: { hz: 300, dur: 1.1, type: 'sawtooth', gain: 0.4, sweep: -220, bus: 'anomaly' },
+  DEPLOYED: { hz: 180, dur: 0.14, type: 'square', gain: 0.16, sweep: 0, bus: 'instruments' },
+  RETRIEVED: { hz: 260, dur: 0.11, type: 'square', gain: 0.13, sweep: 0, bus: 'instruments' },
+  CIRCUIT_CHANGED: { hz: 70, dur: 0.5, type: 'sawtooth', gain: 0.26, sweep: 30, bus: 'ambience' },
+  DOOR_CHANGED: { hz: 120, dur: 0.4, type: 'triangle', gain: 0.2, sweep: -30, bus: 'ambience' },
+  BATTERY_DEAD: { hz: 420, dur: 0.5, type: 'sine', gain: 0.24, sweep: -260, bus: 'instruments' },
+  EVIDENCE_LOGGED: { hz: 880, dur: 0.09, type: 'sine', gain: 0.12, sweep: 0, bus: 'instruments' },
 });
+
+/* ── captions (GDD §17.3, §19.1, §19.2) ───────────────────────────────────────
+ *
+ * A parallel table, same keys as CUES so a cue without a line is a visible hole rather
+ * than a quiet omission — `missingCaptions()` below is the check, and it is one line for
+ * a future suite to assert.
+ *
+ * `kind` decides the rendering, not the wording:
+ *   'nonspeech' — bracketed, because that is the convention every player already reads.
+ *   'speech'    — attributed to a speaker, quoted.
+ * `priority` 3 is "you must read this or you will lose the operation"; 1 is furniture. A
+ * caption channel that is showing three lines drops the lowest priority first.
+ * `directional` marks the lines where WHERE it came from is part of the information, so
+ * the HUD can append a bearing when the caller supplies one — §19.2 forbids a rule that
+ * depends on stereo hearing, and this is how that promise is kept.
+ */
+export const CAPTIONS = Object.freeze({
+  CONTACT: { text: 'a rush of cold, close', kind: 'nonspeech', priority: 3, directional: true },
+  SEAL_ATTEMPT: { text: 'case latches strain', kind: 'nonspeech', priority: 2, directional: false },
+  CUSTODY_VERIFIED: { text: 'case tone steadies — custody verified', kind: 'nonspeech', priority: 3, directional: false },
+  CUSTODY_LOST: { text: 'the note falls away — custody lost', kind: 'nonspeech', priority: 3, directional: false },
+  DEPLOYED: { text: 'unit sets down and powers up', kind: 'nonspeech', priority: 1, directional: false },
+  RETRIEVED: { text: 'unit powers down and is lifted', kind: 'nonspeech', priority: 1, directional: false },
+  CIRCUIT_CHANGED: { text: 'the floor takes power', kind: 'nonspeech', priority: 2, directional: false },
+  DOOR_CHANGED: { text: 'a door drives on its motor', kind: 'nonspeech', priority: 2, directional: true },
+  BATTERY_DEAD: { text: 'a cell dies', kind: 'nonspeech', priority: 3, directional: false },
+  EVIDENCE_LOGGED: { text: 'logged', kind: 'nonspeech', priority: 1, directional: false },
+
+  /* The continuous voices. These come from captionsForMixChange, not from the event bus,
+   * because they describe a sound that is ALREADY PLAYING rather than one that fired. The
+   * wording is the content file's own `audioCue` text, so what the player reads and what
+   * the anomaly document promises are the same sentence. */
+  WHISTLE_SHARPENS: { text: 'the whistle sharpens', kind: 'nonspeech', priority: 3, directional: true },
+  WHISTLE_DROPS: { text: 'the whistle drops', kind: 'nonspeech', priority: 2, directional: true },
+  FLUTTER_BEGINS: { text: 'the note breaks into a flutter', kind: 'nonspeech', priority: 3, directional: true },
+  NOTE_SUSTAINS: { text: 'the flutter returns to a sustained note', kind: 'nonspeech', priority: 3, directional: true },
+  HEATER_CYCLE: { text: 'the case heater cycles', kind: 'nonspeech', priority: 2, directional: false },
+  DRAUGHT_STILLS: { text: 'the draught stills', kind: 'nonspeech', priority: 2, directional: false },
+  IMAGER_CONTACT: { text: 'the imager tone rises — contact held', kind: 'nonspeech', priority: 2, directional: false },
+  BREATH_HARD: { text: 'you are breathing hard', kind: 'nonspeech', priority: 1, directional: false },
+});
+
+/** Every cue that has no caption. §17.3 says there must be none; this is how a suite asks. */
+export function missingCaptions() {
+  return Object.keys(CUES).filter((k) => !CAPTIONS[k]);
+}
+
+/**
+ * PURE. Which captions the change from one mix to the next earns.
+ *
+ * Written against deltas rather than against the anomaly state on purpose: the mix is the
+ * only thing the player can actually hear, so a caption derived from it can never describe
+ * a sound that is not playing. Thresholds are wide enough that a ramp does not stutter.
+ *
+ * @returns {string[]} caption keys, in the order they should be read
+ */
+export function captionsForMixChange(prev, next) {
+  const out = [];
+  if (!prev || !next) return out;
+  const up = next.whistleHz > prev.whistleHz + 40;
+  const down = prev.whistleHz > next.whistleHz + 40 && next.whistleHz > 0;
+  if (up) out.push('WHISTLE_SHARPENS');
+  if (down) out.push('WHISTLE_DROPS');
+  if (next.flutterHz > 0 && prev.flutterHz === 0) out.push('FLUTTER_BEGINS');
+  if (next.flutterHz === 0 && prev.flutterHz > 0 && next.whistle > 0) out.push('NOTE_SUSTAINS');
+  if (next.heater > 0 && prev.heater === 0) out.push('HEATER_CYCLE');
+  /* Gone quiet AND gone cold-quiet: whistle off with the drone falling is the contained
+   * signature, and it is the one moment where silence is the information. */
+  if (prev.whistle > 0 && next.whistle === 0 && next.drone < prev.drone) out.push('DRAUGHT_STILLS');
+  /* ⚠ NOT "the imager came on". The contact tone rises smoothly from 620Hz to 880Hz over
+   * two seconds of held lock, so a frame-to-frame delta is about two hertz and no delta
+   * threshold can see it. What the player is being told is that the lock COMPLETED, so the
+   * test is a threshold crossing near the top of the ramp. */
+  if (next.imager > 0 && prev.imagerHz < 820 && next.imagerHz >= 820) out.push('IMAGER_CONTACT');
+  if (next.breath > 0 && prev.breath === 0) out.push('BREATH_HARD');
+  return out;
+}
+
+/** Compass words, because a bearing in degrees is not a caption. */
+const DIRECTION_WORDS = Object.freeze({
+  ahead: 'ahead', behind: 'behind', left: 'to your left', right: 'to your right',
+  above: 'above', below: 'below',
+});
+
+/**
+ * PURE. One caption row plus its context, rendered to the line the HUD prints.
+ * @param {object} row  a CAPTIONS entry
+ * @param {object} ctx  {speaker, direction, showSpeaker, showDirection, text}
+ */
+export function formatCaption(row, ctx = {}) {
+  if (!row) return '';
+  const body = ctx.text || row.text;
+  const dir = ctx.showDirection !== false && row.directional && ctx.direction
+    ? ` — ${DIRECTION_WORDS[ctx.direction] || ctx.direction}` : '';
+  if (row.kind === 'speech') {
+    const who = ctx.showSpeaker !== false && (ctx.speaker || row.speaker);
+    return who ? `${who}: "${body}"${dir}` : `"${body}"${dir}`;
+  }
+  return `[${body}${dir}]`;
+}
+
+/**
+ * The caption event stream. NO DOM, NO CLOCK — the HUD renders it and the caller supplies
+ * simulation time, which is also what makes it drivable in the headless suite.
+ *
+ * ⚠ Time comes in, it is never read. audio.js is one of the two files section K5 exempts
+ * from the wall-clock ban, and it stays that way by not needing the exemption: a caption
+ * that expired according to Date.now() would expire while the game was paused.
+ */
+export class CaptionChannel {
+  constructor({ maxLines = 3, holdMs = 4200, dedupeMs = 1200, logSize = 128 } = {}) {
+    this.enabled = true;
+    this.maxLines = maxLines;
+    this.holdMs = holdMs;
+    this.dedupeMs = dedupeMs;
+    this.logSize = logSize;
+    this.log = [];              // ring, newest last — the debrief can read it back
+    this._lastAt = new Map();   // caption key -> simTimeMs it last fired
+    /** Subscribe to get every accepted caption as it lands. */
+    this.onCaption = null;
+  }
+
+  /**
+   * Offer a caption. Returns the accepted record, or null when it was suppressed.
+   * @param {string} key   a CAPTIONS key (usually the simulation event's own type)
+   * @param {object} evt   {simTimeMs, direction, speaker, text}
+   */
+  push(key, evt = {}) {
+    if (!this.enabled) return null;
+    const row = CAPTIONS[key];
+    if (!row) return null;                      // an event with no line is silent, not fatal
+    const t = Number.isFinite(evt.simTimeMs) ? evt.simTimeMs : 0;
+    /* The mix is sampled every frame, so without this a sharpening whistle would print
+     * sixty identical lines a second. Dedupe by KEY, never by text. */
+    const last = this._lastAt.get(key);
+    if (last !== undefined && t - last < this.dedupeMs && t >= last) return null;
+    this._lastAt.set(key, t);
+
+    const rec = {
+      key, at: t, priority: row.priority, kind: row.kind,
+      text: formatCaption(row, evt), direction: evt.direction || null, speaker: evt.speaker || null,
+    };
+    this.log.push(rec);
+    if (this.log.length > this.logSize) this.log.shift();
+    if (this.onCaption) this.onCaption(rec);
+    return rec;
+  }
+
+  /**
+   * What should be on screen at `nowMs`. Oldest first, so the HUD can print them as a
+   * stack that scrolls upward. Over-full drops the LOWEST priority, not the oldest: losing
+   * "logged" to keep "custody lost" is the whole point of the priority column.
+   */
+  active(nowMs) {
+    const live = this.log.filter((r) => nowMs - r.at < this.holdMs && nowMs >= r.at);
+    if (live.length <= this.maxLines) return live;
+    const keep = live.slice().sort((a, b) => (b.priority - a.priority) || (b.at - a.at)).slice(0, this.maxLines);
+    const keepSet = new Set(keep);
+    return live.filter((r) => keepSet.has(r));
+  }
+
+  clear() { this.log.length = 0; this._lastAt.clear(); }
+}
 
 export class Audio {
   constructor() {
     this.ctx = null;
     this.ok = false;
     this.voices = null;
+    this.buses = null;
+    /* Volumes are held here whether or not there is an AudioContext, so a player who sets
+     * them on the title screen still gets them when the first click starts the graph. */
+    this.volumes = { ...DEFAULT_VOLUMES };
+    /** The visual channel. Lives here because it is fed by exactly the same table the
+     *  oscillators are, and a caption that lived elsewhere would drift out of step. */
+    this.captions = new CaptionChannel();
+    this._lastMix = null;
   }
 
   /** Browsers refuse an AudioContext before a gesture; main.js calls this on first input. */
@@ -80,30 +291,68 @@ export class Audio {
     if (!AC) return false;
     try { this.ctx = new AC(); } catch { return false; }
     const master = this.ctx.createGain();
-    master.gain.value = CONFIG.audio.masterGain;
+    master.gain.value = CONFIG.audio.masterGain * this.volumes.master;
     master.connect(this.ctx.destination);
     this.master = master;
 
-    const voice = (type, hz, gain) => {
+    /* One gain node per §19.1 slider, between the voices and the master. Everything the
+     * mix decides passes through exactly one of them. */
+    this.buses = { master };
+    for (const name of BUSES) {
+      if (name === 'master') continue;
+      const g = this.ctx.createGain();
+      g.gain.value = this.volumes[name];
+      g.connect(master);
+      this.buses[name] = g;
+    }
+
+    const voice = (type, hz, gain, bus) => {
       const o = this.ctx.createOscillator();
       const g = this.ctx.createGain();
       o.type = type; o.frequency.value = hz; g.gain.value = gain;
-      o.connect(g); g.connect(master); o.start();
+      o.connect(g); g.connect(this.buses[bus] || master); o.start();
       return { o, g };
     };
     this.voices = {
-      drone: voice('sine', 58, 0),
-      whistle: voice('triangle', 420, 0),
-      imager: voice('sine', 620, 0),
-      hum: voice('sawtooth', 110, 0),
-      breath: voice('sine', 180, 0),
+      drone: voice('sine', 58, 0, VOICE_BUSES.drone),
+      whistle: voice('triangle', 420, 0, VOICE_BUSES.whistle),
+      imager: voice('sine', 620, 0, VOICE_BUSES.imager),
+      hum: voice('sawtooth', 110, 0, VOICE_BUSES.hum),
+      breath: voice('sine', 180, 0, VOICE_BUSES.breath),
     };
     this.ok = true;
     return true;
   }
 
-  /** Apply a mix. Ramps rather than steps, so nothing clicks. */
-  apply(mix, tSec = 0.12) {
+  /**
+   * Set one or more bus volumes, 0..1. Partial objects are fine — the settings panel sends
+   * one key at a time, and a save file sends all six.
+   * ⚠ Ramped, not stepped. A slider dragged to zero with `.value =` clicks, and the click
+   * is loudest at exactly the moment the player was trying to make it quieter.
+   */
+  setVolumes(v = {}) {
+    for (const [name, raw] of Object.entries(v)) {
+      if (!BUSES.includes(name)) continue;
+      const val = Math.max(0, Math.min(1, Number(raw) || 0));
+      this.volumes[name] = val;
+      if (!this.ok) continue;
+      const node = name === 'master' ? this.master : this.buses[name];
+      const target = name === 'master' ? CONFIG.audio.masterGain * val : val;
+      node.gain.setTargetAtTime(target, this.ctx.currentTime, 0.04);
+    }
+    return { ...this.volumes };
+  }
+
+  busGain(name) { return this.volumes[name]; }
+
+  /** Apply a mix. Ramps rather than steps, so nothing clicks.
+   *  ⚠ `simTimeMs` is the SIMULATION clock, not a frame count and not wall time. Captions
+   *  expire on it, so a paused game holds its last line on screen instead of blanking it
+   *  while the player is reading. Pass `game.clock.simTimeMs`. */
+  apply(mix, tSec = 0.12, simTimeMs = 0) {
+    /* Captions first, and outside the `ok` guard: a player with no sound card, a muted tab
+     * or a headless harness must still be told what the room is doing (§17.3). */
+    this.captionMix(mix, simTimeMs);
     if (!this.ok) return;
     const t = this.ctx.currentTime;
     const set = (v, gain, hz) => {
@@ -119,7 +368,33 @@ export class Audio {
     set(this.voices.breath, mix.breath);
   }
 
-  cue(name) {
+  /**
+   * Caption the continuous voices by comparing this mix with the last one. Safe to call
+   * every frame; the channel dedupes. Separate from apply() so a build with audio disabled
+   * can still run the visual channel.
+   * @param {object} mix   the value mixFor returned
+   * @param {number} simTimeMs  the simulation clock, so captions expire on game time
+   */
+  captionMix(mix, simTimeMs = 0) {
+    if (!mix) return [];
+    const keys = captionsForMixChange(this._lastMix, mix);
+    this._lastMix = mix;
+    const out = [];
+    for (const k of keys) {
+      const rec = this.captions.push(k, { simTimeMs });
+      if (rec) out.push(rec);
+    }
+    return out;
+  }
+
+  /**
+   * Fire a one-shot cue and its caption.
+   * @param {string} name  a CUES / CAPTIONS key — in practice the event's own `type`
+   * @param {object} evt   the simulation event, for simTimeMs and direction
+   */
+  cue(name, evt = {}) {
+    // The caption is not conditional on the audio graph existing. That is the point of it.
+    this.captions.push(name, evt);
     if (!this.ok) return false;
     const c = CUES[name];
     if (!c) return false;
@@ -132,7 +407,7 @@ export class Audio {
     g.gain.setValueAtTime(0, t);
     g.gain.linearRampToValueAtTime(c.gain, t + 0.012);
     g.gain.exponentialRampToValueAtTime(0.0001, t + c.dur);
-    o.connect(g); g.connect(this.master);
+    o.connect(g); g.connect(this.buses[c.bus] || this.master);
     o.start(t); o.stop(t + c.dur + 0.02);
     return true;
   }

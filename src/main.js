@@ -18,25 +18,12 @@ import { Hud } from './ui/hud.js';
 import { Panels } from './ui/panels.js';
 import { Audio, mixFor } from './audio/audio.js';
 import { Input } from './core/input.js';
+import { Settings, SettingsPanel } from './ui/settings.js';
+import { escapeHtml } from './ui/hud.js';
 import { dist } from './sim/geometry.js';
 import { CONFIG } from './config.js';
 
 const CONFIG_NET_HZ = CONFIG.net.snapshotHz;
-
-const BINDINGS = Object.freeze({
-  moveUp: ['KeyW', 'ArrowUp'],
-  moveDown: ['KeyS', 'ArrowDown'],
-  moveLeft: ['KeyA', 'ArrowLeft'],
-  moveRight: ['KeyD', 'ArrowRight'],
-  sprint: ['ShiftLeft', 'ShiftRight'],
-  crouch: ['ControlLeft', 'KeyC'],
-  interact: ['KeyF'],
-  use: ['KeyE'],
-  imager: ['KeyQ'],
-  tablet: ['Tab'],
-  abort: ['KeyR'],
-  slot1: ['Digit1'], slot2: ['Digit2'], slot3: ['Digit3'], slot4: ['Digit4'], slot5: ['Digit5'],
-});
 
 /* The crash banner keeps the FIRST error and tallies the rest — a page that rewrites the
  * banner on every follow-on error hides the one that started it. */
@@ -74,7 +61,12 @@ async function boot() {
   const hud = new Hud(document.getElementById('hud'), game, renderer);
   const audio = new Audio();
 
-  const input = new Input(window, BINDINGS).attach();
+  /* Settings are restored before anything reads them, so frame one is already the one the
+   * player configured last session (GDD 19.1). A profile that refuses storage starts at
+   * the defaults rather than throwing. */
+  const settings = Settings.restore();
+  const input = new Input(window, settings.bindings(), settings.holdModes()).attach();
+  input.onBindingsChanged = (table) => { settings.setBindings(table); settings.save(); };
   const net = new NetSession(game, { snapshotHz: CONFIG_NET_HZ });
   let pointerLocked = false;
 
@@ -91,9 +83,33 @@ async function boot() {
     onResume: () => { if (game.mission.phase !== PHASE.DEBRIEF) grabPointer(); },
   });
 
+  /**
+   * ONE function applies every setting. A settings screen that pushed each value straight
+   * to its own consumer grows a path per option and eventually loses one of them — and the
+   * option it loses is the one somebody needed (GDD §19.1).
+   *
+   * ⚠ Read `settings.effective`, never the raw values: `effective` is the copy with the
+   * photosensitivity clamps already applied, so a safe-mode player cannot be handed a
+   * strobe by a code path that forgot to check.
+   */
+  const applySettings = () => {
+    settings.applyCssVars(document.documentElement);
+    audio.setVolumes(settings.volumes());
+    audio.captions.enabled = settings.get('captions.enabled');
+    audio.captions.maxLines = settings.get('captions.maxLines');
+    audio.captions.holdMs = settings.get('captions.holdMs');
+    input.setHoldModes(settings.holdModes());
+  };
+  const settingsPanel = new SettingsPanel(document.body, settings, {
+    input,
+    onChange: applySettings,
+    onClose: () => { if (game.mission.phase !== PHASE.DEBRIEF && !panels.isOpen) grabPointer(); },
+  });
+  applySettings();
+
   /* Cues are a table lookup, so a new simulation event is a new row in audio.js and never
    * a change here. An event with no row is silent rather than fatal. */
-  game.bus.onAny((e) => { audio.cue(e.type); });
+  game.bus.onAny((e) => { audio.cue(e.type, e); });
   game.bus.on(EVENTS.MISSION_ENDED, (e) => {
     document.exitPointerLock();
     document.body.classList.add('free');
@@ -117,13 +133,30 @@ async function boot() {
 
   /* ── the loop ────────────────────────────────────────────────────────── */
 
+  /**
+   * The caption channel's visual end — GDD §17.3 requires a visual alternative for every
+   * critical audio cue, and §19.2 forbids any required rule from depending on hearing at
+   * all. Captions expire on SIMULATION time, so a paused game holds its last line instead
+   * of losing it while the player reads the tablet.
+   */
+  const capNode = document.getElementById('captions');
+  let capSig = '';
+  function drawCaptions() {
+    const on = settings.get('captions.enabled');
+    capNode.style.display = on ? 'flex' : 'none';
+    if (!on) return;
+    const html = audio.captions.active(game.clock.simTimeMs)
+      .map((r) => `<div class="cap p${r.priority}">${escapeHtml(r.text)}</div>`).join('');
+    if (html !== capSig) { capSig = html; capNode.innerHTML = html; }
+  }
+
   let lastFrameAt = 0;
   function frame(now) {
     requestAnimationFrame(frame);
 
     /* Total pause by construction: the panel closes the clock, and every mutation in the
      * game runs inside the clock's step callback, so no system needs to check a flag. */
-    const paused = panels.isOpen || !pointerLocked;
+    const paused = panels.isOpen || settingsPanel.isOpen || !pointerLocked;
     game.clock.setPaused(paused);
 
     const me = game.playerById(net.localPlayerId);
@@ -167,6 +200,7 @@ async function boot() {
         else if (me) me.selectSlot(i - 1);
       }
       if (input.wasPressed('tablet')) { document.exitPointerLock(); panels.showTablet(); }
+      if (input.wasPressed('settings')) { document.exitPointerLock(); settingsPanel.show(); }
     }
 
     /* THE AUTHORITY RULE, in three lines. A host (or a solo operative, which is a host
@@ -185,6 +219,7 @@ async function boot() {
 
     renderer.render();
     hud.update();
+    drawCaptions();
 
     if (audio.ok) {
       audio.apply(mixFor({
@@ -196,7 +231,7 @@ async function boot() {
         stressNorm: game.player.stressNorm,
         pressureStage: game.mission.stage,
         activeEmitters: game.deployables.list.filter((d) => d.isEmitter && d.active).length,
-      }));
+      }), 0.12, game.clock.simTimeMs);
     }
   }
 
@@ -213,6 +248,7 @@ async function boot() {
   game.localId = net.localPlayerId;
 
   window.__CD = { game, renderer, hud, panels, audio, input, content, mixFor, net, ROLE, ACT,
+    settings, settingsPanel,
     get paused() { return game.clock.paused; } };
   window.dispatchEvent(new CustomEvent('cd-ready', { detail: window.__CD }));
 }
