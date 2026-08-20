@@ -1,47 +1,136 @@
 {
   "id": "cold-storage-l2",
-  "contentRevision": "0.1.0",
+  "displayName": "Cold storage, level 2",
+  "contentRevision": "0.2.0-web",
   "_incident": "A cold-storage floor two levels down: four shelving aisles, a loading bay, and an office nobody has opened since the second shift stopped answering. The aisles are 4.2m wide — wider than one floodlight's 40C contour — so the fence that sealed the plant room's corridor with a single tripod needs TWO here, staggered, or a lane the draught simply walks around. Power is a two-step: the office circuit's switch is on the bay wall, the storage circuit's switch is INSIDE the office.",
+  "_webNote": "Imported from Dev\\ContainmentDetail revision 0.1.0. The geometry, spawn, extraction, anomaly spawn, doors and circuits are unchanged. Added for the browser build: a perimeter, a ceiling height, the cargo cache the loadout wager needs somewhere to live, named rooms so a player can say where they are, mains luminaires per circuit, and the static evidence sources named in the anomaly file.",
+
+  "bounds": { "minX": -12.0, "maxX": 12.0, "minZ": -12.0, "maxZ": 12.0 },
+  "ceilingHeight": 3.4,
+
   "spawn": [8.5, -8.5],
+  "spawnFacingRad": 2.4,
   "extraction": { "x": 9.5, "z": -9.5, "radius": 2.0 },
   "anomalySpawn": [-10.0, 10.0],
+  "cache": { "x": 6.4, "z": -7.2 },
+
   "crates": [[0.0, -3.5], [-5.5, 5.0], [9.0, 3.0]],
+
   "statics": [
+    [-12.4, -12.4, 12.4, -12.0],
+    [-12.4, 12.0, 12.4, 12.4],
+    [-12.4, -12.4, -12.0, 12.4],
+    [12.0, -12.4, 12.4, 12.4],
+
     [-12.0, -5.2, -9.0, -4.8],
     [-7.0, -5.2, 4.0, -4.8],
     [6.0, -5.2, 12.0, -4.8],
+
     [-8.4, -2.0, -7.6, 8.0],
     [-3.4, -2.0, -2.6, 8.0],
     [1.6, -2.0, 2.4, 8.0],
     [6.6, -2.0, 7.4, 8.0],
+
     [-8.2, -12.0, -7.8, -10.5],
     [-8.2, -9.0, -7.8, -8.0],
-    [-12.0, -8.2, -8.0, -7.8]
+    [-12.0, -8.2, -8.0, -7.8],
+
+    [8.6, -12.0, 9.0, -8.6]
   ],
+
+  "_porousNote": "Indices into `statics` that are STEEL SHELVING rather than cold-store panel. The anomaly's constraint list blocks it with closed-cell insulation only — 'Portable barrier panels work; sheet metal and plasterboard do not' — so every static stops the draught EXCEPT these four aisle runs. The site being a cold store is the reason its own structure is a fence at all, and why the doors are worth power.",
+  "porousStatics": [7, 8, 9, 10],
+
   "doors": [
     {
       "id": "door-freight-cold",
+      "displayName": "Freight door",
       "aabb": [-9.0, -5.2, -7.0, -4.8],
       "circuitId": "circuit-storage",
       "initiallyOpen": false
     },
     {
       "id": "door-office",
+      "displayName": "Office door",
       "aabb": [-8.2, -10.5, -7.8, -9.0],
       "circuitId": "circuit-office",
       "initiallyOpen": false
     }
   ],
+
   "circuits": [
     {
       "id": "circuit-office",
+      "displayName": "Office circuit",
       "switch": [-6.0, -7.0],
+      "switchLabel": "Office circuit — breaker on the bay wall",
       "initiallyOn": false
     },
     {
       "id": "circuit-storage",
+      "displayName": "Storage circuit",
       "switch": [-10.0, -10.0],
+      "switchLabel": "Storage circuit — breaker inside the office",
       "initiallyOn": false
+    }
+  ],
+
+  "luminaires": [
+    { "at": [-10.0, -10.0], "circuitId": "circuit-office" },
+    { "at": [-10.0, -6.6], "circuitId": "circuit-office" },
+    { "at": [-5.5, 1.0], "circuitId": "circuit-storage" },
+    { "at": [-5.5, 6.5], "circuitId": "circuit-storage" },
+    { "at": [-0.5, 1.0], "circuitId": "circuit-storage" },
+    { "at": [-0.5, 6.5], "circuitId": "circuit-storage" },
+    { "at": [4.5, 1.0], "circuitId": "circuit-storage" },
+    { "at": [4.5, 6.5], "circuitId": "circuit-storage" },
+    { "at": [9.6, 3.0], "circuitId": "circuit-storage" },
+    { "at": [-10.5, 3.0], "circuitId": "circuit-storage" },
+    { "at": [3.0, -8.5], "circuitId": null, "emergency": true },
+    { "at": [-4.0, -9.5], "circuitId": null, "emergency": true }
+  ],
+
+  "rooms": [
+    { "id": "stair-head", "name": "Stair head", "rect": [9.0, -12.0, 12.0, -8.6] },
+    { "id": "loading-bay", "name": "Loading bay", "rect": [-7.8, -12.0, 8.6, -5.2] },
+    { "id": "east-dock", "name": "East dock", "rect": [9.0, -8.6, 12.0, -5.2] },
+    { "id": "office", "name": "Office", "rect": [-12.0, -12.0, -8.2, -8.2] },
+    { "id": "freight-lobby", "name": "Freight lobby", "rect": [-12.0, -7.8, -8.2, -5.2] },
+    { "id": "aisle-west", "name": "West run", "rect": [-12.0, -4.8, -8.4, 12.0] },
+    { "id": "aisle-a", "name": "Aisle A", "rect": [-7.6, -4.8, -3.4, 12.0] },
+    { "id": "aisle-b", "name": "Aisle B", "rect": [-2.6, -4.8, 1.6, 12.0] },
+    { "id": "aisle-c", "name": "Aisle C", "rect": [2.4, -4.8, 6.6, 12.0] },
+    { "id": "aisle-east", "name": "East run", "rect": [7.4, -4.8, 12.0, 12.0] }
+  ],
+
+  "evidenceSources": [
+    {
+      "evidenceId": "frost-bloom",
+      "at": [-10.2, 9.2],
+      "label": "Frost on a stanchion",
+      "prompt": "Examine the frost",
+      "requiresEquipment": []
+    },
+    {
+      "evidenceId": "survivor-account",
+      "at": [7.6, -8.2],
+      "label": "Surviving crew member",
+      "prompt": "Take a statement",
+      "requiresEquipment": []
+    },
+    {
+      "evidenceId": "maintenance-log",
+      "at": [-11.2, -11.4],
+      "label": "Plant log on the office desk",
+      "prompt": "Read the log",
+      "requiresEquipment": []
+    },
+    {
+      "evidenceId": "stairwell-draught",
+      "at": [10.8, -11.2],
+      "label": "Draught at the stair head",
+      "prompt": "Note the draught",
+      "requiresEquipment": []
     }
   ]
 }

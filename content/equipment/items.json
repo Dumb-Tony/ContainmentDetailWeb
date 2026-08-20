@@ -1,19 +1,39 @@
 {
-  "contentRevision": "0.2.0",
+  "contentRevision": "0.3.0-web",
+  "_note": "Imported from Dev\\ContainmentDetail (the Unity build) at revision 0.2.0 and extended. The additions are portable-heater, power-pack and sample-kit, all three of which the anomaly definition already names in graybox-draught.json (constraint `heat-gradient`, procedures `heat-fence-safe` and `heat-fence-research`) but which the Unity manifest had not reached yet. Every item also gained the fields this build's simulation reads: cargoVolume for the loadout wager (GDD 10.7), batteryMinutes for legible failure (GDD 10.6), and heatFalloffMetres so a heat emitter's 40C contour radius is content, not a constant buried in code.",
+
+  "cargoVolumeBudget": 11,
+
   "items": [
+    {
+      "id": "thermal-imager",
+      "displayName": "Thermal imager",
+      "bulk": "general",
+      "role": "detection",
+      "deployable": false,
+      "cargoVolume": 1,
+      "batteryMinutes": 14,
+      "summary": "Sees the anomaly in any state. Narrow view; you cannot watch the room and the screen at once."
+    },
     {
       "id": "motion-sensor",
       "displayName": "Motion sensor",
       "bulk": "compact",
       "role": "detection",
-      "deployable": true
+      "deployable": true,
+      "cargoVolume": 1,
+      "batteryMinutes": 20,
+      "summary": "Watches one lane. Reports motion, not identity."
     },
     {
       "id": "remote-camera",
       "displayName": "Remote camera",
       "bulk": "compact",
       "role": "detection",
-      "deployable": true
+      "deployable": true,
+      "cargoVolume": 1,
+      "batteryMinutes": 16,
+      "summary": "Extends observation. Records the approach lane you cannot stand in."
     },
     {
       "id": "floodlight-tripod",
@@ -21,35 +41,85 @@
       "bulk": "long",
       "role": "containment",
       "deployable": true,
-      "heatOutputCelsius": 60
+      "cargoVolume": 2,
+      "batteryMinutes": 5.5,
+      "heatOutputCelsius": 60,
+      "heatFalloffMetres": 2.2,
+      "summary": "Light, and heat as a side effect. Its 40C contour is the cheapest fence post you have."
     },
     {
-      "id": "thermal-imager",
-      "displayName": "Thermal imager",
+      "id": "portable-heater",
+      "displayName": "Portable heater",
       "bulk": "general",
-      "role": "detection",
-      "deployable": false
+      "role": "containment",
+      "deployable": true,
+      "cargoVolume": 2,
+      "batteryMinutes": 4,
+      "heatOutputCelsius": 78,
+      "heatFalloffMetres": 2.9,
+      "summary": "A wider contour than a tripod and a much shorter life. Bring a pack or bring two."
     },
     {
-      "id": "trauma-kit",
-      "displayName": "Trauma kit",
-      "bulk": "compact",
+      "id": "power-pack",
+      "displayName": "Power pack",
+      "bulk": "general",
       "role": "support",
-      "deployable": false
+      "deployable": true,
+      "cargoVolume": 2,
+      "batteryMinutes": 9,
+      "feedRadiusMetres": 5.0,
+      "summary": "Feeds every emitter within 5m off its own cells instead of theirs. The difference between a fence that holds and a fence that dims in sequence."
     },
     {
       "id": "portable-barrier",
       "displayName": "Portable barrier",
       "bulk": "general",
       "role": "containment",
-      "deployable": true
+      "deployable": true,
+      "cargoVolume": 2,
+      "barrierWidthMetres": 2.4,
+      "summary": "Closed-cell insulation. The only solid thing on this site the draught will not walk through."
     },
     {
       "id": "reinforced-transit-case",
       "displayName": "Reinforced transit case",
       "bulk": "general",
       "role": "containment",
-      "deployable": true
+      "deployable": true,
+      "cargoVolume": 2,
+      "batteryMinutes": 12,
+      "heatOutputCelsius": 39,
+      "heatFalloffMetres": 1.6,
+      "_heatNote": "The case runs its heater at 39C — one degree under the gradient threshold. That is the whole reason it works as a lure: it is the warmest thing on the floor the draught can still reach, so it out-competes an operative at 37C without becoming a wall. Warm it past 40 and it stops attracting anything, which is exactly what happens if you set a tripod down too close to it.",
+      "summary": "Custody. Insulated, heated to 39C, and useless until the thing is already held still."
+    },
+    {
+      "id": "dosimeter",
+      "displayName": "Dosimeter",
+      "bulk": "compact",
+      "role": "detection",
+      "deployable": false,
+      "cargoVolume": 1,
+      "batteryMinutes": 22,
+      "summary": "Logs anomalous radiation. Research-grade procedure asks for it; this incident is thermal, and it will read nothing."
+    },
+    {
+      "id": "sample-kit",
+      "displayName": "Sample kit",
+      "bulk": "compact",
+      "role": "research",
+      "deployable": false,
+      "cargoVolume": 1,
+      "summary": "Preserves a frost sample. Research standing, not survival."
+    },
+    {
+      "id": "trauma-kit",
+      "displayName": "Trauma kit",
+      "bulk": "compact",
+      "role": "support",
+      "deployable": false,
+      "cargoVolume": 1,
+      "summary": "Stabilises. It does not undo exposure — it stops it getting worse."
     }
   ]
 }

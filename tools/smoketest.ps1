@@ -1,4 +1,4 @@
-# Airport Baggage Crew - headless smoke test.
+# Containment Detail (browser build) - headless smoke test.
 #
 # There is no Node.js on this machine, so the harness IS a browser (Dev\INDEX.md ->
 # Testing). Copied from SomethingsDifferent\tools\smoketest.ps1 and adapted: this game is
@@ -14,7 +14,7 @@
 param(
   [string]$Tests = "tools\m0-tests.js",
   [string]$Game  = "index.html",
-  [int]$Port     = 8379,
+  [int]$Port     = 8411,
   [switch]$Keep
 )
 $ErrorActionPreference = "Stop"
@@ -42,12 +42,12 @@ $html = $html -replace '</body>', $inject
 # Stamp it. Other projects on this machine run this same harness with the same scratch
 # filename, so "something answered 200 on the port" is NOT proof it is our server — it
 # can silently run the wrong game's page and report its results as ours.
-$stamp = "ABCTEST-" + [System.Guid]::NewGuid().ToString("N")
+$stamp = "CDTEST-" + [System.Guid]::NewGuid().ToString("N")
 $html = $html -replace '</head>', "<!--$stamp--></head>"
 Set-Content -Path $scratch -Value $html -Encoding utf8
 
 . "$root\tools\_serve-mine.ps1"
-$srv = Start-MyServer -Root $root -ScratchName $scratchName -Stamp $stamp -Ports @($Port, 8386, 8387, 8388, 8389)
+$srv = Start-MyServer -Root $root -ScratchName $scratchName -Stamp $stamp -Ports @($Port, 8412, 8413, 8414, 8415)
 if (-not $srv) {
   Write-Host "Could not get a port serving this project." -ForegroundColor Red
   exit 2
@@ -58,8 +58,8 @@ $url = $srv.Url
 # NOTE: chrome.exe is a GUI-subsystem binary, so `$x = & chrome --dump-dom` captures
 # NOTHING under PowerShell - the DOM has to be redirected to a file. Do not "simplify"
 # this back to a direct capture; it silently cost an hour on the last project.
-$profileDir = Join-Path $env:TEMP ("abc-smoke-" + [System.Guid]::NewGuid().ToString("N").Substring(0,8))
-$domFile    = Join-Path $env:TEMP ("abc-dom-"   + [System.Guid]::NewGuid().ToString("N").Substring(0,8) + ".html")
+$profileDir = Join-Path $env:TEMP ("cd-smoke-" + [System.Guid]::NewGuid().ToString("N").Substring(0,8))
+$domFile    = Join-Path $env:TEMP ("cd-dom-"   + [System.Guid]::NewGuid().ToString("N").Substring(0,8) + ".html")
 $proc = Start-Process $chrome -ArgumentList `
   "--headless=new","--disable-gpu","--no-first-run","--no-default-browser-check",
   "--user-data-dir=$profileDir","--window-size=1280,720",
@@ -76,7 +76,7 @@ if (Test-Path $domFile) { $text = Get-Content $domFile -Raw -Encoding UTF8 }
 try { Remove-Item $domFile -Force -ErrorAction Stop } catch {}
 if (-not $text) { $text = "" }
 
-$m = [regex]::Match($text, '==ABCTEST-BEGIN==(.*?)==ABCTEST-END==', 'Singleline')
+$m = [regex]::Match($text, '==CDTEST-BEGIN==(.*?)==CDTEST-END==', 'Singleline')
 if (-not $m.Success) {
   Write-Host "No test output found - the page probably crashed before the harness ran." -ForegroundColor Red
   $eb = [regex]::Match($text, 'id="err-banner"[^>]*>(.*?)</div>', 'Singleline')

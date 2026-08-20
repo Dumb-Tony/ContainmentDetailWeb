@@ -20,7 +20,7 @@ function Start-MyServer {
     [Parameter(Mandatory = $true)][string]$Root,
     [Parameter(Mandatory = $true)][string]$ScratchName,   # e.g. _shot.html
     [Parameter(Mandatory = $true)][string]$Stamp,         # must appear in the served file
-    [int[]]$Ports = @(8378, 8380, 8381, 8382, 8383, 8384, 8385)
+    [int[]]$Ports = @(8411, 8412, 8413, 8414, 8415)
   )
 
   foreach ($port in $Ports) {
