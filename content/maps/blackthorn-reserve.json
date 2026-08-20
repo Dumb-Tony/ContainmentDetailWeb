@@ -1,0 +1,202 @@
+{
+  "id": "blackthorn-reserve",
+  "displayName": "Blackthorn Reserve",
+  "contentRevision": "0.1.0-web",
+
+  "_incident": "A forest research reserve on the edge of a plantation: a ranger station and its car park on the forest road, a fenced maintenance compound with the standby set in it, four visitor cabins and a washblock, a fire lookout and the site radio mast on the ridge, and a drainage channel running the full width of the reserve with two crossings on it. The load-bearing fact is that it is OUTDOORS, and outdoors there are no lanes.\n\nA lane is a thing a building makes. Both previous maps are arguments about lanes — the cold store's aisles are 4.2m and cost two posts each, Ashlar's heating gallery is 2.400m and costs one — and neither argument survives contact with open ground, because `isFenced` casts twenty-four rays to 6.5m and on open ground twenty-four of them leave. Measured over 4,739 standable points on a 0.6m grid with every door shut and nothing deployed: 41.5% of this reserve has all twenty-four lanes open, 84.8% has eighteen or more, and the ground with six or fewer is 29.9 square metres out of 1,706. Nowhere on the bare reserve is fenced. The single best position on 2,304 square metres is one open lane, and it is in the pump house court.\n\nThe reserve LOOKS like it is made of walls, and that is the first thing it lies about. There are 441.8m of deer fence, chain-link, tree line, timber cabin wall and open concrete channel on this site, and 49.5m of concrete. 10.1% of the built length of this place stops the draught; 100% of it stops a person. The maintenance compound is the trap: a fenced yard with a powered vehicle gate, which is what a squad that has learned the cold store will walk the thing into. Measured, standing in that yard: 24 of 24 rays escape with the gate open and 24 of 24 with it shut. The gate is 2.8m of insulation in 45.6m of chain-link. The only object in the compound that stops a ray at all is the generator bay, and it stops six. Backing into the corner of the map is the same mistake: the reserve boundary is deer fence and it is porous, so hard against it the count is 24 of 24. Neither of the other two maps has a single position on it that is worth nothing.\n\nHEAT CANNOT PAY FOR THIS. Not because it is scarce — this is the map where it is cheapest — but because in the open a heat fence is not a wall, it is a ring, and a ring has to be built around the thing rather than across a gap. Measured on the meadow: two floodlights close it only while both posts are within 1.9m of the mass, three within 3.1m, four within 4.5m; two heaters within 3.4m and four within 6.0m. It moves at 2 m/s while it is drawn. You cannot build a ring around a thing that is walking, and the one object that makes it stop walking is the transit case — which a floodlight deletes at 16.02m and a heater at 24.44m, because either one lifts the case's own centre past 40C and `chooseTarget` drops it. Sixteen metres is 35% of this reserve and 140% of a 24m floor. That is the whole difference: on the cold store and at Ashlar a working lure and a lit fence could not exist anywhere on the same floor, and here they can, thirty metres apart.\n\nSO THE FENCE IS COLD. Two things on this reserve stop a draught and emit nothing: a 2.4m barrier panel, and the culvert gate. The north bank between the drainage channel and the mouth of the pump house court is 2.400m, which is one panel, and there are two flanks. Bare, with the gate shut, the court reads 2 of 24 at the back and 5 of 24 out in the forecourt; one panel takes it to 2; both panels take it to zero, and the pen is 4.2m by 5.4m with not one degree of deployed heat anywhere on the map. That is the third argument, and it is the reason the portable barrier stops being research-grade garnish here and becomes the two most important units of cargo in the van. Imager, case and two panels is 7 of 11.\n\nINFRASTRUCTURE IS NEITHER OF THE OTHER TWO ANSWERS. The cold store's power opens doors and a closed door is a fence post; Ashlar's power closes doors that start stuck open. Here there is one door that matters and power buys mostly LIGHT — 23.8% of standable ground has any illumination at all when you arrive, against 79.7% with both circuits live, and on 2,304 dark square metres that is the difference between a reserve you can work in and a reserve you get lost in. The one door that matters is the culvert gate, and it is shut when you arrive because the compound circuit is dead. That dead circuit IS the pen's south wall, for free, and it is the only thing this map ever gives away. Restoring the compound circuit is what opens the haul road — 44.8m from the extraction point to the court against 50.4m over the footbridge, and the only one of the two crossings a vehicle can use — and opening it re-opens the gate. Measured: both panels with the gate open is 1 of 24, and that one lane costs exactly one floodlight on the culvert deck. The same floodlight puts the case at 46.2C, so it goes down last and never before the lure has done its work. The shortcut and the fence are the same object.\n\nTWO AUTHORED FAILURE STATES, and neither is Ashlar's. The first: the panels are the LAST two things you place, not the first. Placed early they turn the court into a funnel whose only entrance is the culvert throat, and a memoryless wall-follower cannot walk a funnel — traced from the cabins with both panels standing, it gets to 2.15m of the case and paces the north glade for four minutes without ever going back south and round. The second is the price of the cold answer: with both panels down and the gate shut, the pen is sealed to OPERATIVES as well. It is 26.1 square metres, nobody outside can reach the case, nobody inside can walk out, and the latches need somebody within 2.2m of the case. Whoever seals it is in there with it until a panel is lifted. The mass is banked by then and banked does not touch anybody, so this is a fact to plan around rather than a way to die — which is exactly what it should be.",
+  "_webNote": "Authored for the browser build against revision 0.5.0 of graybox-draught and 0.4.0-web of the equipment manifest. Pure geometry: no `anomalySpawn`, no `evidenceSources`, no `instanceSites`. The incident supplies all three and `validateMap` runs on the merged document — verified by driving the real `loadContent` with a synthetic incident and getting zero problems.\n\nWHAT IS HERE, against GDD 26.2's field-map list: ranger station and car park (south, on the forest road, with the spawn, the cargo cache and the extraction point all in the car park); maintenance compound (south-west, chain-link, vehicle gate, workshop, fuel store bay, generator bay); visitor cabins (four, north-west, with the washblock and bin store behind them); fire lookout and radio mast (north-east ridge, the lookout's plinth store and the mast lockup); trail network and drainage crossing (the channel runs the width of the reserve at z = 3.2 to 4.8 with a footbridge at x = -11.2 to -8.8 and a culvert at x = 4.4 to 7.2); backup power and radio (two circuits — the standby set in the generator bay and the transfer switch in the mast lockup); two extraction routes (see `_extractionNote`).\n\nBOUNDS ARE 48m BY 48m, FOUR TIMES BOTH SHIPPED MAPS, AND THE COST IS ONE NUMBER. `ThermalFloor` samples a fixed 96x96 grid whatever the bounds are, so the imager costs exactly the same 9,216 samples per update here as on a 24m floor — bigger is free in time and paid for entirely in metres per pixel: 0.2500 m/px at 24m, 0.5000 m/px at 48m. Both stay coarser than the rule's own 0.18m path sampling (1.39x and 2.78x), which is the invariant thermalFloor.js asks for, so the picture still never promises a gap the rule does not resolve. What it loses is the contour. Averaged over sixteen sub-pixel offsets, a lone floodlight's 40C band draws 20.0 pixels at 24m and 5.0 at 48m; two floodlights 3.2m apart, 46.0 and 11.8; one heater, 49.3 and 12.8. A quarter of the contour, which on a map whose fence is made of heat would be a straight downgrade of the single most important readout in the game. This map's fence is made of panels and a gate, which emit nothing and have no contour to draw, so what the imager is for here is finding the mass and counting lanes. That is a design consequence and it is stated so it can be argued with: any FUTURE outdoor map that wants a lit fence should be authored at 32m or 40m (10.5 and 7.3 band pixels) rather than 48m, or thermalFloor.js should size N off the bounds.\n\nThe other things that change at this size, all measured: `MARK_RANGE_M` is 30m and the reserve's diagonal is 67.9m, so only 61% of standable ground can be pinged from the car park and a squad that splits genuinely loses the ping board; `pressure.withdrawalDistanceM` is 14m, so withdrawal relief is actually reachable here and is not on a 24m floor; and the anomaly's 12m wake radius covers 20% of this reserve against 79% of a 24m one, so it stays latent far longer and the investigation phase has room to happen before the containment does.\n\nCEILING HEIGHT IS 4.6m AND IT IS A COMPROMISE, not a measurement. scene.js draws a ceiling plane over the whole bounds and hangs every mains luminaire at h - 0.25 with a distance-9 point light, so a sky-high ceiling would leave the ground unlit and a low one would make the reserve read as a cellar. 4.6m is the closed plantation canopy: high enough to read as outdoors under the exponential fog, low enough that the yard lights still reach the floor. Porous statics render as open racking at a fixed 2.6m regardless, which is why the deer fence, the chain-link and the tree lines read as see-through and the concrete does not. There is no verticality in this build, so the fire lookout is present as the concrete plinth store at its foot and the tower above it is out of the simulation's plane; nothing on this map depends on a sightline from height.\n\nMEASURED, by running the real Site, HeatField, DeployableSet, Anomaly and ThermalFloor against this file.\n\nGeometry. 53 statics, no two overlapping; no door rect overlapping a static or another door; 31 room rects, none overlapping; no crate inside a static; no luminaire fitting buried in one. Clearance at every anchor with EVERY DOOR SHUT, against the 0.34m operative radius: spawn 3.600, cache 1.756, extraction 3.800, both breakers 0.600 — worst 0.600m, and the four-operative 1.1m spawn ring is clear. On a 0.20m grid there are 40,585 standable cells and all 40,585 of them are reachable from the spawn with every door on the map shut; the reserve is one connected space and the doors are shortcuts, never gates on the only way through. `roomNameAt` names every one of those cells, no cell reports \"Unmarked floor\", every one of the 31 authored rooms is reached by some standable cell, and the worst distance from a standable cell to the rect that names it is 0.100m.\n\nFences. Bare, doors shut: open meadow 23 of 24, cabin row 18, lookout clearing 17, compound yard 24, hard against the deer fence 24, ranger station office with its door shut 22. Pump house court with the culvert gate shut and nothing deployed: 2 at the back, 4 in the middle, 5 in the forecourt; one panel 2; both panels ZERO, at every point of a 4.2m by 5.4m envelope (550 of 660 sampled points inside the court and forecourt). Gate open, both panels: 1, closed by one floodlight on the culvert deck. Without panels the court can also be closed by two heaters or two floodlights in the mouth (4 of 11 cargo either way); one heater alone leaves one lane. Fuel store bay: bare 5, one panel 1, two panels or two floodlights or one panel and one heater all zero. Washblock passage: bare 10, two panels or two heaters zero, one panel and one floodlight 2. Three pens, three prices, and the cheapest of them is 53.8m from the cache and the dearest is 32.6m.\n\nDrift. Traced with the real `_drift`, the case at (5.8, 9.6) in the court, the gate shut on arrival and both panels going down three seconds after the mass settles: from the cabins it is within 1.5m of the case in 27.3s at drawn pace, banked at 30.3s and SEALED; from the lookout clearing 19.6s; from the compound, south of the channel and across it, 29.9s; from the ridge 8.3s; from the car park, 32.7m away and the whole reserve between, 15.6s. At aware pace from the cabins, 35.6s. With both panels already standing when it starts, it never arrives: closest approach 2.15m, and it finishes in the north glade.\n\nLight. 23.8% of standable ground has any mains illumination with nothing energised — the solar waymarkers alone, seven of them, and they trace the trail network. Compound circuit 58.4%, ridge circuit 47.9%, both 79.7%.",
+  "_extractionNote": "GDD 26.2 asks for TWO EXTRACTION ROUTES and the map format's `extraction` field is one point, so this map ships one point and two disjoint routes to it, and says which is which. The point is the vehicle at the car park, (-9.6, -20.2) radius 2.4, beside the spawn and the cargo cache. The drainage channel cuts the reserve in half from boundary to boundary and is crossed in exactly two places: the FOOTBRIDGE on the west trail (x = -11.2 to -8.8, cabin row to car park, no door, always open) and the CULVERT on the haul road (x = 4.4 to 7.2, pump house court to the meadow to the compound approach, gated, on the compound circuit, shut and dead on arrival). Measured on a 0.20m flood fill from the extraction point to the pump house court: 44.8m by the culvert, 50.4m by the footbridge, and with both crossings closed the north half of the reserve cannot reach the extraction point at all — which is the proof that these are the only two. The culvert is the compromisable one and it starts compromised: it is a vehicle route rather than a footpath, restoring the compound circuit is what opens it, and opening it is also what opens the south wall of the pen (see `_incident`). A squad that never restores power runs the whole operation on the footbridge and carries everything.",
+
+  "bounds": { "minX": -24.0, "maxX": 24.0, "minZ": -24.0, "maxZ": 24.0 },
+  "ceilingHeight": 4.6,
+
+  "spawn": [-10.0, -18.6],
+  "spawnFacingRad": 3.14,
+  "extraction": { "x": -9.6, "z": -20.2, "radius": 2.4 },
+  "cache": { "x": -12.8, "z": -19.6 },
+
+  "crates": [[13.4, 5.6], [-12.0, -6.0], [-15.0, -19.0], [2.6, -16.0], [-6.0, 16.0], [19.0, 8.6]],
+
+  "statics": [
+    [3.2, 3.2, 4.4, 4.8],
+    [7.2, 3.2, 8.4, 4.8],
+    [3.0, 7.2, 3.4, 11.6],
+    [3.4, 11.2, 8.2, 11.6],
+    [8.2, 7.2, 12.2, 11.6],
+    [-20.7, -7.4, -16.4, -7.0],
+    [-20.7, -3.7, -16.4, -3.3],
+    [-20.7, -7.0, -20.3, -3.7],
+    [-13.6, -13.4, -10.0, -10.6],
+    [-17.6, 17.2, -13.6, 21.6],
+    [-17.6, 13.2, -13.6, 14.8],
+    [11.2, 15.2, 14.8, 18.8],
+    [17.2, 15.6, 20.0, 18.4],
+    [-22.0, -20.4, -19.6, -18.0],
+
+    [-24.4, -24.4, 24.4, -24.0],
+    [-24.4, 24.0, 24.4, 24.4],
+    [-24.4, -24.0, -24.0, 24.0],
+    [24.0, -24.0, 24.4, 24.0],
+
+    [-24.0, 3.2, -11.2, 4.8],
+    [-8.8, 3.2, 3.2, 4.8],
+    [8.4, 3.2, 24.0, 4.8],
+
+    [-21.0, -15.0, -13.4, -14.7],
+    [-10.6, -15.0, -7.0, -14.7],
+    [-21.0, -3.3, -7.0, -3.0],
+    [-21.0, -14.7, -20.7, -3.3],
+    [-7.3, -14.7, -7.0, -8.4],
+    [-7.3, -6.0, -7.0, -3.3],
+    [-20.7, -13.4, -16.4, -9.0],
+
+    [4.0, -21.0, 16.0, -20.6],
+    [4.0, -13.4, 8.4, -13.0],
+    [10.8, -13.4, 16.0, -13.0],
+    [4.0, -20.6, 4.4, -13.4],
+    [15.6, -20.6, 16.0, -18.6],
+    [15.6, -16.2, 16.0, -13.4],
+    [9.6, -20.6, 10.0, -16.4],
+
+    [-20.8, 9.6, -17.6, 12.8],
+    [-15.6, 9.6, -12.4, 12.8],
+    [-10.8, 9.6, -7.6, 12.8],
+    [-21.2, 16.8, -18.8, 20.0],
+
+    [15.6, 14.0, 17.2, 14.3],
+    [19.6, 14.0, 21.6, 14.3],
+    [15.6, 19.7, 21.6, 20.0],
+    [15.6, 14.3, 15.9, 19.7],
+    [21.3, 14.3, 21.6, 19.7],
+
+    [-4.0, -14.0, -3.2, -4.4],
+    [-1.6, -9.4, 2.4, -8.6],
+    [12.4, -8.0, 13.2, 1.2],
+    [-4.0, 8.4, -3.2, 17.6],
+    [14.8, 6.4, 22.0, 7.2],
+    [-22.4, 6.4, -12.8, 7.2],
+    [-22.4, 21.6, -8.0, 22.4],
+    [2.4, 21.6, 16.0, 22.4],
+    [17.6, -14.0, 18.4, -4.0]
+  ],
+
+  "_porousNote": "Indices into `statics` that stop a PERSON and not the draught. The anomaly's constraint list blocks it with closed-cell insulation only — 'Portable barrier panels work; sheet metal and plasterboard do not' — so on a reserve the line is drawn at CONCRETE, and it is drawn by the order of the array: 0 to 13 are every square metre of this site that stops a draught, and 14 to 52 are everything else. Read the first fourteen and you have read the whole containment problem.\n\n0 and 1 are the culvert's two wing walls, 1.2m each. 2, 3 and 4 are the pump house court — the screen wall, the settling-tank end wall, and the pump house itself. 5, 6 and 7 are the fuel store blockhouse, three sides of a bay open to the east. 8 is the generator bay. 9 and 10 are the washblock and the bin store, and the 2.400m passage between them is the third pen. 11 and 12 are the fire lookout's plinth store and the mast lockup. 13 is the toilet block at the car park. Two wing walls, one walled court, one three-sided bay and six small blocks: fourteen runs, 49.5m.\n\nEverything from 14 is porous, and that is 441.8m: the reserve's own boundary is deer fence on all four sides (14-17), the drainage channel is an open concrete cut with a guard rail either side and a draught flows straight down and across it (18-20), the maintenance compound is chain-link (21-26), the workshop is steel-clad (27), the ranger station and the four visitor cabins are timber (28-38), the mast compound is mesh (39-43), and 44 to 52 are tree lines and undergrowth. 10.1% of the built length of this reserve is a fence and 89.9% of it is scenery that a person cannot walk through — which is the exact inverse of the cold store, where the building's own structure was a fence and four shelving runs were the exception.\n\nTwo consequences worth stating because both of them are ways to lose an operation. A closed DOOR is always insulated — `Site._rebuildBlocking` pushes a shut door into `insulatedRects` unconditionally and there is no porous door — so the compound's vehicle gate is 2.8m of insulation in a chain-link perimeter, and shutting it on the thing achieves precisely nothing (24 of 24, measured, with the gate open and with it shut). And CRATES are not insulation either: `Site` puts them in `_blocking` and never in `_insulatedStatics`, so the six of them on this map are cover for a person and nothing at all to the draught. With every door open this reserve presents 59 rects that stop a person and 14 that stop the draught; with every door shut, 59 and 17.",
+  "porousStatics": [
+    14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33,
+    34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52
+  ],
+
+  "doors": [
+    {
+      "id": "door-culvert-gate",
+      "displayName": "Culvert gate",
+      "aabb": [4.4, 3.8, 7.2, 4.2],
+      "circuitId": "circuit-yard",
+      "initiallyOpen": false
+    },
+    {
+      "id": "door-compound-gate",
+      "displayName": "Compound vehicle gate",
+      "aabb": [-13.4, -15.0, -10.6, -14.7],
+      "circuitId": "circuit-yard",
+      "initiallyOpen": false
+    },
+    {
+      "id": "door-station",
+      "displayName": "Ranger station door",
+      "aabb": [8.4, -13.4, 10.8, -13.0],
+      "circuitId": "circuit-yard",
+      "initiallyOpen": true
+    }
+  ],
+
+  "circuits": [
+    {
+      "id": "circuit-yard",
+      "displayName": "Compound circuit",
+      "switch": [-9.4, -12.0],
+      "switchLabel": "Compound circuit — the standby set in the generator bay",
+      "initiallyOn": false
+    },
+    {
+      "id": "circuit-ridge",
+      "displayName": "Ridge circuit",
+      "switch": [18.6, 15.0],
+      "switchLabel": "Ridge circuit — the transfer switch in the mast lockup",
+      "initiallyOn": false
+    }
+  ],
+
+  "luminaires": [
+    { "at": [-16.0, -18.6], "circuitId": "circuit-yard" },
+    { "at": [-7.0, -18.6], "circuitId": "circuit-yard" },
+    { "at": [2.0, -22.4], "circuitId": "circuit-yard" },
+    { "at": [14.0, -22.4], "circuitId": "circuit-yard" },
+    { "at": [7.0, -17.0], "circuitId": "circuit-yard" },
+    { "at": [13.0, -17.0], "circuitId": "circuit-yard" },
+    { "at": [-18.5, -14.0], "circuitId": "circuit-yard" },
+    { "at": [-18.5, -8.2], "circuitId": "circuit-yard" },
+    { "at": [-18.4, -5.4], "circuitId": "circuit-yard" },
+    { "at": [-12.0, -13.8], "circuitId": "circuit-yard" },
+    { "at": [-8.5, -12.0], "circuitId": "circuit-yard" },
+    { "at": [-12.0, -5.0], "circuitId": "circuit-yard" },
+    { "at": [-4.0, 0.0], "circuitId": "circuit-yard" },
+    { "at": [8.0, -5.0], "circuitId": "circuit-yard" },
+    { "at": [5.8, 1.4], "circuitId": "circuit-yard" },
+
+    { "at": [-6.0, 6.0], "circuitId": "circuit-ridge" },
+    { "at": [1.0, 6.0], "circuitId": "circuit-ridge" },
+    { "at": [5.8, 9.0], "circuitId": "circuit-ridge" },
+    { "at": [-18.6, 8.4], "circuitId": "circuit-ridge" },
+    { "at": [-14.0, 8.4], "circuitId": "circuit-ridge" },
+    { "at": [-9.2, 8.4], "circuitId": "circuit-ridge" },
+    { "at": [-15.6, 16.0], "circuitId": "circuit-ridge" },
+    { "at": [-8.0, 15.0], "circuitId": "circuit-ridge" },
+    { "at": [0.0, 15.0], "circuitId": "circuit-ridge" },
+    { "at": [13.0, 13.8], "circuitId": "circuit-ridge" },
+    { "at": [18.6, 14.9], "circuitId": "circuit-ridge" },
+    { "at": [16.0, 9.0], "circuitId": "circuit-ridge" },
+
+    { "at": [-9.6, -19.2], "circuitId": null, "emergency": true },
+    { "at": [-8.0, -7.2], "circuitId": null, "emergency": true },
+    { "at": [9.6, -12.6], "circuitId": null, "emergency": true },
+    { "at": [5.8, 2.2], "circuitId": null, "emergency": true },
+    { "at": [-10.0, 6.0], "circuitId": null, "emergency": true },
+    { "at": [-12.0, 13.6], "circuitId": null, "emergency": true },
+    { "at": [10.0, 12.4], "circuitId": null, "emergency": true }
+  ],
+
+  "rooms": [
+    { "id": "forest-road", "name": "Forest road", "rect": [-23.6, -23.6, 23.6, -21.4] },
+    { "id": "car-park", "name": "Car park", "rect": [-23.6, -21.4, -2.0, -15.0] },
+    { "id": "station-verge", "name": "Station verge", "rect": [-2.0, -21.4, 4.0, -13.0] },
+    { "id": "station-office", "name": "Ranger station, office", "rect": [4.4, -20.6, 9.6, -13.4] },
+    { "id": "station-store", "name": "Ranger station, store", "rect": [10.0, -20.6, 15.6, -13.4] },
+    { "id": "station-porch", "name": "Station verandah", "rect": [16.0, -21.4, 23.6, -13.0] },
+    { "id": "station-lawn", "name": "Station lawn", "rect": [-2.0, -13.0, 12.4, -3.0] },
+    { "id": "compound-approach", "name": "Compound approach", "rect": [-7.0, -15.0, -2.0, -3.0] },
+    { "id": "compound-yard", "name": "Compound yard", "rect": [-16.4, -14.7, -7.3, -3.3] },
+    { "id": "workshop-apron", "name": "Workshop apron", "rect": [-20.7, -14.7, -16.4, -7.4] },
+    { "id": "fuel-bay", "name": "Fuel store bay", "rect": [-20.3, -7.0, -16.4, -3.7] },
+    { "id": "west-verge", "name": "West verge", "rect": [-23.6, -15.0, -21.0, 3.2] },
+    { "id": "meadow", "name": "The meadow", "rect": [-21.0, -3.0, 12.4, 3.2] },
+    { "id": "east-trail", "name": "East trail", "rect": [12.4, -13.0, 23.6, 3.2] },
+    { "id": "footbridge", "name": "Footbridge", "rect": [-11.2, 3.2, -8.8, 4.8] },
+    { "id": "culvert-deck", "name": "Culvert deck", "rect": [4.4, 3.2, 7.2, 4.8] },
+    { "id": "north-bank", "name": "North bank", "rect": [-21.0, 4.8, 12.4, 7.2] },
+    { "id": "north-bank-east", "name": "North bank", "rect": [12.4, 4.8, 23.6, 7.2] },
+    { "id": "pump-court", "name": "Pump house court", "rect": [3.4, 7.2, 8.2, 11.2] },
+    { "id": "cabin-row", "name": "Cabin row", "rect": [-21.0, 7.2, -3.2, 13.2] },
+    { "id": "glade-west", "name": "North glade", "rect": [-3.2, 7.2, 3.0, 14.0] },
+    { "id": "glade-north", "name": "North glade", "rect": [3.0, 11.6, 8.6, 14.0] },
+    { "id": "glade-east", "name": "North glade", "rect": [8.6, 7.2, 12.4, 14.0] },
+    { "id": "ridge-trail", "name": "Ridge trail", "rect": [12.4, 7.2, 23.6, 14.0] },
+    { "id": "north-trail-west", "name": "North trail", "rect": [-21.0, 13.2, -17.6, 21.6] },
+    { "id": "washblock", "name": "Washblock passage", "rect": [-17.6, 14.8, -13.6, 17.2] },
+    { "id": "north-trail-mid", "name": "North trail", "rect": [-13.6, 13.2, -3.2, 21.6] },
+    { "id": "lookout-clearing", "name": "Lookout clearing", "rect": [-3.2, 14.0, 15.6, 21.6] },
+    { "id": "mast-compound", "name": "Mast compound", "rect": [15.6, 14.0, 23.6, 21.6] },
+    { "id": "west-boundary", "name": "West boundary", "rect": [-23.6, 3.2, -21.0, 21.6] },
+    { "id": "north-boundary", "name": "North boundary", "rect": [-23.6, 21.6, 23.6, 23.6] }
+  ]
+}

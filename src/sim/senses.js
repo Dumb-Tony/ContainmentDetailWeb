@@ -80,6 +80,37 @@ export const SENSES = Object.freeze({
 
   'unobserved-for': { poll: (a, w, ctx) => !ctx.observation || ctx.observation.count === 0 },
 
+  /* ── the auditory field (GDD §26.2, "auditory lure and restraint") ──────────
+   * The fourth measurable quantity, and the first one the SQUAD emits whether it means to
+   * or not. Heat is something you place and observation is something you point; noise is
+   * something you make, so being quiet is a playable state — and a loud source is a tool
+   * as well as a hazard, because it masks everything quieter than itself. That is what
+   * makes a lure a lure rather than just bait.
+   *
+   * ⚠ `!== undefined` RATHER THAN `||`. A level of 0 dB is a real reading and `||` would
+   * turn it into "no reading at all" — the same falsy-zero trap `lastUsed.get(id) || -1e9`
+   * fell into in anomaly.js, which handed a capability a free second use at sim-time zero. */
+  'noise-above': {
+    poll: (a, w, ctx) => !!ctx.sound && ctx.sound.levelDb !== undefined
+      && ctx.sound.levelDb >= w.thresholdDb,
+  },
+
+  /** The source it has actually picked out of the noise, close enough to commit to. Reads
+   *  `heard`, so it inherits masking for free — a lure drowned by a louder one was never
+   *  chosen, exactly as a target behind a 40C wall was never chosen. */
+  'loudest-noise-within': {
+    poll: (a, w, ctx) => {
+      const h = ctx.sound && ctx.sound.heard;
+      return !!h && dist(a.x, a.z, h.x, h.z) <= w.radiusMetres;
+    },
+  },
+
+  /** Nothing beats the room. The restraint half, and deliberately NOT symmetric with the
+   *  one above: it carries a sustain in the content, so a lure that flickers at the
+   *  threshold — a battery browning out, somebody walking between it and the thing — does
+   *  not release it. The same asymmetry `observed`/`unobserved-for` has, paid for §8.2. */
+  'masked-for': { poll: (a, w, ctx) => !ctx.sound || !ctx.sound.heard },
+
   /* ── the set (GDD §26.2, distributed-object recovery and verification) ──────
    * The third measurable quantity, and the first one that is a COUNT rather than a field.
    * Heat asks "how hot is it there", observation asks "is anyone looking", and this asks

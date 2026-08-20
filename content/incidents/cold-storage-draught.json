@@ -1,6 +1,6 @@
 {
   "id": "cold-storage-draught",
-  "contentRevision": "0.1.0",
+  "contentRevision": "0.2.0",
   "displayName": "Cold that moves",
   "anomaly": "graybox-draught",
   "map": "cold-storage-l2",
@@ -19,10 +19,17 @@
     ]
   },
 
+  "_placementNote": "⚠ THE CONTEXT VERB IS NEAREST-WINS, AND `sourceInReach` RETURNS THE FIRST HIT RATHER THAN THE NEAREST ONE. Its probe radius is `reachMetres + 0.6` = 2.8m, so two sources inside 2.8m of each other means the EARLIER one in this array answers for both — and once that one is logged, `contextAction` offers the later one nothing at all, because the candidate is only pushed when the ledger does not already hold it. Not 'harder to select'. No verb.\n\nSo the standard on this floor is a clear margin, not the bare 2m: the tightest pair here is 4.39m (the survivor and the stair-head draught, both authored before this note). Every source is also clear of both door centres, both breakers, the cargo cache and the extraction circle, so nothing on the floor can shadow a pickup and no pickup can shadow the breaker a squad needs.\n\nThe five sources added at revision 0.2.0 are SPREAD, deliberately. Evidence that all lives in one room is one pickup wearing five hats: a squad reads the lot in ninety seconds and learns nothing about the floor. The muster board and the charging rack are safe reading in the bay; the chart recorder is in the freight lobby; the crew's imager and the two lamps are up the aisles, where the draught is, and cost the walk.",
+
   "evidenceSources": [
     { "evidenceId": "frost-bloom", "at": [-10.2, 9.2], "label": "Frost on a stanchion", "prompt": "Examine the frost", "requiresEquipment": [] },
     { "evidenceId": "survivor-account", "at": [7.6, -8.2], "label": "Surviving crew member", "prompt": "Take a statement", "requiresEquipment": [] },
     { "evidenceId": "maintenance-log", "at": [-11.2, -11.4], "label": "Plant log on the office desk", "prompt": "Read the log", "requiresEquipment": [] },
-    { "evidenceId": "stairwell-draught", "at": [10.8, -11.2], "label": "Draught at the stair head", "prompt": "Note the draught", "requiresEquipment": [] }
+    { "evidenceId": "stairwell-draught", "at": [10.8, -11.2], "label": "Draught at the stair head", "prompt": "Note the draught", "requiresEquipment": [] },
+    { "evidenceId": "chart-recorder", "at": [-11.2, 2.0], "label": "Chart recorder on the west run wall", "prompt": "Read the chart", "requiresEquipment": [] },
+    { "evidenceId": "crew-imager", "at": [-10.6, 5.6], "label": "The crew's imager, face down in the west run", "prompt": "Play back the buffer", "requiresEquipment": [] },
+    { "evidenceId": "lantern-pair", "at": [-5.5, 1.2], "label": "Two dead lamps in Aisle A", "prompt": "Follow the frost between the lamps", "requiresEquipment": [] },
+    { "evidenceId": "spent-cells", "at": [0.2, -7.6], "label": "Charging rack in the bay", "prompt": "Check the packs", "requiresEquipment": [] },
+    { "evidenceId": "ambulance-transcript", "at": [0.4, -11.4], "label": "Handover sheet on the muster board", "prompt": "Read the handover", "requiresEquipment": [] }
   ]
 }

@@ -1,6 +1,6 @@
 {
   "id": "stillwater-figure",
-  "contentRevision": "0.1.0",
+  "contentRevision": "0.2.0",
   "licensingRecordId": null,
   "incidentPremise": "The night supervisor reported 'a man standing at the end of aisle B' four times in one shift and walked the aisle four times to find nothing. On the fifth call she stopped walking and watched the camera instead, and it was still there. She kept the feed up for six hours until the shift ended, and it did not move once. It has been eleven days.",
 
@@ -157,6 +157,8 @@
     }
   ],
 
+  "_evidenceNote": "Four second paths, one per required rule (GDD §27.2, added at revision 0.2.0). The list is read in PAIRS and each pair is two different kinds of observation.\n\nThe hard part here is that `seen` and `unwatched` are the same coin, so a careless second path for one is a restatement of the other. They are split on what the observation RECORDS rather than on what it means: `seen` is evidenced by things that STOPPED — a woman who watched for six hours, and drag marks with no taper at either end — while `unwatched` is evidenced by things that CHANGED BETWEEN TWO LOOKS: eleven days of footage in which it is never caught moving, and five phone calls giving four different positions inside forty-six minutes.\n\n`unwatched` is the only rule here whose first path costs cargo, so its second is the switchboard log, which is free and lies on the way in. The forklift driver is graded disputed on purpose: he is one frightened man who did it twice, and §7.3 has a word for that rather than a reason to leave him out.",
+
   "evidenceRules": [
     {
       "id": "supervisor-statement",
@@ -166,6 +168,18 @@
       "reliability": "probable",
       "revealsRule": "seen",
       "requiredEquipment": [],
+      "channel": "witness",
+      "isFalseLead": false
+    },
+    {
+      "id": "scuff-runs",
+      "type": "environmental",
+      "dimension": "constraint",
+      "rawObservation": "Drag marks in eleven days of dust down aisle B: five runs of three to four metres each, laid end to end along the lane. Every one of them begins and ends square, with no taper at either end and no scuffing out to the sides.",
+      "reliability": "confirmed",
+      "revealsRule": "seen",
+      "requiredEquipment": [],
+      "channel": "visual",
       "isFalseLead": false
     },
     {
@@ -176,17 +190,19 @@
       "reliability": "confirmed",
       "revealsRule": "unwatched",
       "requiredEquipment": ["remote-camera"],
+      "channel": "instrument",
       "isFalseLead": false
     },
     {
-      "id": "thermal-null",
-      "type": "instrumental",
-      "dimension": "form",
-      "rawObservation": "Thermal imager reads it at ambient, to within the instrument's error. It is exactly as warm as the wall behind it.",
-      "reliability": "confirmed",
-      "revealsRule": "",
-      "requiredEquipment": ["thermal-imager"],
-      "isFalseLead": true
+      "id": "switchboard-log",
+      "type": "documentary",
+      "dimension": "trigger",
+      "rawObservation": "Site switchboard log for that night. Five calls from the storage extension between 01:12 and 01:58, each written up with the position the caller gave: end of aisle B, end of aisle B, halfway down aisle B, end of aisle B, and against the mesh by the door. Nothing after 01:58, and the shift ran to 06:00.",
+      "reliability": "probable",
+      "revealsRule": "unwatched",
+      "requiredEquipment": [],
+      "channel": "document",
+      "isFalseLead": false
     },
     {
       "id": "dust-ring",
@@ -196,6 +212,18 @@
       "reliability": "confirmed",
       "revealsRule": "roused",
       "requiredEquipment": [],
+      "channel": "visual",
+      "isFalseLead": false
+    },
+    {
+      "id": "driver-statement",
+      "type": "testimonial",
+      "dimension": "trigger",
+      "rawObservation": "Day-shift forklift driver. He states he has taken aisle B twice since and both times stopped at the pallet line and sent his mate down instead. He says the once he went past the line himself it was nearer when he came back out, and that he was down there 'about a five-count'.",
+      "reliability": "disputed",
+      "revealsRule": "roused",
+      "requiredEquipment": [],
+      "channel": "witness",
       "isFalseLead": false
     },
     {
@@ -206,7 +234,30 @@
       "reliability": "probable",
       "revealsRule": "kill-the-lights",
       "requiredEquipment": [],
+      "channel": "document",
       "isFalseLead": false
+    },
+    {
+      "id": "fault-counters",
+      "type": "instrumental",
+      "dimension": "capability",
+      "rawObservation": "Both emergency luminaires on this floor are showing a fault LED. The counter behind each diffuser — one count for every supply dropout the fitting has carried — reads 14 on one and 13 on the other.",
+      "reliability": "confirmed",
+      "revealsRule": "kill-the-lights",
+      "requiredEquipment": [],
+      "channel": "instrument",
+      "isFalseLead": false
+    },
+    {
+      "id": "thermal-null",
+      "type": "instrumental",
+      "dimension": "form",
+      "rawObservation": "Thermal imager reads it at ambient, to within the instrument's error. It is exactly as warm as the wall behind it.",
+      "reliability": "confirmed",
+      "revealsRule": "",
+      "requiredEquipment": ["thermal-imager"],
+      "channel": "instrument",
+      "isFalseLead": true
     },
     {
       "id": "night-shift-roster",
@@ -216,6 +267,7 @@
       "reliability": "disputed",
       "revealsRule": "",
       "requiredEquipment": [],
+      "channel": "document",
       "isFalseLead": true
     }
   ],

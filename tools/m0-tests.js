@@ -39,7 +39,7 @@ import {
   CommsWheel, WHEEL_ORDER, sectorAt, sectorPos, projectPoint, aimPoint, KIND_VARS,
 } from '../src/ui/commswheel.js';
 import { Progression, loadSite, DEPLOYMENT_COST, DEPARTMENT_IDS } from '../src/sim/progression.js';
-import { Input, DEFAULT_BINDINGS, isReservedCode } from '../src/core/input.js';
+import { Input, DEFAULT_BINDINGS, isReservedCode, PAD_BUTTONS, HOLD_MODE } from '../src/core/input.js';
 import { segmentHitsRect, moveWithWalls, dist, circleHitsRect } from '../src/sim/geometry.js';
 
 /* ── harness ─────────────────────────────────────────────────────────────── */
@@ -593,6 +593,29 @@ async function sectionI(content) {
   };
   const wait = (ms) => { g.setCommand('p1', { axis: { x: 0, y: 0 }, sprint: false, crouch: false }); g.skipMs(ms); };
 
+  /**
+   * Walk to a fixture and make sure it is the thing on offer.
+   *
+   * ⚠ A TOLERANCE IS NOT AN APPROACH. `walkTo(switchX, switchZ, 1.6)` stops anywhere on a
+   * 1.6m circle, and which side of that circle you stop on decides which fixture is
+   * nearest — so the bot arrived 1.5m from the office breaker, on the side facing a
+   * charging rack somebody had just authored two metres away, and was offered the rack.
+   * Six assertions and a crash, from a coordinate in a content file.
+   *
+   * A player does not stop at 1.6m and squint; they walk up to the thing until the prompt
+   * says what they want. So this closes in until the verb is right, which makes the bot
+   * test the GAME rather than a particular arrangement of furniture — and leaves a real
+   * failure (the verb is not reachable at all) still failing.
+   */
+  const workAt = (x, z, kind) => {
+    for (const tol of [1.2, 0.8, 0.5, 0.3]) {
+      walkTo(x, z, tol, 20000);
+      const act = g.contextAction();
+      if (act && act.kind === kind) return act;
+    }
+    return g.contextAction();
+  };
+
   eq('I1 the mission starts on the operation card', g.mission.phase, PHASE.BRIEFING);
   ok('I2 an over-budget manifest is refused',
     !!g.commitLoadout([{ itemId: 'floodlight-tripod', qty: 9 }]));
@@ -618,8 +641,7 @@ async function sectionI(content) {
   /* The office is the cheap fence: four insulated walls and one door. Getting into it is
    * the map's authored two-step — the office breaker is out on the bay wall. */
   const sw = g.site.circuits.get('circuit-office');
-  walkTo(sw.switchX, sw.switchZ, 1.6);
-  const swAct = g.contextAction();
+  const swAct = workAt(sw.switchX, sw.switchZ, 'circuit');
   ok('I12 the breaker on the bay wall offers itself', swAct && swAct.kind === 'circuit');
   g.doInteract();
   ok('I13 which brings the office circuit up', g.site.circuitOn('circuit-office'));
@@ -652,7 +674,7 @@ async function sectionI(content) {
    * it the draught's only way south is the 2m gap at the far end of the cross-wall, and
    * a memoryless drifter that picks the wrong way round a fifteen-metre panel spends the
    * whole operation finding out. Restoring this circuit is what makes the lure work. */
-  walkTo(-10.0, -10.0, 1.4);
+  workAt(-10.0, -10.0, 'circuit');
   g.doInteract();
   ok('I22 the storage breaker is inside the office, and it works', g.site.circuitOn('circuit-storage'));
 
@@ -794,7 +816,7 @@ async function sectionK() {
   const files = [
     'src/config.js', 'src/game.js', 'src/main.js',
     'src/core/rng.js', 'src/core/clock.js', 'src/core/input.js', 'src/core/eventBus.js',
-    'src/sim/geometry.js', 'src/sim/site.js', 'src/sim/heat.js', 'src/sim/anomaly.js',
+    'src/sim/geometry.js', 'src/sim/site.js', 'src/sim/heat.js', 'src/sim/sound.js', 'src/sim/anomaly.js',
     'src/sim/deployables.js', 'src/sim/evidence.js', 'src/sim/player.js',
     'src/sim/mission.js', 'src/sim/content.js', 'src/sim/senses.js', 'src/sim/perception.js',
     'src/sim/comms.js', 'src/ui/commswheel.js',
@@ -3647,42 +3669,363 @@ async function sectionAD(content) {
   note(`  budget 2: ${tiny.map((x) => `${x.itemId}×${x.qty}`).join(', ') || '(nothing)'}`);
   emit();
 }
+
+/* ══ AE. the controller (GDD §27.1, §19.1) ═════════════════════════════════════
+ *
+ * §27.1's Definition of Done requires "keyboard/mouse and controller flows work". The
+ * whole build asks for ACTIONS and never for keys, so a pad button is a synthetic CODE
+ * through the same `_press`/`_release` the keyboard uses — which means what has to be
+ * tested is not "does a button fire" but that the pad INHERITS everything: the binding
+ * table, the conflict checker, hold-versus-toggle, and rebinding.
+ *
+ * The pad is passed IN rather than read from `navigator`, so this drives the same code
+ * path a real controller does rather than a mock of it.
+ */
+function sectionAE() {
+  lines.push('--- AE. a controller, through the same actions a keyboard uses ---');
+
+  /* A W3C standard-mapping pad, as `navigator.getGamepads()` reports one. */
+  const mkPad = (over = {}) => ({
+    connected: true, mapping: 'standard', id: 'Test Pad (STANDARD GAMEPAD)',
+    buttons: Array.from({ length: 16 }, () => ({ pressed: false, value: 0 })),
+    axes: [0, 0, 0, 0],
+    ...over,
+  });
+  const press = (pad, name, v = 1) => {
+    const i = PAD_BUTTONS.indexOf(name);
+    pad.buttons[i] = { pressed: v >= 0.55, value: v };
+    return pad;
+  };
+
+  const input = new Input({ addEventListener() {}, removeEventListener() {} });
+  eq('AE1 no pad is connected until one is seen', input.pad.connected, false);
+  eq('AE2 and polling nothing stays that way', input.pollPads([]), false);
+
+  const pad = mkPad();
+  ok('AE3 a standard pad connects', input.pollPads([pad]));
+  eq('AE4 and says which one', input.pad.id.length > 0, true);
+
+  /* ⚠ A pad reporting a non-standard mapping is IGNORED, not guessed at. A player whose
+   * fire button opens the tablet has a broken game; one with no pad support has a
+   * keyboard. */
+  eq('AE5 a pad with an unknown button layout is refused rather than mis-mapped',
+    input.pollPads([mkPad({ mapping: '' })]), false);
+  input.pollPads([pad]);
+
+  /* Buttons arrive as ACTIONS, through the shipped default bindings. */
+  press(pad, 'PadA');
+  input.pollPads([pad]);
+  ok('AE6 the south face button is the context verb, because that is what it is bound to',
+    input.wasPressed('interact'));
+  ok('AE7 and the keyboard binding is still there beside it', DEFAULT_BINDINGS.interact.includes('KeyF'));
+  input.endStep();
+  press(pad, 'PadA', 0);
+  input.pollPads([pad]);
+  ok('AE8 releasing it is a release', input.wasReleased('interact'));
+  input.endStep();
+
+  /* Triggers are analog and need a line drawn somewhere. */
+  press(pad, 'PadRT', 0.3);
+  input.pollPads([pad]);
+  ok('AE9 a half-pulled trigger is not a press', !input.wasPressed('slot5'));
+  press(pad, 'PadRT', 0.9);
+  input.pollPads([pad]);
+  ok('AE10 a pulled one is', input.wasPressed('slot5'));
+  input.endStep();
+  press(pad, 'PadRT', 0);
+  input.pollPads([pad]);
+
+  /* ⚠ HOLD VERSUS TOGGLE IS INHERITED. The accessibility setting was written for a
+   * keyboard and the pad must not need its own copy of it — that is the entire reason a
+   * button is a code rather than a special case. */
+  input.setHoldMode('sprint', HOLD_MODE.TOGGLE);
+  press(pad, 'PadLS');
+  input.pollPads([pad]);
+  ok('AE11 a toggled action latches from the pad', input.isDown('sprint'));
+  input.endStep();
+  press(pad, 'PadLS', 0);
+  input.pollPads([pad]);
+  ok('AE12 and stays on when the stick click is released', input.isDown('sprint'));
+  press(pad, 'PadLS');
+  input.pollPads([pad]);
+  ok('AE13 pressing again turns it off', !input.isDown('sprint'));
+  input.endStep();
+  press(pad, 'PadLS', 0);
+  input.pollPads([pad]);
+  input.setHoldMode('sprint', HOLD_MODE.HOLD);
+
+  /* Rebinding works on pad codes for the same reason. */
+  input.rebind('use', 'PadY');
+  press(pad, 'PadY');
+  input.pollPads([pad]);
+  ok('AE14 a pad button can be rebound like any other code', input.wasPressed('use'));
+  input.endStep();
+  press(pad, 'PadY', 0);
+  input.pollPads([pad]);
+  input.resetBindings();
+
+  /* ── the sticks, which are the part that actually matters ─────────────────── */
+  pad.axes = [0, 0, 0, 0];
+  input.pollPads([pad]);
+  const idle = input.moveAxis();
+  eq('AE15 a centred stick is exactly zero, not nearly zero', `${idle.x},${idle.y}`, '0,0');
+
+  pad.axes = [0.15, 0, 0, 0];
+  input.pollPads([pad]);
+  eq('AE16 and so is a stick inside the deadzone', input.moveAxis().x, 0);
+
+  pad.axes = [1, 0, 0, 0];
+  input.pollPads([pad]);
+  const full = input.moveAxis();
+  ok('AE17 full deflection is full speed', Math.abs(full.x - 1) < 0.001, String(full.x));
+
+  pad.axes = [0.55, 0, 0, 0];
+  input.pollPads([pad]);
+  const half = input.moveAxis().x;
+  note(`stick response: 0.15 → 0.000, 0.55 → ${half.toFixed(3)}, 1.00 → ${full.x.toFixed(3)}`);
+  note('  squared, so the first half of the travel is fine control — which is what makes');
+  note('  placing a tripod in a 1.5m doorway possible on a pad at all.');
+  ok('AE18 half deflection is well under half speed', half > 0 && half < 0.35, String(half));
+
+  /* Diagonals stay on the unit circle rather than going faster. */
+  pad.axes = [0.8, 0.8, 0, 0];
+  input.pollPads([pad]);
+  const diag = input.moveAxis();
+  const mag = Math.hypot(diag.x, diag.y);
+  ok(`AE19 a diagonal is never faster than a straight line (${mag.toFixed(3)})`, mag <= 1.0001);
+
+  /* ⚠ THE KEYBOARD IS NOT ADDED TO THE STICK. A player with a hand on each — a real
+   * accessibility configuration — gets one vector, not a doubled one. */
+  input._debugPress('KeyD');
+  pad.axes = [-1, 0, 0, 0];
+  input.pollPads([pad]);
+  const both = input.moveAxis();
+  ok('AE20 stick and keys do not sum', Math.abs(both.x) <= 1.0001, String(both.x));
+  eq('AE21 the stick wins while it is being held', Math.sign(both.x), -1);
+  pad.axes = [0, 0, 0, 0];
+  input.pollPads([pad]);
+  eq('AE22 and the keyboard takes over the moment it is let go', input.moveAxis().x, 1);
+  input._debugRelease('KeyD');
+
+  /* ⚠ LOOK IS A RATE, NOT A DELTA. A mouse hands the game a distance a hand actually
+   * moved; a stick hands it a position it is being held at. Treating one as the other
+   * makes turn speed a function of frame rate — smooth at 144Hz, unusable at 30fps. */
+  pad.axes = [0, 0, 1, 0];
+  input.pollPads([pad]);
+  const at60 = input.padLook(1000 / 60).yaw;
+  const at30 = input.padLook(1000 / 30).yaw;
+  note(`look at full deflection: ${Math.abs(at60 * 1000).toFixed(2)} mrad in a 60Hz frame, ${Math.abs(at30 * 1000).toFixed(2)} in a 30Hz one`);
+  ok('AE23 a longer frame turns further, so what is constant is the rate',
+    Math.abs(at30 / at60 - 2) < 0.01, String(at30 / at60));
+  input.pollPads([mkPad()]);
+  eq('AE24 and a centred stick turns nothing at all', input.padLook(16).yaw, 0);
+
+  /* ⚠ An unplugged pad RELEASES what it was holding. Otherwise the operative sprints into
+   * a wall for the rest of the operation. */
+  const p2 = mkPad();
+  press(p2, 'PadLS');
+  input.pollPads([p2]);
+  ok('AE25 a held pad button reads as held', input.isDown('sprint'));
+  input.pollPads([]);
+  ok('AE26 unplugging the pad lets go of everything it was holding', !input.isDown('sprint'));
+  eq('AE27 and the stick goes to zero with it', input.moveAxis().x, 0);
+  emit();
+}
+
+/* ══ AF. nothing stands on top of anything else ════════════════════════════════
+ *
+ * ⚠ THE SINGLE MOST LIKELY WAY TO BREAK A MAP WITHOUT BREAKING A TEST, and it has now
+ * done it three times in this project.
+ *
+ * The context verb is NEAREST-WINS and it is right to be: one resolver, so the prompt and
+ * the key can never disagree. The consequence is that two interactable things within a
+ * couple of metres of each other are in competition, and the loser can NEVER be selected —
+ * not "is harder to select", cannot. There is no error, no warning, and the map looks
+ * perfectly fine; a verb simply does not exist any more.
+ *
+ * Every occurrence so far:
+ *   · a transit case set down on the office desk made the plant log unreadable;
+ *   · the frost line authored at the pen made the lane door unselectable, so the tally
+ *     incident could not be closed;
+ *   · a charging rack placed 2.7m from the office breaker made the whole solo containment
+ *     unplayable — the bot could not restore the circuit, could not open the office, and
+ *     six assertions and a crash followed from one coordinate.
+ *
+ * Each was found by an unrelated test failing strangely, minutes to hours after the
+ * content was written. This finds it at the coordinate.
+ */
+async function sectionAF() {
+  lines.push('--- AF. no two interactables compete for the same verb ---');
+
+  /* The reach that decides it, plus the door's own bonus, plus a margin. Two things this
+   * far apart can still both be reached from somewhere — what matters is that from any
+   * point where you can reach one, it is unambiguously the nearer. */
+  const MARGIN = 2.5;
+  const rows = [];
+  let tightest = { d: Infinity, what: '—' };
+
+  for (const id of INCIDENTS) {
+    const c = await loadContent({ incident: id });
+    const m = c.map;
+    /* Everything the context verb can resolve to, in one list, with a label that will
+     * make sense in a failure message at 2am. */
+    const fixtures = [
+      ...m.evidenceSources.map((e) => ({ x: e.at[0], z: e.at[1], what: `evidence ${e.evidenceId}` })),
+      ...(m.instanceSites || []).map((s) => ({ x: s.at[0], z: s.at[1], what: `object ${s.id}` })),
+      ...m.circuits.map((s) => ({ x: s.switch[0], z: s.switch[1], what: `breaker ${s.id}` })),
+      ...m.doors.map((d) => ({
+        x: (d.aabb[0] + d.aabb[2]) / 2, z: (d.aabb[1] + d.aabb[3]) / 2, what: `door ${d.id}`,
+      })),
+      { x: m.cache.x, z: m.cache.z, what: 'the cargo cache' },
+      { x: m.extraction.x, z: m.extraction.z, what: 'extraction' },
+    ];
+
+    const clashes = [];
+    for (let i = 0; i < fixtures.length; i++) {
+      for (let j = i + 1; j < fixtures.length; j++) {
+        const a = fixtures[i], b = fixtures[j];
+        const d = dist(a.x, a.z, b.x, b.z);
+        /* ⚠ Two objects of the SET are exempt from each other, and only from each other.
+         * They are supposed to sit in a drawer together — that is the search gradient the
+         * incident is built on — and `nearestLoose` resolves between them by distance with
+         * no other candidate to lose to. */
+        if (a.what.startsWith('object ') && b.what.startsWith('object ')) continue;
+        if (d < MARGIN) clashes.push(`${a.what} ↔ ${b.what} at ${d.toFixed(2)}m`);
+        if (d < tightest.d) tightest = { d, what: `${id}: ${a.what} ↔ ${b.what}` };
+      }
+    }
+    rows.push({ id, n: fixtures.length, clashes });
+  }
+
+  /**
+   * ⚠ PROXIMITY IS NOT THE PROPERTY. The first version of this failed on any pair inside
+   * 2.5m and found thirty-seven across four incidents — nearly all of them content that has
+   * demonstrably worked for the whole project. An office breaker and a plant log two metres
+   * apart are both perfectly selectable; you stand on one side or the other.
+   *
+   * What actually matters is whether there EXISTS a standable point from which a thing is
+   * the nearest interactable. If there is not, that verb is gone — not harder to reach,
+   * gone — and no other test will say so. So the pairs are reported as information, and the
+   * assertion is the property.
+   */
+  for (const r of rows) {
+    note(`${r.id}: ${r.n} interactables${r.clashes.length ? `, closest pairs — ${r.clashes.slice(0, 3).join(' · ')}${r.clashes.length > 3 ? ` (+${r.clashes.length - 3})` : ''}` : ''}`);
+  }
+  note(`tightest pair anywhere: ${tightest.what} at ${tightest.d.toFixed(2)}m`);
+
+  const shadowed = [];
+  for (const id of INCIDENTS) {
+    const c = await loadContent({ incident: id });
+    const m = c.map;
+    const site = new Site(m);
+    const all = [
+      ...m.evidenceSources.map((e) => ({ x: e.at[0], z: e.at[1], what: `evidence ${e.evidenceId}` })),
+      ...m.circuits.map((s) => ({ x: s.switch[0], z: s.switch[1], what: `breaker ${s.id}` })),
+    ];
+    for (const f of all) {
+      /* Sweep the ring an operative could stand on to work this thing, and ask whether any
+       * point on it makes this the winner. 0.2m steps out to the 2.2m reach. */
+      let won = false;
+      for (let r = 0.4; r <= 2.1 && !won; r += 0.2) {
+        for (let a = 0; a < 24 && !won; a++) {
+          const th = (a / 24) * Math.PI * 2;
+          const x = f.x + Math.cos(th) * r, z = f.z + Math.sin(th) * r;
+          if (!standsAt(site, x, z)) continue;
+          let nearest = f, best = r;
+          for (const o of all) {
+            if (o === f) continue;
+            const d = dist(x, z, o.x, o.z);
+            if (d < best) { best = d; nearest = o; }
+          }
+          if (nearest === f) won = true;
+        }
+      }
+      if (!won) shadowed.push(`${id}: ${f.what}`);
+    }
+  }
+  eq(`AF1 every interactable has somewhere to stand where it is the nearest thing${shadowed.length ? ` — shadowed: ${shadowed.join(', ')}` : ''}`,
+    shadowed.length, 0);
+
+  /* And the positive half: every evidence source can actually be selected. A source that
+   * clears the margin but sits inside a wall is equally unreachable, and the margin test
+   * would not notice. */
+  const c = await loadContent({ incident: 'cold-storage-draught' });
+  const g = new Game(c, { seed: 'reach' });
+  g.commitLoadout(RECOMMENDED_MANIFEST);
+  const unreachable = [];
+  for (const s of c.map.evidenceSources) {
+    if ((s.requiresEquipment || []).length) continue;   // needs kit this bot has not taken
+    g.player.x = s.at[0]; g.player.z = s.at[1];
+    g.skipMs(50);
+    const act = g.contextAction();
+    if (!act || act.kind !== 'evidence') unreachable.push(`${s.evidenceId} → ${act ? act.kind : 'nothing'}`);
+  }
+  eq(`AF2 standing on an evidence source offers the evidence${unreachable.length ? ` (${unreachable.join(', ')})` : ''}`,
+    unreachable.length, 0);
+  emit();
+}
+/**
+ * ⚠ ONE SECTION THROWING MUST NOT DELETE EVERY SECTION AFTER IT.
+ *
+ * This was a single try/catch around the whole run, and a suite of forty assertions can
+ * afford that. At seven hundred it cannot: an evidence source authored 2.7m from a breaker
+ * made section I's bot throw on an undefined transit case, and the report that came back
+ * was 112 assertions of a 700-assertion suite — five hundred and eighty results silently
+ * absent, none of them broken, with no indication that anything had been skipped. The
+ * failure looked ten times worse than it was, and the six hundred passing results that
+ * would have located it were the ones that went missing.
+ *
+ * So each section is isolated. A section that throws is one FAILURE with its stack, and
+ * the run continues. The only thing that stops the suite now is the harness itself.
+ */
+async function run(name, fn) {
+  try {
+    await fn();
+  } catch (e) {
+    lines.push(`FAIL  section ${name} threw: ${e && e.stack ? e.stack : e}`);
+    fails++;
+    emit();
+  }
+}
+
 (async () => {
   try {
-    sectionA();
+    await run('A', () => sectionA());
     const content = await loadContent();
-    await sectionB(content);
-    sectionC(content);
-    sectionD(content);
-    sectionE(content);
-    sectionF(content);
-    sectionG(content);
-    sectionH(content);
-    await sectionI(content);
-    sectionJ();
-    await sectionM(content);
-    await sectionN(content);
-    await sectionO();
-    sectionP();
-    await sectionQ(content);
-    await sectionR();
-    await sectionS(content);
-    await sectionT(content);
-    await sectionU();
-    sectionW();
-    sectionX();
-    sectionY();
-    await sectionZ(content);
-    await sectionAA(content);
-    await sectionAB();
-    await sectionAC();
-    await sectionAD(content);
-    await sectionK();
-    await sectionL();
-    await sectionV();
+    await run('B', () => sectionB(content));
+    await run('C', () => sectionC(content));
+    await run('D', () => sectionD(content));
+    await run('E', () => sectionE(content));
+    await run('F', () => sectionF(content));
+    await run('G', () => sectionG(content));
+    await run('H', () => sectionH(content));
+    await run('I', () => sectionI(content));
+    await run('J', () => sectionJ());
+    await run('M', () => sectionM(content));
+    await run('N', () => sectionN(content));
+    await run('O', () => sectionO());
+    await run('P', () => sectionP());
+    await run('Q', () => sectionQ(content));
+    await run('R', () => sectionR());
+    await run('S', () => sectionS(content));
+    await run('T', () => sectionT(content));
+    await run('U', () => sectionU());
+    await run('W', () => sectionW());
+    await run('X', () => sectionX());
+    await run('Y', () => sectionY());
+    await run('Z', () => sectionZ(content));
+    await run('AA', () => sectionAA(content));
+    await run('AB', () => sectionAB());
+    await run('AC', () => sectionAC());
+    await run('AD', () => sectionAD(content));
+    await run('AE', () => sectionAE());
+    await run('AF', () => sectionAF());
+    await run('K', () => sectionK());
+    await run('L', () => sectionL());
+    await run('V', () => sectionV());
     emit();
   } catch (e) {
-    lines.push(`FAIL  suite threw: ${e && e.stack ? e.stack : e}`);
+    lines.push(`FAIL  the harness itself threw: ${e && e.stack ? e.stack : e}`);
     fails++;
     emit();
   }

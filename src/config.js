@@ -51,6 +51,15 @@ export const CONFIG = Object.freeze({
      * human is a lure, never a fence. Asserted directly in the suite. */
     bodyHeatC: 37,
     bodyHeatFalloffM: 1.15,
+    /* Footfall level at 1m, read from SPEED and not from the key being held — a sprint
+     * key against a wall is silent. The squad emits on BOTH fields and neither is
+     * optional, which is what makes being quiet a playable state rather than a setting.
+     * Measured carry in the unpowered cold store: 1.0m still, 3.4m crouched, 15.8m
+     * walking, and sprinting is heard across the whole map. */
+    stillNoiseDb: 34,
+    crouchNoiseDb: 42,
+    walkNoiseDb: 55,
+    sprintNoiseDb: 68,
   },
 
   heat: {
@@ -72,6 +81,29 @@ export const CONFIG = Object.freeze({
      * longer the team takes; it is the clock you can feel. */
     ambientDriftCPerMin: 0.55,
     ambientFloorC: -8,
+  },
+
+  /* The second field (GDD §26.2, "auditory lure and restraint"). See src/sim/sound.js —
+   * the design argument for why this is not heat with different numbers lives there. */
+  sound: {
+    /* Six days unpowered: no plant, no fans. NOT a backdrop — audibility is measured
+     * against this, so it is the number that decides how far a footstep carries. */
+    ambientDb: 28,
+    /* d0 for spreading. At 1m the softened inverse-square IS the free-field law
+     * (measured 0.04 dB out at 10m), while staying finite at the source. */
+    referenceDistanceM: 1.0,
+    /* How far above everything else a source must be to be picked out of it. There is
+     * deliberately no absolute hearing floor: ambientDb is always in the sum, so the room
+     * tone IS the floor and there is only one mechanism. */
+    audibilityMarginDb: 3,
+    /* Transmission loss. ⚠ THE THIRD RELATIONSHIP TO WALLS: sound is attenuated by mass
+     * rather than stopped by it, so site.js's two lists become three prices — and the
+     * third disagreement between them is the interesting one. */
+    massiveLossDb: 32,          // closed cold-store door, structural panel
+    panelLossDb: 12,            // a deployed portable barrier: absolute to the draught, 12dB here
+    rackLossDb: 5,              // steel shelving: stops a person, stops sight, barely slows sound
+    /* What a diffraction bend costs. Below this, going through beats going round. */
+    cornerLossDb: 9,
   },
 
   fence: {

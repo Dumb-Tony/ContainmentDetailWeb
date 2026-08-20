@@ -1,6 +1,6 @@
 {
   "id": "graybox-draught",
-  "contentRevision": "0.4.0",
+  "contentRevision": "0.5.0",
   "licensingRecordId": null,
   "incidentPremise": "A maintenance crew sealed a basement plant room after reporting 'cold that moves'. Two of the three came back. The site has been without mains power for six days and the anomaly has spread as far as the stairwell.",
 
@@ -196,6 +196,8 @@
     }
   ],
 
+  "_evidenceNote": "GDD §27.2 asks for at least two evidence paths per required rule. This file shipped with exactly one each, which meant a squad that walked past a single pickup could never learn that rule at all — not found it harder, could not. The five entries added at revision 0.5.0 are second paths, not second copies, and the list is now read in PAIRS: each rule's two entries sit together, and each pair is two different kinds of observation.\n\nThe reliabilities inside a pair are deliberately mismatched. §7.3 grades an observation confirmed, probable or disputed, and two confirmed sources for one rule is one source written twice. A squad holding the frost bloom AND the chart recorder knows something a squad holding two frost blooms does not: that a second, weaker channel agrees. The heat-wall pair is the sharpest case — a frost edge you can put a hand across, and a hypothermic man in an ambulance saying the same four words eleven times with his core at 31.4C.\n\n`thermal-visibility` is the one rule whose first path costs cargo, so its second path is the dead crew's own imager, lying on the floor with its review buffer still full. It teaches the rule without granting live coverage, which is exactly the distinction the loadout wager is made of.",
+
   "evidenceRules": [
     {
       "id": "frost-bloom",
@@ -205,36 +207,18 @@
       "reliability": "confirmed",
       "revealsRule": "heat-detected",
       "requiredEquipment": [],
+      "channel": "visual",
       "isFalseLead": false
     },
     {
-      "id": "thermal-void",
-      "type": "instrumental",
-      "dimension": "form",
-      "rawObservation": "Thermal imager shows a coherent sub-ambient mass roughly 1.5m across holding its shape while it moves.",
-      "reliability": "confirmed",
-      "revealsRule": "thermal-visibility",
-      "requiredEquipment": ["thermal-imager"],
-      "isFalseLead": false
-    },
-    {
-      "id": "battery-drain",
-      "type": "instrumental",
-      "dimension": "capability",
-      "rawObservation": "Two separate battery-powered tools lost charge four times faster than rated while in the same room.",
+      "id": "chart-recorder",
+      "type": "documentary",
+      "dimension": "trigger",
+      "rawObservation": "Cold-store chart recorder on the plant wall, seven-day paper, still turning on its clockwork. The trace holds flat at -18 until Tuesday, then falls off the bottom of the chart four separate times. Each of the four begins within two minutes of an entry on the door card hung beside it, and none of them begins with the floor empty.",
       "reliability": "probable",
-      "revealsRule": "drain-battery",
+      "revealsRule": "heat-detected",
       "requiredEquipment": [],
-      "isFalseLead": false
-    },
-    {
-      "id": "frost-boundary",
-      "type": "environmental",
-      "dimension": "constraint",
-      "rawObservation": "Frost stops in a straight line two metres from a still-warm boiler, and does not resume on the far side.",
-      "reliability": "confirmed",
-      "revealsRule": "heat-wall",
-      "requiredEquipment": [],
+      "channel": "document",
       "isFalseLead": false
     },
     {
@@ -245,6 +229,84 @@
       "reliability": "probable",
       "revealsRule": "lock-on",
       "requiredEquipment": [],
+      "channel": "witness",
+      "isFalseLead": false
+    },
+    {
+      "id": "lantern-pair",
+      "type": "environmental",
+      "dimension": "trigger",
+      "rawObservation": "Two lamps lie eleven metres apart in the same aisle, both flat now: a floodlight head on a stand, and a hand torch on the floor. The frost path runs the full eleven metres, passes the torch within a hand's width without turning, and ends in a bloom that has lifted the paint off the floodlight's housing.",
+      "reliability": "confirmed",
+      "revealsRule": "lock-on",
+      "requiredEquipment": [],
+      "channel": "visual",
+      "isFalseLead": false
+    },
+    {
+      "id": "frost-boundary",
+      "type": "environmental",
+      "dimension": "constraint",
+      "rawObservation": "Frost stops in a straight line two metres from a still-warm boiler, and does not resume on the far side.",
+      "reliability": "confirmed",
+      "revealsRule": "heat-wall",
+      "requiredEquipment": [],
+      "channel": "visual",
+      "isFalseLead": false
+    },
+    {
+      "id": "ambulance-transcript",
+      "type": "documentary",
+      "dimension": "constraint",
+      "rawObservation": "Ambulance handover sheet for the second crew member, taken on the way out. He answers no question that is put to him and says 'stay by the pipes' eleven times. The medic has written a core temperature of 31.4C against it, and 'not orientated to place'.",
+      "reliability": "disputed",
+      "revealsRule": "heat-wall",
+      "requiredEquipment": [],
+      "channel": "document",
+      "isFalseLead": false
+    },
+    {
+      "id": "thermal-void",
+      "type": "instrumental",
+      "dimension": "form",
+      "rawObservation": "Thermal imager shows a coherent sub-ambient mass roughly 1.5m across holding its shape while it moves.",
+      "reliability": "confirmed",
+      "revealsRule": "thermal-visibility",
+      "requiredEquipment": ["thermal-imager"],
+      "channel": "instrument",
+      "isFalseLead": false
+    },
+    {
+      "id": "crew-imager",
+      "type": "instrumental",
+      "dimension": "form",
+      "rawObservation": "The crew's own thermal imager, face down on the floor with eleven percent of its cell left. The review buffer holds ninety seconds: a sub-ambient mass crosses the frame twice, once against the racking and once against open floor, and its outline measures the same across on both passes.",
+      "reliability": "probable",
+      "revealsRule": "thermal-visibility",
+      "requiredEquipment": [],
+      "channel": "instrument",
+      "isFalseLead": false
+    },
+    {
+      "id": "battery-drain",
+      "type": "instrumental",
+      "dimension": "capability",
+      "rawObservation": "Two separate battery-powered tools lost charge four times faster than rated while in the same room.",
+      "reliability": "probable",
+      "revealsRule": "drain-battery",
+      "requiredEquipment": [],
+      "channel": "instrument",
+      "isFalseLead": false
+    },
+    {
+      "id": "spent-cells",
+      "type": "environmental",
+      "dimension": "capability",
+      "rawObservation": "A four-way charging rack in the bay, dead with the rest of the floor. All four packs on it show zero on their own gauges. Two identical packs still boxed underneath it, never fitted, show full.",
+      "reliability": "confirmed",
+      "revealsRule": "drain-battery",
+      "requiredEquipment": [],
+      "channel": "visual",
       "isFalseLead": false
     },
     {
@@ -255,6 +317,7 @@
       "reliability": "disputed",
       "revealsRule": "",
       "requiredEquipment": [],
+      "channel": "document",
       "isFalseLead": true
     },
     {
@@ -265,6 +328,7 @@
       "reliability": "unreliable",
       "revealsRule": "",
       "requiredEquipment": [],
+      "channel": "sensory",
       "isFalseLead": true
     }
   ],

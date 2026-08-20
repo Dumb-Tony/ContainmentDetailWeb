@@ -1,6 +1,6 @@
 {
   "id": "cold-storage-figure",
-  "contentRevision": "0.1.0",
+  "contentRevision": "0.2.0",
   "displayName": "The figure in aisle B",
   "anomaly": "stillwater-figure",
   "map": "cold-storage-l2",
@@ -20,12 +20,18 @@
     ]
   },
 
+  "_placementNote": "⚠ THE CONTEXT VERB IS NEAREST-WINS, AND `sourceInReach` RETURNS THE FIRST HIT RATHER THAN THE NEAREST ONE, over a probe radius of `reachMetres + 0.6` = 2.8m. Two sources inside that of each other means the earlier one in this array answers for both, and once it is logged the later one has NO VERB — `contextAction` only pushes an evidence candidate the ledger does not already hold.\n\nTwo pairs on this floor were inside that radius and both are moved at revision 0.2.0, because both were already broken and nobody had stood on them to find out:\n  · `thermal-null` was at [-0.5, 6.0], 2.40m from `dust-ring`. Standing on the sighting offered 'Examine the floor'; after the ring was logged it offered nothing. Moved to [-0.5, 5.0] — 3.40m clear of the ring and 3.40m clear of the new drag marks.\n  · `night-shift-roster` was at [-10.4, -9.2], 2.34m from `brownout-log` on the same desk, in an office that also holds the storage breaker and a door. The office is 3.8m square and cannot carry three interactables. The roster moves out to the clock-in board at the muster point, [-6.4, -11.4], which is where a roster is pinned anyway.\n\nAisle B now reads as a line down the lane — the ring at the far end, the sighting, the drag marks, the camera position at the mouth — spaced 3.4m, 3.4m and 4.6m. That is the aisle telling the story in the order you walk it, and every step of it is clear of the next.",
+
   "evidenceSources": [
     { "evidenceId": "supervisor-statement", "at": [7.6, -8.2], "label": "Night supervisor", "prompt": "Take a statement", "requiresEquipment": [] },
     { "evidenceId": "dust-ring", "at": [-0.5, 8.4], "label": "A ring of bare floor", "prompt": "Examine the floor", "requiresEquipment": [] },
     { "evidenceId": "brownout-log", "at": [-11.2, -11.4], "label": "Electrical log on the office desk", "prompt": "Read the log", "requiresEquipment": [] },
-    { "evidenceId": "night-shift-roster", "at": [-10.4, -9.2], "label": "Roster pinned by the office door", "prompt": "Read the roster", "requiresEquipment": [] },
+    { "evidenceId": "night-shift-roster", "at": [-6.4, -11.4], "label": "Roster on the clock-in board", "prompt": "Read the roster", "requiresEquipment": [] },
     { "evidenceId": "camera-still", "at": [-0.5, -3.0], "label": "The aisle B camera position", "prompt": "Review the recorded feed", "requiresEquipment": ["remote-camera"] },
-    { "evidenceId": "thermal-null", "at": [-0.5, 6.0], "label": "Thermal reading at the sighting", "prompt": "Take a thermal reading", "requiresEquipment": ["thermal-imager"] }
+    { "evidenceId": "thermal-null", "at": [-0.5, 5.0], "label": "Thermal reading at the sighting", "prompt": "Take a thermal reading", "requiresEquipment": ["thermal-imager"] },
+    { "evidenceId": "scuff-runs", "at": [-0.5, 1.6], "label": "Drag marks in the dust, Aisle B", "prompt": "Follow the drag marks", "requiresEquipment": [] },
+    { "evidenceId": "switchboard-log", "at": [-3.0, -11.2], "label": "Switchboard log by the bay phone", "prompt": "Read the call log", "requiresEquipment": [] },
+    { "evidenceId": "driver-statement", "at": [4.6, -3.6], "label": "Forklift driver at the pallet line", "prompt": "Take a statement", "requiresEquipment": [] },
+    { "evidenceId": "fault-counters", "at": [3.0, -8.5], "label": "Emergency luminaire, bay ceiling", "prompt": "Read the fault counter", "requiresEquipment": [] }
   ]
 }

@@ -32,6 +32,7 @@ import { Mission, PHASE } from './sim/mission.js';
 import { observedBy, operativeViewer, cameraViewer } from './sim/perception.js';
 import { PingBoard, requestPing } from './sim/comms.js';
 import { InstanceSet } from './sim/instances.js';
+import { SoundField, operativeSource, deployableSource } from './sim/sound.js';
 import { dist } from './sim/geometry.js';
 
 /** A command is what one operative is asking for this step, whoever is asking. */
@@ -150,6 +151,10 @@ export class Game {
 
     this.site = new Site(content.map);
     this.heat = new HeatField();
+    /* The second field (GDD §26.2). Built for every incident whether or not the anomaly
+     * listens: the squad makes noise on every floor, so a mission that ignores it still
+     * needs it for the "how loud am I" readout and for stress. */
+    this.sound = new SoundField();
     this.deployables = new DeployableSet();
     this.anomaly = new Anomaly(content.anomaly, this.site, this.heat, this.deployables);
     this.ledger = new EvidenceLedger(content.anomaly);
@@ -440,6 +445,28 @@ export class Game {
      * over. The field that is a WALL in one incident is an INSTRUMENT in another. */
     const sink = this.anomaly.asSink();
     this.heat.setSinks([...(sink ? [sink] : []), ...this.instances.sinks()]);
+
+    /**
+     * The sound field, rebuilt from the world on the same step and for the same reason.
+     *
+     * ⚠ THE SQUAD IS A SOURCE WHETHER IT MEANS TO BE OR NOT, and the level comes from
+     * SPEED rather than from a key being held — a sprint key pressed against a wall is
+     * silent. That is the whole difference between this field and the other two: heat is
+     * something you place and observation is something you point, but noise is something
+     * you make, so being quiet is a playable state rather than a setting.
+     */
+    const heard = [];
+    for (const p of this.players) {
+      if (!p.alive) continue;
+      const s = operativeSource(p);
+      if (s) heard.push(s);
+    }
+    for (const d of this.deployables.list) {
+      const s = deployableSource(d);
+      if (s) heard.push(s);
+    }
+    this.sound.setSources(heard);
+    this.sound.setOccluders(this.sound.occludersFor(this.site, this.deployables));
     this.heat.drift(stepMs, this.anomaly.isLoose);
 
     /* 2. the squad. One pass per operative, each reading its own command — there is no
@@ -537,6 +564,13 @@ export class Game {
       sources, operatives: this.players.filter((p) => p.alive), pressureStage: m.stage,
       observation: this.observation,
       instances: this.instances,
+      /* What the anomaly can hear from where it is standing. `heard` carries the mask it
+       * beat, so "it did not come because the generator was louder here" is answerable
+       * rather than mysterious. */
+      sound: {
+        levelDb: this.sound.levelAt(this.anomaly.x, this.anomaly.z),
+        heard: this.sound.loudestAudibleFrom(this.anomaly.x, this.anomaly.z),
+      },
     });
     if (this.anomaly.state !== prevState) {
       const t = this.anomaly.transitions[this.anomaly.transitions.length - 1];

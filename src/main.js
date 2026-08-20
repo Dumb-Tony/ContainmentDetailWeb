@@ -271,9 +271,26 @@ async function boot() {
     const paused = panels.isOpen || settingsPanel.isOpen || !pointerLocked;
     game.clock.setPaused(paused);
 
+    /* The pad is POLLED, not evented — once a frame, before anything asks what is held.
+     * `navigator.getGamepads` is passed in rather than reached for inside input.js so that
+     * file never touches the browser and the suite can drive a synthetic pad down the same
+     * path a real one uses. */
+    input.pollPads(navigator.getGamepads ? navigator.getGamepads() : []);
+
     const me = game.playerById(net.localPlayerId);
     let cmd = null;
     if (!paused) {
+      /* Stick look, applied to the same `look()` the mouse calls. It arrives as a RATE and
+       * is multiplied by the frame's own duration; the mouse arrives as a distance already
+       * travelled. Confusing the two makes turning speed a function of frame rate. */
+      if (input.pad.connected && me && pointerLocked !== undefined) {
+        const dtLook = Math.min(100, now - (lastFrameAt || now));
+        const l = input.padLook(dtLook);
+        if (l.yaw || l.pitch) {
+          if (commsWheel.isOpen) commsWheel.aim(-l.yaw * 220, l.pitch * 220);
+          else { me.yaw += l.yaw; me.pitch = Math.max(-CONFIG.player.pitchLimit, Math.min(CONFIG.player.pitchLimit, me.pitch + l.pitch)); }
+        }
+      }
       /* One command object per frame, exactly the shape a remote operative's arrives in.
        * From here down the simulation cannot tell a keyboard from a network packet. */
       cmd = {

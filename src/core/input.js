@@ -26,16 +26,17 @@ export const DEFAULT_BINDINGS = Object.freeze({
   moveDown:  ['KeyS', 'ArrowDown'],
   moveLeft:  ['KeyA', 'ArrowLeft'],
   moveRight: ['KeyD', 'ArrowRight'],
-  sprint:    ['ShiftLeft', 'ShiftRight'],
-  crouch:    ['ControlLeft', 'KeyC'],
-  interact:  ['KeyF'],
-  use:       ['KeyE'],
-  imager:    ['KeyQ'],
-  tablet:    ['Tab'],
-  abort:     ['KeyR'],
-  settings:  ['KeyO'],
-  comms:     ['KeyZ'],
-  slot1: ['Digit1'], slot2: ['Digit2'], slot3: ['Digit3'], slot4: ['Digit4'], slot5: ['Digit5'],
+  sprint:    ['ShiftLeft', 'ShiftRight', 'PadLS'],
+  crouch:    ['ControlLeft', 'KeyC', 'PadB'],
+  interact:  ['KeyF', 'PadA'],
+  use:       ['KeyE', 'PadX'],
+  imager:    ['KeyQ', 'PadLB'],
+  tablet:    ['Tab', 'PadBack'],
+  abort:     ['KeyR', 'PadY'],
+  settings:  ['KeyO', 'PadStart'],
+  comms:     ['KeyZ', 'PadRB'],
+  slot1: ['Digit1', 'PadLeft'], slot2: ['Digit2', 'PadUp'], slot3: ['Digit3', 'PadRight'],
+  slot4: ['Digit4', 'PadDown'], slot5: ['Digit5', 'PadRT'],
 });
 
 /* Codes the page must never swallow, and therefore must never be bindable.
@@ -129,6 +130,52 @@ export function sanitiseHoldModes(raw) {
   return out;
 }
 
+/* ── the controller (GDD §19.1, §27.1) ────────────────────────────────────────
+ *
+ * §27.1's Definition of Done requires "keyboard/mouse and controller flows work", and
+ * §19.1 asks for remapping. Both come almost free, because nothing above this file has
+ * ever asked about a KEY — the whole build asks for ACTIONS. So a pad button is a synthetic
+ * CODE fed through the same `_press`/`_release` the keyboard uses, and it inherits the
+ * binding table, the conflict checker, hold-versus-toggle and the rebinding UI without any
+ * of them learning that a gamepad exists.
+ *
+ * ⚠ THE STICKS ARE NOT BUTTONS. Movement and look are analog, and squashing them to four
+ * digital directions would be the one part of controller support that actually matters
+ * done badly: a stick that only ever means "full speed north-east" is worse than the
+ * keyboard, not equal to it. `moveAxis()` returns the stick when it is out of the deadzone
+ * and the keys otherwise, so a player can use both in the same session — or one hand on
+ * each, which is a real accessibility configuration and costs nothing to allow.
+ *
+ * Names follow the W3C Standard Gamepad mapping, which is what a browser reports for
+ * anything Xbox-shaped. A pad that reports `mapping: ''` is left alone rather than guessed
+ * at: wrong buttons are worse than no buttons.
+ */
+export const PAD_BUTTONS = Object.freeze([
+  'PadA', 'PadB', 'PadX', 'PadY', 'PadLB', 'PadRB', 'PadLT', 'PadRT',
+  'PadBack', 'PadStart', 'PadLS', 'PadRS', 'PadUp', 'PadDown', 'PadLeft', 'PadRight',
+]);
+
+/** Trigger travel that counts as a press. Analog, so it needs a line drawn somewhere. */
+const TRIGGER_PRESS = 0.55;
+/** Radial deadzone. Per-axis deadzones make a stick feel square; this one does not. */
+const STICK_DEADZONE = 0.22;
+
+/**
+ * Deadzone, then a squared response curve.
+ *
+ * The curve is not decoration: containment work is placing a tripod within a few
+ * centimetres of a doorway, and a linear stick spends most of its travel on speeds nobody
+ * needs. Squaring gives fine control near the centre and full speed at the edge, which is
+ * what makes the last metre of a placement possible on a pad at all.
+ */
+function stickVector(x, y) {
+  const mag = Math.hypot(x, y);
+  if (mag < STICK_DEADZONE) return { x: 0, y: 0, mag: 0 };
+  const scaled = Math.min(1, (mag - STICK_DEADZONE) / (1 - STICK_DEADZONE));
+  const curved = scaled * scaled;
+  return { x: (x / mag) * curved, y: (y / mag) * curved, mag: curved };
+}
+
 export class Input {
   constructor(target = window, bindings = DEFAULT_BINDINGS, holdModes = DEFAULT_HOLD_MODES) {
     this.target = target;
@@ -151,6 +198,15 @@ export class Input {
     /** Fired after any rebind/reset, so the settings panel and the tablet's control list
      *  redraw from one source instead of each keeping their own idea of the keys. */
     this.onBindingsChanged = null;
+
+    /* The pad. `null` until one is seen, so a keyboard-only session allocates nothing and
+     * `padConnected` is a straight answer rather than a guess. */
+    this.pad = { connected: false, id: '', move: { x: 0, y: 0 }, look: { x: 0, y: 0 } };
+    this._padDown = new Set();
+    /** Look sensitivity for the stick, in radians per second at full deflection. It is
+     *  separate from the mouse's per-pixel figure because they are different quantities —
+     *  a mouse delta is distance, a stick is a rate, and one number cannot be both. */
+    this.padLookRate = 2.6;
   }
 
   setBindings(bindings) {
@@ -353,8 +409,100 @@ export class Input {
     return false;
   }
 
-  /** -1..1 on each axis, from the four movement actions. Diagonals are normalised. */
+  /**
+   * Poll the connected pad and turn it into presses, releases and stick vectors.
+   *
+   * Called once per FRAME from the boot loop, not per step: the Gamepad API is polled
+   * rather than evented, and a pad read twice inside one frame reports the same buttons
+   * both times — which would be indistinguishable from the player holding them, and would
+   * be fine, but reading it once is cheaper and says what it means.
+   *
+   * @param {Array} pads  navigator.getGamepads(), passed in so this file never touches the
+   *   browser and the suite can drive a synthetic pad through the same path the real one
+   *   uses. Testing the simulation is not testing the game, and neither is testing a mock.
+   */
+  pollPads(pads) {
+    const list = pads || [];
+    let g = null;
+    for (const p of list) {
+      if (!p || !p.connected) continue;
+      /* ⚠ A pad that does not report the standard mapping is IGNORED rather than guessed
+       * at. Wrong buttons are worse than no buttons: a player whose fire button opens the
+       * tablet has a broken game, and one with no pad support has a keyboard. */
+      /* ⚠ `mapping` must BE 'standard', not merely fail to contradict it. The first version
+       * read `p.mapping && p.mapping !== 'standard'`, which lets an EMPTY mapping through —
+       * and empty is precisely what a browser reports when it could not work out what the
+       * device is. That is the case the check exists for. */
+      if (p.mapping !== 'standard') continue;
+      g = p;
+      break;
+    }
+    if (!g) {
+      if (this.pad.connected) {
+        /* Release everything it was holding, or an unplugged pad leaves the operative
+         * sprinting into a wall for the rest of the operation. */
+        for (const code of Array.from(this._padDown)) this._release(code);
+        this._padDown.clear();
+      }
+      this.pad.connected = false;
+      this.pad.id = '';
+      this.pad.move = { x: 0, y: 0 };
+      this.pad.look = { x: 0, y: 0 };
+      return false;
+    }
+
+    this.pad.connected = true;
+    this.pad.id = g.id || '';
+    const btns = g.buttons || [];
+    for (let i = 0; i < PAD_BUTTONS.length; i++) {
+      const code = PAD_BUTTONS[i];
+      const b = btns[i];
+      const v = b == null ? 0 : (typeof b === 'number' ? b : (b.value !== undefined ? b.value : (b.pressed ? 1 : 0)));
+      const down = typeof b === 'object' && b && b.pressed !== undefined && code !== 'PadLT' && code !== 'PadRT'
+        ? !!b.pressed : v >= TRIGGER_PRESS;
+      const was = this._padDown.has(code);
+      if (down && !was) { this._padDown.add(code); this._press(code); }
+      else if (!down && was) { this._padDown.delete(code); this._release(code); }
+    }
+
+    const ax = g.axes || [];
+    /* Standard mapping: 0/1 left stick, 2/3 right. A pad missing axes reports zeros
+     * rather than undefined arithmetic. */
+    const mv = stickVector(ax[0] || 0, ax[1] || 0);
+    const lk = stickVector(ax[2] || 0, ax[3] || 0);
+    this.pad.move = { x: mv.x, y: mv.y };
+    this.pad.look = { x: lk.x, y: lk.y };
+    return true;
+  }
+
+  /**
+   * How far to turn the head this frame, in radians, from the right stick.
+   *
+   * ⚠ RATE × TIME, not a raw delta. The mouse hands the game a distance the hand actually
+   * moved; a stick hands it a position it is being held at, and treating that as a distance
+   * makes the look speed a function of the frame rate — smooth on a 144Hz monitor, unusable
+   * on a 30fps one. The two paths are different quantities and only one of them is allowed
+   * near a delta.
+   */
+  padLook(dtMs) {
+    if (!this.pad.connected) return { yaw: 0, pitch: 0 };
+    const dt = Math.min(100, Math.max(0, dtMs)) / 1000;
+    return {
+      yaw: -this.pad.look.x * this.padLookRate * dt,
+      pitch: this.pad.look.y * this.padLookRate * dt,
+    };
+  }
+
+  /**
+   * -1..1 on each axis. The stick when it is out of the deadzone, the keys otherwise.
+   *
+   * Deliberately not a sum: a player with a hand on each does not want a doubled vector,
+   * and whichever they moved last is the one they meant.
+   */
   moveAxis() {
+    if (this.pad.connected && (this.pad.move.x || this.pad.move.y)) {
+      return { x: this.pad.move.x, y: this.pad.move.y };
+    }
     let x = (this.isDown('moveRight') ? 1 : 0) - (this.isDown('moveLeft') ? 1 : 0);
     let y = (this.isDown('moveDown') ? 1 : 0) - (this.isDown('moveUp') ? 1 : 0);
     if (x && y) { const inv = Math.SQRT1_2; x *= inv; y *= inv; }
