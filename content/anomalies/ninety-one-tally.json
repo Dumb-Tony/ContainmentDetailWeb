@@ -158,14 +158,25 @@
   "evidenceRules": [
     {
       "id": "thermal-void",
+      "type": "instrumental",
+      "dimension": "presence",
+      "revealsRule": "first-logged",
+      "isFalseLead": false,
       "displayName": "Cold reading with no source",
       "rawObservation": "An object on the shelf reads 2.1C against a 6C ambient. Nothing near it is cold and nothing is running.",
       "reliability": "confirmed",
+      "type": "instrumental",
+      "dimension": "presence",
+      "revealsRule": "first-logged",
       "requiredEquipment": ["thermal-imager"],
-      "channel": "thermal"
+      "isFalseLead": false
     },
     {
       "id": "frost-bloom",
+      "type": "environmental",
+      "dimension": "presence",
+      "revealsRule": "first-logged",
+      "isFalseLead": false,
       "displayName": "Frost ring on a surface",
       "rawObservation": "A ring of frost on the shelf, about the size of a hand, with a clean unfrosted patch in the middle of it.",
       "reliability": "confirmed",
@@ -174,6 +185,10 @@
     },
     {
       "id": "frost-boundary",
+      "type": "environmental",
+      "dimension": "presence",
+      "revealsRule": "account-closed",
+      "isFalseLead": false,
       "displayName": "Frost with a hard edge",
       "rawObservation": "The frost stops in a straight line rather than fading, and the line does not follow anything in the room.",
       "reliability": "probable",
@@ -182,6 +197,10 @@
     },
     {
       "id": "maintenance-log",
+      "type": "documentary",
+      "dimension": "presence",
+      "revealsRule": "account-closed",
+      "isFalseLead": false,
       "displayName": "The stocktake",
       "rawObservation": "A stocktake sheet, half-finished, in two different hands. The first hand counts to ninety-one and stops. The second has written 'again' under it and counted to ninety-one as well.",
       "reliability": "confirmed",
@@ -191,6 +210,10 @@
     },
     {
       "id": "survivor-account",
+      "type": "testimonial",
+      "dimension": "presence",
+      "revealsRule": "account-closed",
+      "isFalseLead": false,
       "displayName": "The stocktaker",
       "rawObservation": "The clerk who did the second count. She will say how many she found and that she counted twice because the first number felt wrong, and she cannot say why it felt wrong.",
       "reliability": "probable",
@@ -199,6 +222,10 @@
     },
     {
       "id": "battery-drain",
+      "type": "instrumental",
+      "dimension": "presence",
+      "revealsRule": "adulterated",
+      "isFalseLead": false,
       "displayName": "Cells flat before their time",
       "rawObservation": "Two torches from the same box, one left on the shelf and one carried, and the one on the shelf is flat.",
       "reliability": "disputed",
@@ -207,6 +234,10 @@
     },
     {
       "id": "stairwell-draught",
+      "type": "environmental",
+      "dimension": "presence",
+      "revealsRule": "adulterated",
+      "isFalseLead": false,
       "displayName": "Cold on the stairs",
       "rawObservation": "The stair is colder than the floor it serves, and the difference does not change with the door open or shut.",
       "reliability": "disputed",

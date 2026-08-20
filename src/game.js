@@ -60,6 +60,7 @@ export const EVENTS = Object.freeze({
   INSTANCE_COLLECTED: 'INSTANCE_COLLECTED',
   INSTANCE_LOGGED: 'INSTANCE_LOGGED',
   SET_PURGED: 'SET_PURGED',
+  NOISE_MADE: 'NOISE_MADE',
   NOTICE: 'NOTICE',
 });
 
@@ -1005,6 +1006,26 @@ export class Game {
       if (!this.anomaly.icePatches.length && !this.anomaly.isHeld) return 'No frost worth taking.';
       this.notice('Frost sample sealed. Research will want this.');
       p.drop(p.heldSlot);
+      return null;
+    }
+    /**
+     * A noisy action costs Incident Pressure. §5.4 lists noisy weapons as a pressure
+     * input and §10.4 says firing raises it, so the sidearm and the less-lethal launcher
+     * price their own noise in the manifest — 9 and 4 against `pressure.perMinute` of 3.4,
+     * which is 2.6 minutes of investigation for one shot and 1.2 for a baton round.
+     *
+     * ⚠ THE FIELD WOULD OTHERWISE BE A LIE, and this build has already deleted ten config
+     * constants for exactly that. An item that says it raises pressure and does not is the
+     * same defect as a config value nothing reads, one file further out.
+     *
+     * For the microphone the noisy action is PLAYBACK, never listening: listening costs
+     * only your attention, and §10.2 documents playback as a tradeoff in its own right.
+     */
+    const item = id ? this.itemsById.get(id) : null;
+    if (item && item.pressureOnUse) {
+      this.mission.applyPressureDelta(item.pressureOnUse);
+      this.bus.emit(EVENTS.NOISE_MADE, { itemId: id, pressure: item.pressureOnUse, by: p.id }, this.clock.simTimeMs);
+      this.notice(`${item.displayName} used. Everything on this floor heard that.`);
       return null;
     }
     if (id) return this.deployHeld(playerId);

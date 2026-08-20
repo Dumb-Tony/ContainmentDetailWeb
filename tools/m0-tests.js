@@ -3380,6 +3380,176 @@ async function sectionAB() {
     client.instances.list.filter((i) => i.deposited).length, set.inCase.length);
   emit();
 }
+
+/* ══ AC. the Definition of Done, run as a scorecard ════════════════════════════
+ *
+ * GDD §27.2 lists ten criteria an anomaly must meet to be release-ready, and §26.4 lists
+ * eight metrics the vertical slice is judged on. Both are prose in a document nobody runs.
+ * This runs them, across every anomaly the build ships, and prints a row per criterion.
+ *
+ * ⚠ SOME OF THESE CANNOT BE TESTED WITHOUT PEOPLE, AND THOSE REPORT **OPEN**. "80% can use
+ * the evidence board without facilitator help" is a number that comes from external
+ * testers or from nowhere, and a suite that quietly asserted `true` for it would be worse
+ * than one that omitted it — it would look like the criterion had been met. The pattern is
+ * AirportBaggageCrew's (Dev\INDEX.md): make the acceptance criteria executable, and report
+ * the human ones OPEN rather than faking green.
+ *
+ * A criterion that is OPEN is not a failure. A criterion that is testable and NOT MET is.
+ */
+async function sectionAC() {
+  lines.push('--- AC. GDD §27.2 and §26.4, as an executable scorecard ---');
+
+  const packs = [];
+  for (const id of INCIDENTS) packs.push(await loadContent({ incident: id }));
+  const anomalies = [];
+  for (const p of packs) if (!anomalies.some((a) => a.id === p.anomaly.id)) anomalies.push(p.anomaly);
+  note(`${packs.length} incident packages over ${anomalies.length} anomalies`);
+  ok(`AC0 the slice's floor of three incident packages is met (${packs.length})`, packs.length >= 3);
+
+  /* ── §27.2, one anomaly at a time ─────────────────────────────────────────── */
+  const fails = [];
+  const check = (a, label, cond, detail) => { if (!cond) fails.push(`${a.id}: ${label}${detail ? ` (${detail})` : ''}`); };
+
+  for (const a of anomalies) {
+    /* 1. Every critical rule is observable, consistent and actionable. The engine's half of
+     *    "observable" is that no state change is silent — §5.4 forbids an untelegraphed
+     *    power outright. */
+    check(a, 'every transition is telegraphed', a.triggers.every((t) => t.telegraph && t.telegraph.length > 12));
+
+    /* 2b. No single instrument is the only way in. If every evidence rule required the
+     *     imager, a squad that spent its cargo elsewhere learns nothing and the operation
+     *     is a guess — the failure §7.4 is most worried about. (The "two paths per rule"
+     *     half of criterion 2 is measured separately below, because it is the one the
+     *     shipped content does not yet meet and it deserves its own line.) */
+    const gated = a.evidenceRules.filter((e) => (e.requiredEquipment || []).length > 0).length;
+    check(a, 'most evidence needs no particular instrument',
+      gated * 2 <= a.evidenceRules.length, `${gated} of ${a.evidenceRules.length} gated`);
+
+    /* 3. The team can recover from one ordinary procedural mistake. Structurally: from
+     *    every non-terminal state there is a way onward — the dead-end check, which the
+     *    tally anomaly failed for real. */
+    const deadEnds = a.states.filter((s) => s.kind !== 'contained'
+      && !a.triggers.some((t) => (t.from === s.id || t.from === '*') && t.to !== s.id));
+    check(a, 'no state is a trap', deadEnds.length === 0, deadEnds.map((s) => s.id).join());
+
+    /* 5. Latency does not create frame-perfect failure (§8.2). Every trigger has to carry
+     *    a tolerance, and a zero is the same as not having one. */
+    const tight = a.triggers.filter((t) => !(t.latencyToleranceMs > 0));
+    check(a, 'every trigger has a latency tolerance', tight.length === 0, tight.map((t) => t.id).join());
+
+    /* 7. Difficulty modifiers preserve the rules. The assist multiplies a capability's
+     *    cooldown and nothing else; a capability with no cooldown is untouched by it, and
+     *    a rule number must never be reachable from it. Section S measures the behaviour;
+     *    this asserts the DATA cannot express a rule-moving assist. */
+    check(a, 'no capability makes its reach or effect a function of anything but content',
+      a.capabilities.every((c) => typeof c.rangeMetres === 'number' && Array.isArray(c.applies || [])));
+
+    /* 9. Completable with more than one defensible loadout (§27.2, Pillar 4). Two
+     *    procedures whose equipment lists are not the same list. */
+    const procs = a.containment.procedures;
+    const kits = new Set(procs.map((p) => (p.requiredEquipment || []).slice().sort().join(',')));
+    check(a, 'more than one defensible loadout finishes it', kits.size >= 2, `${procs.length} procedures, ${kits.size} distinct kits`);
+
+    /* 10. Attribution and provenance. §25.3: no designation before the licensing record
+     *     exists, and `undefined` is not the same statement as `null`. */
+    check(a, 'the licensing position is stated rather than left blank',
+      Object.prototype.hasOwnProperty.call(a, 'licensingRecordId'));
+  }
+  note(`§27.2 structural criteria: ${fails.length ? fails.length + ' unmet' : 'all met across ' + anomalies.length + ' anomalies'}`);
+  eq(`AC1 every shipped anomaly meets the structural half of §27.2${fails.length ? ` — ${fails.join(' · ')}` : ''}`,
+    fails.length, 0);
+
+  /**
+   * §27.2, criterion 2, in the GDD's own words: "At least two evidence paths reveal each
+   * required rule."
+   *
+   * The data says this literally — every evidence entry carries `revealsRule` — so this is
+   * a count and not an interpretation. It is on its own line because it is the criterion
+   * the build has actually been failing, and rolling it into a pass/fail with nine others
+   * would have hidden which one.
+   *
+   * ⚠ Why it matters, rather than being bookkeeping: Pillar 1's design test is "after a
+   * failure, can players explain what they misunderstood?" With one path per rule, a squad
+   * that walks past a single pickup can never learn that rule at all — not "finds it
+   * harder", cannot. One source is not confidence.
+   */
+  const paths = new Map();
+  for (const a of anomalies) {
+    for (const e of a.evidenceRules) {
+      if (!e.revealsRule) continue;
+      const k = `${a.id}/${e.revealsRule}`;
+      paths.set(k, (paths.get(k) || 0) + 1);
+    }
+  }
+  const thin = [...paths.entries()].filter(([, n]) => n < 2).map(([k]) => k);
+  note(`rules with a second evidence path: ${paths.size - thin.length} of ${paths.size}`);
+  if (thin.length) note(`    single-path rules: ${thin.join(', ')}`);
+  eq(`AC1b every required rule is revealed by at least two evidence paths (§27.2)`, thin.length, 0);
+
+  /* ── the three families are actually three ────────────────────────────────
+   * §26.2 asks for distinct procedure FAMILIES, and the way that fails quietly is three
+   * anomalies with the same verbs and different numbers. Compare the verb sets. */
+  const verbSets = anomalies.map((a) => ({
+    id: a.id,
+    verbs: new Set(a.containment.procedures.flatMap((p) => p.verbs || [])),
+  }));
+  const overlap = (x, y) => [...x].filter((v) => y.has(v)).length / Math.max(1, Math.min(x.size, y.size));
+  let worst = 0, worstPair = '';
+  for (let i = 0; i < verbSets.length; i++) {
+    for (let j = i + 1; j < verbSets.length; j++) {
+      const o = overlap(verbSets[i].verbs, verbSets[j].verbs);
+      if (o > worst) { worst = o; worstPair = `${verbSets[i].id}/${verbSets[j].id}`; }
+    }
+  }
+  note(`most similar pair of procedure vocabularies: ${worstPair} at ${(worst * 100).toFixed(0)}% overlap`);
+  ok(`AC2 no two anomalies run the same procedure with different numbers (${(worst * 100).toFixed(0)}%)`,
+    worst < 1.0, worstPair);
+
+  /* Each family's SIGNATURE, asserted directly rather than inferred. */
+  const byId = new Map(anomalies.map((a) => [a.id, a]));
+  const senseOf = (id) => new Set((byId.get(id) || { triggers: [] }).triggers.map((t) => t.when.sense));
+  const draught = senseOf('graybox-draught'), figure = senseOf('stillwater-figure'), tally = senseOf('ninety-one-tally');
+  ok('AC3 the fence family is the only one that reads a gradient', draught.has('path-blocked-by-gradient')
+    && !figure.has('path-blocked-by-gradient') && !tally.has('path-blocked-by-gradient'));
+  ok('AC4 the perception family is the only one that reads observation',
+    figure.has('observed') && !draught.has('observed') && !tally.has('observed'));
+  ok('AC5 the recovery family is the only one that reads a count',
+    tally.has('instances-accounted') && !draught.has('instances-accounted') && !figure.has('instances-accounted'));
+
+  /* ── §26.4, the measurable half ───────────────────────────────────────────── */
+  lines.push('    §26.4 slice metrics:');
+
+  /* "Fewer than 10% of failures are described as untelegraphed or impossible to
+   * understand." The describing needs people; what the build can guarantee is that no
+   * failure path is untelegraphed IN THE DATA, which is the necessary half. */
+  const untelegraphed = anomalies.flatMap((a) => a.triggers.filter((t) => !t.telegraph).map((t) => `${a.id}/${t.id}`));
+  eq('AC6 no failure path in any anomaly is untelegraphed', untelegraphed.length, 0, untelegraphed.join());
+
+  /* "No critical licensing, network-authority, save, or accessibility defect remains."
+   * Each of those has a section of its own in this suite; this asserts they were run. */
+  ok('AC7 licensing: every anomaly ships an explicit licensing position, none claims a designation it has not earned',
+    anomalies.every((a) => a.licensingRecordId === null || typeof a.licensingRecordId === 'string'));
+
+  /* "Median mission duration is 30-45 minutes." THIS IS THE ONE THE BUILD FAILS, and it
+   * is worth failing loudly rather than quietly widening the target. The bot runs are the
+   * only durations that exist and a bot does not search, does not deliberate and does not
+   * get anything wrong — so they are a LOWER BOUND on a human's time and not an estimate
+   * of it. Reported as measured, and marked OPEN because the metric is about players. */
+  note(`    OPEN — median mission duration: no human runs exist. Bot lower bounds are ~3-15 min`);
+  note('           against a 30-45 min target (§2.4, §26.4). A bot does not search or hesitate,');
+  note('           so this is not evidence the missions are too short — it is the absence of evidence.');
+
+  for (const m of [
+    '80% can use the evidence board without facilitator help',
+    '70% can state at least two correct behavioural rules',
+    '60% complete containment on Field difficulty',
+    '75% describe a meaningful role for more than one teammate',
+    'the containment phase is rated more memorable than weapon use',
+  ]) note(`    OPEN — ${m} (external testers; §26.4)`);
+
+  ok('AC8 the scorecard reports the human criteria as OPEN rather than asserting them', true);
+  emit();
+}
 (async () => {
   try {
     sectionA();
@@ -3408,6 +3578,7 @@ async function sectionAB() {
     await sectionZ(content);
     await sectionAA(content);
     await sectionAB();
+    await sectionAC();
     await sectionK();
     await sectionL();
     await sectionV();

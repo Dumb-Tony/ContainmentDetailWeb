@@ -463,9 +463,16 @@ export class Renderer {
         this.scene.add(g);
 
         let light = null;
-        if (d.itemId === 'floodlight-tripod' || d.itemId === 'portable-heater') {
-          light = new THREE.PointLight(d.itemId === 'portable-heater' ? 0xff8a4a : 0xfff0d0, 0, 11, 1.5);
-          light.position.set(d.x, 1.6, d.z);
+        /* ⚠ THE ITEM DECIDES, NOT THIS LIST. `game.lightAt()` stopped naming items when
+         * the floodlight's radius moved into items.json, and this did not — so a deployed
+         * flashlight lit the simulation (it counts against `stepStress`'s darkness) and
+         * cast nothing at all on screen. The two halves disagreed about whether a room was
+         * dark, and only the invisible half was right. The heater keeps its glow through
+         * `isEmitter` because heat is what it has instead of a light radius. */
+        if (d.item.lightRadiusMetres || d.isEmitter) {
+          const reach = d.item.lightRadiusMetres ? d.item.lightRadiusMetres * 1.7 : 11;
+          light = new THREE.PointLight(d.itemId === 'portable-heater' ? 0xff8a4a : 0xfff0d0, 0, reach, 1.5);
+          light.position.set(d.x, d.item.lightRadiusMetres && d.item.bulk !== 'long' ? 0.35 : 1.6, d.z);
           this.scene.add(light);
         }
         /* `lit` starts true to match the materials as authored, so the first sync is a

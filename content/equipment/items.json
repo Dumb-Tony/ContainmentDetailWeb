@@ -1,10 +1,24 @@
 {
-  "contentRevision": "0.3.0-web",
+  "contentRevision": "0.4.0-web",
   "_note": "Imported from Dev\\ContainmentDetail (the Unity build) at revision 0.2.0 and extended. The additions are portable-heater, power-pack and sample-kit, all three of which the anomaly definition already names in graybox-draught.json (constraint `heat-gradient`, procedures `heat-fence-safe` and `heat-fence-research`) but which the Unity manifest had not reached yet. Every item also gained the fields this build's simulation reads: cargoVolume for the loadout wager (GDD 10.7), batteryMinutes for legible failure (GDD 10.6), and heatFalloffMetres so a heat emitter's 40C contour radius is content, not a constant buried in code.",
+
+  "_sliceNote": "0.4.0-web closes GDD 26.2's equipment list for the vertical slice. Missing were the flashlight, the directional microphone/recorder, the sidearm and the less-lethal platform; sample-kit was already here from 0.3.0-web, so this is four new rows, not five. cargoVolumeBudget is DELIBERATELY UNCHANGED at 11. recommendedManifest() already spends all eleven for both anomalies in the build, so each of these four is a subtraction from a fence rather than an extra — which is what GDD 10.7 and Pillar 4 ask a manifest screen to be. 26.2's 'less-lethal or tranquilizer platform' is resolved to the less-lethal launcher (GDD 10.4's own name): a sedative implies a metabolism, and neither slice anomaly has one, so a tranquillizer would have been a rule GDD 8.2 could not make observable. ONE FIELD IN THIS FILE IS NOT YET READ BY ANYTHING: `pressureOnUse`, on the sidearm, the less-lethal launcher and the microphone. It is the Incident Pressure a noisy action adds (GDD 5.4 lists 'noisy weapons' as a pressure input, 10.4 says firing raises it), it is denominated in the same units as CONFIG.pressure.perMinute, and game.js useHeld must read it or it is a lie. The microphone's four polar values are the arguments sim/sound.js `operativeMic` already takes, and the call site must be fed from the item rather than from that function's defaults, for the same reason lightRadiusMetres left CONFIG.",
 
   "cargoVolumeBudget": 11,
 
   "items": [
+    {
+      "id": "flashlight",
+      "displayName": "Flashlight",
+      "bulk": "compact",
+      "role": "support",
+      "deployable": true,
+      "cargoVolume": 1,
+      "batteryMinutes": 40,
+      "lightRadiusMetres": 3.2,
+      "_lightNote": "The second light source in the game, and it is a CONTENT file rather than a code change: game.js lightAt() already loops every deployable's lightRadiusMetres without naming an item. Set down, it holds a 2.86m pool above the 0.2 threshold player.js calls darkness, against the floodlight tripod's 5.81m. The point of the pair is the contrast — this one carries no heatOutputCelsius, so it can never be a fence post, which is how the floor teaches that light is not what stops the draught.",
+      "summary": "Light with no heat: it makes a room survivable and it will never be a fence post. Forty minutes, a quarter of that near anything that drains charge."
+    },
     {
       "id": "thermal-imager",
       "displayName": "Thermal imager",
@@ -34,6 +48,23 @@
       "cargoVolume": 1,
       "batteryMinutes": 16,
       "summary": "Extends observation. Records the approach lane you cannot stand in."
+    },
+    {
+      "id": "directional-microphone",
+      "displayName": "Directional microphone",
+      "bulk": "general",
+      "role": "detection",
+      "deployable": true,
+      "cargoVolume": 1,
+      "batteryMinutes": 12,
+      "listenConeDegrees": 52,
+      "onAxisGainDb": 12,
+      "offAxisRejectionDb": -14,
+      "diffuseRejectionDb": -6,
+      "pressureOnUse": 6,
+      "_instrumentNote": "The imager's opposite number: it reads the sound field the way the imager reads the heat field, and it costs the same three things — a hand, a battery, and the room behind you. These four numbers ARE the instrument, and they are here rather than in CONFIG for the reason lightRadiusMetres is: a lamp's reach belongs to the lamp and a microphone's polar pattern belongs to the microphone. They are the arguments sim/sound.js `operativeMic` takes — listenConeDegrees is its `coneRad` in human units (52 degrees = 0.908 rad), and the three dB values are its on-axis gain, its off-axis rejection and its rejection of diffuse room tone. The rejection is the real instrument: it does not make the room louder, it makes everything you are not pointing at quieter, which is why turning away from the plant lets you hear what the plant was masking. No range and no bearing error are authored, deliberately: the field already makes reach emergent from spreading, occlusion and masking, and it already makes a bearing uncertain by refusing to resolve a masked source. A hard cutoff and a jitter would be two more numbers arguing with a better model.",
+      "_useNote": "THE NOISY ACTION ON THIS ITEM IS PLAYBACK, NOT LISTENING. Listening is free and costs only awareness. Playback is the secondary action (GDD 9.1) and it is what pressureOnUse prices, because GDD 10.2 documents it as a tradeoff in its own right — playback may itself be a trigger. It carries no noiseOutputDb: a recorder is not a continuous noisemaker, so sound.js's `deployableSource` returns null for it and a deployed one is silent, which is correct. Playback is a TRANSIENT — a source the caller adds to the field for a few steps — and its level belongs to that action once CONFIG.sound exists. Deployed, this is an unattended recorder running on its own cells: the audio half of the remote camera.",
+      "summary": "Gains what you point at and rejects everything else, the room included. It gives a bearing, not a position, and your own footsteps are the floor it cannot hear under."
     },
     {
       "id": "floodlight-tripod",
@@ -121,6 +152,29 @@
       "deployable": false,
       "cargoVolume": 1,
       "summary": "Stabilises. It does not undo exposure — it stops it getting worse."
+    },
+    {
+      "id": "sidearm",
+      "displayName": "Sidearm",
+      "bulk": "long",
+      "role": "defence",
+      "deployable": false,
+      "cargoVolume": 1,
+      "pressureOnUse": 9,
+      "_forceNote": "IT SHIPS BECAUSE THE SLICE MEASURES IT. GDD 26.4 asks whether the containment phase is rated as more memorable than weapon use, and 26.5 lists players disliking containment as a kill criterion — neither is measurable if the gun was quietly left out of the manifest. GDD 6.2 lists 'Avoid lethal force' as an optional directive, and that is not a directive you can fail if you were never issued a weapon. So it exists, and it is a strict loss. GDD 10.4: ordinary ammunition may stop hostile civilians, animals, or mortal secondary organisms; this floor was cleared before deployment and neither slice anomaly has a body. senses.js carries no effect verb that can express harm to an anomaly, so there is no code path by which this could ever work on one. That is the design, not an omission.",
+      "_bulkNote": "`long`, on GDD 9.2's own wording: 'One long-tool or weapon slot.' A pistol is physically belt-sized, and authoring it compact would have made carrying it free, which is the exact shape of the failure 4.3 writes down as 'the high-level player's gun solved everything'. In the long slot it competes with the floodlight tripod, so bringing it means walking in one fence post short. cargoVolume is 1 because it costs the van almost nothing — the wager here is not whether you can afford it, it is whether you will carry it instead.",
+      "summary": "Ordinary ammunition, for mortal threats — there are none on this floor. It costs the long slot a fence post wanted, and one shot hands the director two and a half minutes."
+    },
+    {
+      "id": "less-lethal-launcher",
+      "displayName": "Less-lethal launcher",
+      "bulk": "long",
+      "role": "defence",
+      "deployable": false,
+      "cargoVolume": 2,
+      "pressureOnUse": 4,
+      "_forceNote": "The proportional-force half of GDD 26.2's 'less-lethal or tranquilizer platform', and the reason the pair is worth two rows rather than one: the sidearm is what you bring when something has to be killed, and this is what you bring when a PERSON has to be stopped without being killed. GDD 12.3 puts proportional force and civilian care in the Ethics Committee's own remit, and progression.js pays civilianoutcome.protected at ethics +4, so on a floor with people on it this is the item that earns that row. This floor has none. The tranquillizer reading was rejected: a sedative implies a metabolism, the draught is a temperature gradient and the figure reads at ambient, and GDD 8.2 requires a rule to be observable and consistent before it may exist.",
+      "summary": "Proportional force, for people who must be stopped rather than killed. This floor was cleared before deployment: two volumes and the long slot spent on nobody."
     }
   ]
 }
