@@ -79,6 +79,51 @@ export const SENSES = Object.freeze({
   },
 
   'unobserved-for': { poll: (a, w, ctx) => !ctx.observation || ctx.observation.count === 0 },
+
+  /* ── the set (GDD §26.2, distributed-object recovery and verification) ──────
+   * The third measurable quantity, and the first one that is a COUNT rather than a field.
+   * Heat asks "how hot is it there", observation asks "is anyone looking", and this asks
+   * "how many of them are accounted for" — which is why the third procedure family is a
+   * different job and not the same job with different numbers.
+   *
+   * ⚠ `instances-accounted` IS NOT PERFORMED, and that is a real decision. The seal is
+   * performed because §8.4 says containment must be a state the squad CREATES, and a
+   * climax that happens to you is not a climax. But this sense is not the climax — the
+   * seal still is. This only reports whether the arithmetic is finished, and it has to be
+   * pollable so that the state can go BACK when somebody opens the case again. */
+  'instances-accounted': {
+    poll: (a, w, ctx) => {
+      const set = ctx.instances;
+      if (!set || !set.candidates) return false;
+      if (w.requireClean !== false && set.contaminated) return false;
+      const need = w.count === undefined ? set.total : w.count;
+      return set.counted >= need;
+    },
+  },
+
+  /** Something is still out there. The inverse, so a content file can telegraph on it
+   *  rather than the engine deciding when to nag. */
+  'instances-loose': {
+    poll: (a, w, ctx) => {
+      const set = ctx.instances;
+      if (!set) return false;
+      return set.list.filter((i) => i.anomalous && !i.deposited).length >= (w.count || 1);
+    },
+  },
+
+  /** The wrong thing is in the box. A state a squad can be in for a long time without
+   *  knowing, which is the point of it. */
+  'set-contaminated': { poll: (a, w, ctx) => !!(ctx.instances && ctx.instances.contaminated) },
+
+  /** ⚠ The inverse, and it exists because a rule needs a way BACK. The draught pairs
+   *  `path-blocked-by-gradient` with `gradient-below` for exactly this reason: a state
+   *  machine authored with only the entering transition is a trap, and the first version
+   *  of the tally anomaly had one — contaminate the case once and the incident could never
+   *  be completed again, even after the case had been turned out and refilled correctly.
+   *  `validateAnomaly` now refuses a non-terminal state with no way out of it. */
+  'set-clean': {
+    poll: (a, w, ctx) => !!(ctx.instances && ctx.instances.candidates && !ctx.instances.contaminated),
+  },
 });
 
 /**

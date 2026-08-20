@@ -1,0 +1,50 @@
+{
+  "id": "cold-storage-tally",
+  "contentRevision": "0.1.0",
+  "displayName": "The stocktake",
+  "anomaly": "ninety-one-tally",
+  "map": "cold-storage-l2",
+  "difficulty": "field",
+
+  "_note": "THE THIRD FLOOR-SHARE AND THE THIRD PROCEDURE FAMILY AT THE SAME TIME. The cold store now carries three operations: a thing that hunts heat, a thing that stops when you look at it, and a set of objects that does nothing at all. §15.2 wants the building to be the constant and the incident the variable, and by the third one the point is not that the map is reused — it is that a squad walking in already knows where the breakers are, which aisle is the long one, and where the office desk is, and NONE of that knowledge is the answer. Familiarity is the trap.\n\nThe stocktake is where they were left, not where they are from. Eleven candidate objects across the floor; five of them are the set. The other six are the same shape, the same weight, and the same colour, because that is the whole incident: a fetch quest is a set where every candidate is real, and this one refuses to be that.\n\nThey are placed to make the search gradient do the teaching. Three sit together in the office (aisle-side of the desk, within a metre of each other), so their sinks superpose and the imager reads them from the doorway as one obvious cold patch — that is the squad's first success and it is free. The other two are alone, one at the far north end of the west run and one in aisle C, and a lone object is a two-degree smudge you have to stand over. So the first two minutes are easy and the last ten are work, and nothing decided that except where the objects are.",
+
+  "anomalySpawn": [0.0, 11.0],
+  "_spawnNote": "The set has no position — presence.field.kind is 'none' and nothing moves. This is required by validateMap and is placed at the head of aisle B where the anomaly object is notionally 'the set', so an operative who somehow reads the debug handle finds it somewhere sensible rather than at the origin.",
+
+  "briefing": {
+    "headline": "Stock discrepancy, cold storage level 2",
+    "report": "A stocktake on level 2 was run twice by two different clerks and produced the same wrong number both times. The floor was sealed when the second clerk reported a shelf that was 'cold in a way the chiller doesn't do'. Regional wants the discrepancy recovered, counted, and off the site.",
+    "known": [
+      { "text": "The second clerk is at the stair head and has her sheet.", "confidence": "probable" },
+      { "text": "Nothing on this floor has been reported as moving, and nobody has been hurt.", "confidence": "probable" },
+      { "text": "The count is on the sheet. The site does not know it; the sheet does.", "confidence": "probable" },
+      { "text": "A torch left on the shelf overnight was flat in the morning and one carried off the floor was not.", "confidence": "disputed" }
+    ]
+  },
+
+  "instanceSites": [
+    { "id": "t1", "anomalous": true, "at": [-10.6, -10.2], "label": "Brass tally", "mundaneLabel": "Brass tally" },
+    { "id": "t2", "anomalous": true, "at": [-9.8, -10.6], "label": "Brass tally", "mundaneLabel": "Brass tally" },
+    { "id": "t3", "anomalous": true, "at": [-10.2, -9.4], "label": "Brass tally", "mundaneLabel": "Brass tally" },
+
+    { "id": "t4", "anomalous": true, "at": [-10.2, 9.6], "label": "Brass tally", "mundaneLabel": "Brass tally" },
+    { "id": "t5", "anomalous": true, "at": [4.4, 5.2], "label": "Brass tally", "mundaneLabel": "Brass tally" },
+
+    { "id": "m1", "anomalous": false, "at": [-11.0, -6.4], "label": "Brass tally", "mundaneLabel": "Brass tally" },
+    { "id": "m2", "anomalous": false, "at": [-5.4, 2.2], "label": "Brass tally", "mundaneLabel": "Brass tally" },
+    { "id": "m3", "anomalous": false, "at": [-0.6, -1.4], "label": "Brass tally", "mundaneLabel": "Brass tally" },
+    { "id": "m4", "anomalous": false, "at": [4.4, -2.0], "label": "Brass tally", "mundaneLabel": "Brass tally" },
+    { "id": "m5", "anomalous": false, "at": [9.8, 3.6], "label": "Brass tally", "mundaneLabel": "Brass tally" },
+    { "id": "m6", "anomalous": false, "at": [0.4, -8.2], "label": "Brass tally", "mundaneLabel": "Brass tally" }
+  ],
+  "_sitesNote": "⚠ `label` AND `mundaneLabel` ARE THE SAME STRING ON EVERY ROW, on purpose, and that is not an oversight waiting to be filled in. The prompt reads `Take the brass tally` for one nobody has instrumented and `Take the brass tally — reads cold` for one the imager has confirmed, and the ONLY difference between those two sentences is something the squad did. Giving the real ones a different name would put the answer in the interaction prompt and delete the incident. The two fields exist so that a future set CAN differ if a designer wants the confirmed reading to rename the thing.",
+
+  "evidenceSources": [
+    { "evidenceId": "maintenance-log", "at": [-11.2, -11.4], "label": "The stocktake sheet on the office desk", "prompt": "Read the stocktake", "requiresEquipment": [] },
+    { "evidenceId": "survivor-account", "at": [10.8, -11.2], "label": "The clerk who ran the second count", "prompt": "Take a statement", "requiresEquipment": [] },
+    { "evidenceId": "frost-bloom", "at": [-10.2, -9.0], "label": "Frost ring on the office shelf", "prompt": "Examine the frost", "requiresEquipment": [] },
+    { "evidenceId": "frost-boundary", "at": [-10.4, 9.2], "label": "A hard frost line in the west run", "prompt": "Follow the frost line", "requiresEquipment": [] },
+    { "evidenceId": "battery-drain", "at": [7.6, -8.2], "label": "Two torches from the same box", "prompt": "Compare the cells", "requiresEquipment": [] },
+    { "evidenceId": "thermal-void", "at": [4.4, 5.6], "label": "Something cold in aisle C", "prompt": "Take a thermal reading", "requiresEquipment": ["thermal-imager"] }
+  ]
+}

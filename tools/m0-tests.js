@@ -1792,9 +1792,24 @@ async function sectionR() {
    * so rather than omitting the row — an absence is a lie the player cannot notice. */
   const siteDoc = await (await fetch('../content/site.json')).json();
   const ops = siteDoc.operations;
-  eq('R24 three operations on the board', ops.length, 3);
-  eq('R25 two of them share a floor', ops.filter((o) => o.mapId === 'cold-storage-l2').length, 2);
-  eq('R26 and two of them share an anomaly', ops.filter((o) => o.anomalyId === 'graybox-draught').length, 2);
+  /* ⚠ THE PROPERTY, NOT THE COUNT. These read "three operations on the board" and "two of
+   * them share a floor", which were true of the content that existed the afternoon they
+   * were written and failed the moment a fourth operation was added — for no reason except
+   * that the number had moved. A test that has to be edited every time content is authored
+   * is a tax on authoring, and the thing worth asserting was never the number: it is
+   * §26.2's floor of three, and §15.2's claim that the building and the incident vary
+   * independently of each other. */
+  const byMap = new Map(), byAnomaly = new Map();
+  for (const o of ops) {
+    byMap.set(o.mapId, (byMap.get(o.mapId) || 0) + 1);
+    byAnomaly.set(o.anomalyId, (byAnomaly.get(o.anomalyId) || 0) + 1);
+  }
+  note(`${ops.length} operations over ${byMap.size} building(s) and ${byAnomaly.size} anomal${byAnomaly.size === 1 ? 'y' : 'ies'}`);
+  ok(`R24 the board carries at least the three the slice asks for (${ops.length})`, ops.length >= 3);
+  ok('R25 some building carries more than one incident — the map is a variable',
+    Math.max(...byMap.values()) >= 2, JSON.stringify([...byMap]));
+  ok('R26 and some anomaly appears on more than one building — so is the anomaly',
+    Math.max(...byAnomaly.values()) >= 2, JSON.stringify([...byAnomaly]));
   ok('R27 every operation names an incident that exists',
     ops.every((o) => INCIDENTS.includes(o.incident)));
   ok('R28 the Ashlar contract is gated, so the board has something to be honest about',
@@ -3156,6 +3171,215 @@ async function sectionAA(content) {
 }
 
 /* ── K2. the architectural rules, for the two new files ───────────────────── */
+
+/* ══ AB. the third procedure family: recover, verify, account ══════════════════
+ *
+ * GDD §26.2 asks for three incident packages testing DISTINCT procedure families. Two
+ * existed — build a wall out of heat, keep something in view — and both are one thing in
+ * one place ending with a case closing around it. This is the third: nothing hunts you,
+ * there is no fence, and the failure state is arithmetic.
+ *
+ * The thing this section is really guarding is that it is genuinely a third family and not
+ * the first one with the numbers changed. So it asserts what is ABSENT as hard as what is
+ * present: no field disturbance from the anomaly, no fence rule anywhere in its triggers,
+ * and no danger to an operative who does the job properly.
+ */
+async function sectionAB() {
+  lines.push('--- AB. a set of objects, recovered and accounted for ---');
+
+  const tally = await loadContent({ incident: 'cold-storage-tally' });
+  const draught = await loadContent({ incident: 'cold-storage-draught' });
+
+  eq('AB1 the fourth incident package loads and validates', tally.anomaly.id, 'ninety-one-tally');
+  eq('AB2 on a floor the squad has already worked twice', tally.map.id, draught.map.id);
+  eq('AB3 the anomaly disturbs no field of its own', tally.anomaly.presence.field.kind, 'none');
+  ok('AB4 and has no enclosure rule at all — a heat fence is meaningless to it',
+    !tally.anomaly.triggers.some((t) => ['path-blocked-by-gradient', 'gradient-below'].includes(t.when.sense)));
+  ok('AB5 nor an observation rule — this is not the aisle B procedure either',
+    !tally.anomaly.triggers.some((t) => ['observed', 'unobserved-for'].includes(t.when.sense)));
+
+  const g = new Game(tally, { seed: 'tally-1' });
+  const set = g.instances;
+  note(`${set.candidates} candidates on the floor, ${set.total} of them real`);
+  ok('AB6 there are more candidates than there are objects, or nothing needs verifying',
+    set.candidates > set.total);
+  eq('AB7 none of them is in the case yet', set.counted, 0);
+  ok('AB8 and the case is not contaminated before anyone has touched anything', !set.contaminated);
+
+  /* ── the tell is the heat field, and superposition is the search gradient ──
+   * Three in the office within a metre of each other; two on their own. Nothing in the
+   * code decides that one is easier to find than the other — the field does. */
+  g.commitLoadout(RECOMMENDED_MANIFEST);
+  g.skipMs(50);
+  const amb = g.heat.ambientC;
+  const drop = (i) => amb - g.heat.temperatureAt(i.x, i.z);
+  const cluster = set.list.filter((i) => i.anomalous && i.x < -8 && i.z < -8);
+  const alone = set.list.filter((i) => i.anomalous && !cluster.includes(i));
+  ok('AB9 the incident authored a cluster and some singletons', cluster.length >= 2 && alone.length >= 1);
+  const clusterDrop = Math.max(...cluster.map(drop));
+  const aloneDrop = Math.max(...alone.map(drop));
+  note(`cold reading at an object: ${clusterDrop.toFixed(2)}°C in the cluster, ${aloneDrop.toFixed(2)}°C on its own`);
+  ok('AB10 three together read colder than one alone, and no code decided that',
+    clusterDrop > aloneDrop * 1.4, `${clusterDrop.toFixed(2)} vs ${aloneDrop.toFixed(2)}`);
+
+  /* Which means the imager finds the cluster from further away than the singleton. This is
+   * the whole search curve of the incident, and it is an emergent property of a field that
+   * was built to be a wall. */
+  const readableFrom = (i) => {
+    let r = 0;
+    for (let d = 0.2; d <= 6; d += 0.05) {
+      const seen = set.verifyWithImager(g.heat, i.x + d, i.z);
+      if (seen.includes(i)) r = d; else break;
+    }
+    return r;
+  };
+  for (const i of set.list) i.verified = false;
+  const rc = readableFrom(cluster[0]), ra = readableFrom(alone[0]);
+  note(`imager confirms at ${rc.toFixed(2)}m in the cluster, ${ra.toFixed(2)}m on the singleton`);
+  ok('AB11 a lone object has to be stood over; a cluster does not', rc > ra);
+
+  /* A mundane object never reads cold, however close you get. */
+  for (const i of set.list) i.verified = false;
+  const mundane = set.list.find((i) => !i.anomalous);
+  set.verifyWithImager(g.heat, mundane.x, mundane.z, { rangeM: 0.5 });
+  ok('AB12 an object that is not one of them never reads cold, at any range', !mundane.verified);
+
+  /* ── recovery ──────────────────────────────────────────────────────────────
+   * Through the real verbs. The case is the account and the account is the game. */
+  const p = g.player;
+  const box = (() => {
+    /* The case comes out of the cargo cache at the command point, like everything else —
+     * there is no way to conjure one, and a test that conjured one would be testing a game
+     * nobody plays. */
+    p.x = g.site.cache.x; p.z = g.site.cache.z;
+    g.skipMs(50);
+    g.takeFromCache('reinforced-transit-case');
+    p.selectSlot(SLOTS.findIndex((s) => p.slots.get(s.id) === 'reinforced-transit-case'));
+    /* ⚠ In the loading bay, NOT in the office beside the cluster. The obvious place is a
+     * metre from the storage breaker, and `deployHeld` puts an item 0.9m in front of you —
+     * so the case landed almost exactly on the switch and every verb near it afterwards
+     * resolved to "throw the storage circuit". Nearest-wins is correct and it means where
+     * a squad puts the collection point is a real decision. */
+    p.x = -6.0; p.z = -9.0; p.yaw = Math.PI / 2;
+    g.skipMs(50);
+    g.deployHeld();
+    return g.deployables.byItem('reinforced-transit-case')[0];
+  })();
+  ok('AB13 a transit case can be set down as the collection point', !!box);
+
+  const takeAndLog = (inst) => {
+    p.x = inst.x; p.z = inst.z;
+    g.skipMs(50);
+    const act = g.contextAction();
+    if (!act || act.kind !== 'collect') return `expected collect, got ${act ? act.kind : 'none'}`;
+    g.doInteract();
+    p.x = box.x + 0.6; p.z = box.z;
+    g.skipMs(50);
+    const act2 = g.contextAction();
+    if (!act2 || act2.kind !== 'deposit') return `expected deposit, got ${act2 ? act2.kind : 'none'}`;
+    g.doInteract();
+    /* ⚠ Step after the deposit. `doInteract` changes the world; the ANOMALY only finds out
+     * on the next step, because a trigger is polled and not pushed. A test that asserts a
+     * state change on the line after the verb is asserting that the engine works some
+     * other way than it does. */
+    g.skipMs(100);
+    return null;
+  };
+
+  const first = cluster[0];
+  eq('AB14 an object can be picked up and logged into the case', takeAndLog(first), null);
+  eq('AB15 which moves the count', set.counted, 1);
+  eq('AB16 and the anomaly notices — the set is being gathered', g.anomaly.state, 'gathering');
+
+  /* ⚠ ONE PER OPERATIVE, IN THE HANDS. The walk back is the cost the incident is made of,
+   * and an object you could pocket would collapse the whole thing into one lap with a bag. */
+  p.x = cluster[1].x; p.z = cluster[1].z;
+  g.skipMs(50);
+  g.doInteract();
+  p.x = alone[0].x; p.z = alone[0].z;
+  g.skipMs(50);
+  const second = g.contextAction();
+  ok('AB17 with both hands full the verb is not "collect another"',
+    !second || second.kind !== 'collect', second ? second.kind : 'none');
+  eq('AB18 exactly one object is in hand', set.list.filter((i) => i.carried).length, 1);
+
+  /* ── being wrong ───────────────────────────────────────────────────────────
+   * The half of the family §26.2 actually names. A mundane object goes in SILENTLY. */
+  p.x = box.x + 0.6; p.z = box.z; g.skipMs(50); g.doInteract();   // log cluster[1]
+  const before = set.counted;
+  const noticesBefore = g.notices.length;
+  p.x = mundane.x; p.z = mundane.z; g.skipMs(50); g.doInteract(); // collect the wrong one
+  p.x = box.x + 0.6; p.z = box.z; g.skipMs(50); g.doInteract();   // log it
+  eq('AB19 logging a mundane object does not move the count', set.counted, before);
+  ok('AB20 and the game never says it was the wrong one',
+    !g.notices.slice(noticesBefore).some((n) => /wrong|mundane|not one|mistake/i.test(n.text)),
+    g.notices.slice(noticesBefore).map((n) => n.text).join(' | '));
+  ok('AB21 but the case is contaminated, whether anybody noticed or not', set.contaminated);
+  g.skipMs(100);
+  eq('AB22 which the anomaly is in no doubt about', g.anomaly.state, 'adulterated');
+
+  /* And it cannot be quietly picked back out. The cost is the whole account. */
+  p.x = box.x + 0.5; p.z = box.z;
+  g.skipMs(50);
+  const purge = g.contextAction();
+  ok('AB23 the only verb offered is to turn the case out',
+    purge && purge.kind === 'purge', purge ? `${purge.kind}: ${purge.text}` : 'none');
+  const inCase = set.inCase.length;
+  g.doInteract();
+  eq('AB24 which puts everything back on the floor, not just the wrong one', set.counted, 0);
+  ok('AB25 all of it', set.list.filter((i) => i.loose).length >= inCase, `${inCase} were inside`);
+  ok('AB26 and the contamination is cleared with it', !set.contaminated);
+
+  /* ── the account, closed ───────────────────────────────────────────────────
+   * Every real one in, nothing else, and only then does it become sealable. */
+  for (const i of set.list.filter((x) => x.anomalous)) {
+    if (i.deposited) continue;
+    p.x = i.x; p.z = i.z; g.skipMs(50);
+    if (g.contextAction() && g.contextAction().kind === 'collect') g.doInteract();
+    p.x = box.x + 0.6; p.z = box.z; g.skipMs(50);
+    if (g.contextAction() && g.contextAction().kind === 'deposit') g.doInteract();
+  }
+  eq('AB27 every member of the set can be recovered', set.counted, set.total);
+  ok('AB28 with nothing else in the box', !set.contaminated);
+  g.skipMs(200);
+  eq('AB29 and the account being closed is what makes it holdable', g.anomaly.state, 'accounted');
+  ok('AB30 which the engine reads as the vulnerable kind, exactly like the other two families',
+    g.anomaly.isHeld);
+
+  /* ⚠ THE SEAL IS STILL PERFORMED. §8.4: containment is a state the squad CREATES, and a
+   * climax that happens to you is not a climax. Closing the account does not close the
+   * case — somebody still has to put the latches over. */
+  ok('AB31 closing the account does NOT seal the case by itself', g.custody === 'none');
+  p.x = box.x + 0.9; p.z = box.z + 0.5;
+  g.skipMs(50);
+  const seal = g.contextAction();
+  ok('AB32 the verb becomes the seal', seal && seal.kind === 'seal',
+    seal ? `${seal.kind}: ${seal.text}` : 'none');
+  eq('AB33 and it takes', g.doInteract(), null);
+  g.skipMs(CONFIG.anomaly.custodyVerifySeconds * 1000 + 1200);
+  eq('AB34 thirty seconds later it is custody', g.custody, 'verified');
+  eq('AB35 and the set is contained', g.anomaly.state, 'contained');
+
+  /* ── nobody was ever in danger ─────────────────────────────────────────────
+   * The family's real signature. A whole operation, and the contact count is zero. */
+  note(`contacts across the whole recovery: ${g.mission.tally.contacts}`);
+  eq('AB36 an entire operation with nobody hurt', g.mission.tally.contacts, 0);
+
+  /* ── the wire ──────────────────────────────────────────────────────────────
+   * The set rides the snapshot, and the truth flag does not. */
+  const client = new Game(tally, { seed: 'tally-client' });
+  const snap = encodeSnapshot(g, g.clock.simTimeMs);
+  ok('AB37 the snapshot carries the set', Array.isArray(snap.ix) && snap.ix.length === set.candidates);
+  ok('AB38 without the answer in it — the client already has the incident file',
+    snap.ix.every((row) => row.length === 6 && typeof row[0] === 'string'
+      && !row.some((v) => v === true || v === false)),
+    JSON.stringify(snap.ix[0]));
+  applySnapshot(client, snap);
+  eq('AB39 and a client reads the same account back', client.instances.counted, set.counted);
+  eq('AB40 with every object where the host says it is',
+    client.instances.list.filter((i) => i.deposited).length, set.inCase.length);
+  emit();
+}
 (async () => {
   try {
     sectionA();
@@ -3183,6 +3407,7 @@ async function sectionAA(content) {
     sectionY();
     await sectionZ(content);
     await sectionAA(content);
+    await sectionAB();
     await sectionK();
     await sectionL();
     await sectionV();

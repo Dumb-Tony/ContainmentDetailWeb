@@ -31,6 +31,7 @@ import {
 import { Mission, PHASE } from './sim/mission.js';
 import { observedBy, operativeViewer, cameraViewer } from './sim/perception.js';
 import { PingBoard, requestPing } from './sim/comms.js';
+import { InstanceSet } from './sim/instances.js';
 import { dist } from './sim/geometry.js';
 
 /** A command is what one operative is asking for this step, whoever is asking. */
@@ -56,6 +57,9 @@ export const EVENTS = Object.freeze({
   CUSTODY_LOST: 'CUSTODY_LOST',
   BATTERY_DEAD: 'BATTERY_DEAD',
   MISSION_ENDED: 'MISSION_ENDED',
+  INSTANCE_COLLECTED: 'INSTANCE_COLLECTED',
+  INSTANCE_LOGGED: 'INSTANCE_LOGGED',
+  SET_PURGED: 'SET_PURGED',
   NOTICE: 'NOTICE',
 });
 
@@ -177,6 +181,19 @@ export class Game {
      * primary way a squad talks has to be something a player with neither can use to run
      * a whole operation. It is host state, like the notices above it. */
     this.comms = new PingBoard();
+    /* The distributed-object family (GDD §26.2). Empty for an incident that does not use
+     * one, which costs nothing: an empty set contributes no sinks and offers no verbs. */
+    this.instances = new InstanceSet();
+    const inst = this.content.map.instanceSites || [];
+    if (inst.length) {
+      const pres = (this.content.anomaly.presence && this.content.anomaly.presence.instances) || {};
+      this.instances.reset(inst, {
+        chillC: pres.chillCelsius,
+        falloffM: pres.falloffMetres,
+        depositRadiusM: pres.depositRadiusMetres,
+        reachM: CONFIG.player.reachMetres,
+      });
+    }
     /** Private to this machine. A snapshot replaces `notices` and never touches these. */
     this.localNotices = [];
     this.result = null;
@@ -388,8 +405,14 @@ export class Game {
     const emitters = this.deployables.heatEmitters();
     for (const p of this.players) if (p.alive) emitters.push({ ...p.heatSource(), active: true });
     this.heat.setEmitters(emitters);
+    /* ⚠ THE INSTANCES ARE SINKS ON THE SAME FIELD, and that is the whole design of the
+     * third procedure family rather than an implementation detail. Each is four degrees of
+     * cold at 0.9m, so the imager the squad brought to fence a draught is the instrument
+     * that finds them — and superposition, which nothing here writes, makes three in a
+     * drawer legible from the doorway while one on its own is a smudge you have to stand
+     * over. The field that is a WALL in one incident is an INSTRUMENT in another. */
     const sink = this.anomaly.asSink();
-    this.heat.setSinks(sink ? [sink] : []);
+    this.heat.setSinks([...(sink ? [sink] : []), ...this.instances.sinks()]);
     this.heat.drift(stepMs, this.anomaly.isLoose);
 
     /* 2. the squad. One pass per operative, each reading its own command — there is no
@@ -452,6 +475,15 @@ export class Game {
      * and clients keep drawing markers that stopped being true minutes ago. */
     this.comms.prune(simTimeMs);
 
+    /* Carried objects follow their carrier, and a live imager reads whatever is close
+     * enough to read. Verification is bookkeeping — no rule consults it, because the game
+     * does not care whether you checked, only whether you were right. */
+    this.instances.step(this.players);
+    for (const id of this.imagerOnIds) {
+      const p = this.playerById(id);
+      if (p && p.alive) this.instances.verifyWithImager(this.heat, p.x, p.z);
+    }
+
     /* 4. the anomaly, reading the field built in step 1. Every operative is a candidate
      *    meal; `chooseTarget` picks the strongest it can reach, so a squad that spreads
      *    out is choosing which of them is the bait. */
@@ -477,6 +509,7 @@ export class Game {
     const res = this.anomaly.step(stepMs, simTimeMs, {
       sources, operatives: this.players.filter((p) => p.alive), pressureStage: m.stage,
       observation: this.observation,
+      instances: this.instances,
     });
     if (this.anomaly.state !== prevState) {
       const t = this.anomaly.transitions[this.anomaly.transitions.length - 1];
@@ -644,6 +677,16 @@ export class Game {
     /* A downed operative has one verb, and it is not theirs to press. */
     if (p.downed) return null;
 
+    /* Carrying one of the set. It is in the HANDS, so the only two verbs are log it or put
+     * it down — and the walk back to the case is the cost the whole incident is made of. */
+    const held = this.instances.carriedBy(p.id);
+    if (held) {
+      const box = this.deployables.byItem('reinforced-transit-case')
+        .find((d) => !d.sealed && dist(p.x, p.z, d.x, d.z) <= this.instances.depositRadiusM);
+      if (box) return { kind: 'deposit', text: `Log the ${held.label.toLowerCase()} into the case`, target: box };
+      return { kind: 'drop-instance', text: `Set the ${held.label.toLowerCase()} down` };
+    }
+
     if (p.hands) return { kind: 'put-down', text: `Put down the ${this.itemsById.get(p.hands).displayName}` };
 
     /* A teammate on the floor outranks everything except a seal. GDD §9.5 — the rescue
@@ -659,9 +702,42 @@ export class Game {
     /* The seal comes first: when it is available it is the only thing that matters. */
     const caseDep = this.deployables.byItem('reinforced-transit-case')
       .find((d) => !d.sealed && dist(p.x, p.z, d.x, d.z) <= reach);
-    if (caseDep && this.anomaly.isHeld
-      && dist(this.anomaly.x, this.anomaly.z, caseDep.x, caseDep.z) <= 1.5) {
+    /**
+     * ⚠ "IS IT IN THE CASE" IS NOT ALWAYS A DISTANCE.
+     *
+     * For a mass it is: the draught has to be within 1.5m of the case for the latches to
+     * mean anything. For a distributed set it is not, and cannot be — the anomaly has no
+     * meaningful position, its `anomalySpawn` is a formality the map format requires, and
+     * the objects are already inside the box. The distance test put the tally incident's
+     * seal twenty metres away from where the operation actually finishes, so the verb
+     * simply never appeared and the incident could not be completed at all.
+     *
+     * The set's version of the same question is whether the account is closed, and
+     * `isHeld` already answers it — the `accounted` state is of the vulnerable kind, which
+     * is the same thing `banked` and `held` are for the other two families.
+     */
+    const inTheCase = this.anomaly.isDistributed
+      ? true
+      : (caseDep && dist(this.anomaly.x, this.anomaly.z, caseDep.x, caseDep.z) <= 1.5);
+    if (caseDep && this.anomaly.isHeld && inTheCase) {
       return { kind: 'seal', text: 'SEAL THE CASE', target: caseDep };
+    }
+
+    /* A contaminated case outranks everything except the seal and a casualty, the same way
+     * the seal does — for the same reason. Standing at a case with the wrong thing in it,
+     * there is exactly one useful action, and burying it under "retrieve the transit case"
+     * would let a squad carry a case they cannot seal to a stair head they cannot leave by.
+     * Offered ONLY while contaminated, so it never appears as a way to casually undo a
+     * correct deposit. */
+    if (this.instances.contaminated) {
+      const spoiled = this.deployables.byItem('reinforced-transit-case')
+        .find((d) => !d.sealed && dist(p.x, p.z, d.x, d.z) <= reach);
+      if (spoiled) {
+        return {
+          kind: 'purge', target: spoiled,
+          text: `Open the case and turn it out (${this.instances.inCase.length} inside)`,
+        };
+      }
     }
 
     const cands = [];
@@ -671,6 +747,17 @@ export class Game {
       if (dep.sealed && this.custody === 'verified') cands.push({ d, kind: 'carry-case', text: 'Lift the transit case', target: dep });
       else if (dep.sealed) cands.push({ d, kind: 'blocked', text: 'Custody unverified — the case must hold thirty seconds', target: dep });
       else cands.push({ d, kind: 'retrieve', text: `Retrieve the ${dep.item.displayName}`, target: dep });
+    }
+
+    const loose = this.instances.nearestLoose(p.x, p.z, reach);
+    if (loose) {
+      cands.push({
+        d: dist(p.x, p.z, loose.x, loose.z), kind: 'collect', target: loose,
+        /* The prompt says what it LOOKS like, never what it is. An object the imager has
+         * confirmed says so; one nobody has read is just an object, and the whole incident
+         * is the difference between those two sentences. */
+        text: loose.verified ? `Take the ${loose.label.toLowerCase()} — reads cold` : `Take the ${loose.mundaneLabel.toLowerCase()}`,
+      });
     }
 
     const sw = this.site.circuitSwitchNear(p.x, p.z, reach);
@@ -692,7 +779,21 @@ export class Game {
     if (dCache <= reach + 1.0) cands.push({ d: dCache, kind: 'cache', text: 'Open the cargo manifest', target: null });
 
     if (!cands.length) return null;
-    cands.sort((a, b) => a.d - b.d);
+    /**
+     * Nearest wins, and a tie is broken by how SMALL the thing is.
+     *
+     * ⚠ A plain distance sort is not enough once objects can be lying on top of a
+     * deployable, which is exactly what happens the moment a contaminated case is turned
+     * out: eleven objects and the case they came from all at the same coordinates. The
+     * distances were equal, `retrieve the transit case` had been pushed first, and picking
+     * any of them back up became impossible — the operative stood in the pile they had
+     * just made and was offered the case, over and over.
+     *
+     * So a tie resolves to the more specific object. You can always step away from a case;
+     * you cannot step away from a tie.
+     */
+    const grain = { collect: 0, purge: 1, deposit: 1, retrieve: 2, 'carry-case': 2, blocked: 3 };
+    cands.sort((a, b) => (a.d - b.d) || ((grain[a.kind] ?? 2) - (grain[b.kind] ?? 2)));
     return cands[0];
   }
 
@@ -739,6 +840,34 @@ export class Game {
       case 'put-down':
         this._putDownCase(p);
         return null;
+      case 'collect': {
+        const err = this.instances.collect(p.id, a.target);
+        if (err) { this.noticeLocal(err); return err; }
+        this.bus.emit(EVENTS.INSTANCE_COLLECTED, { id: a.target.id, by: p.id }, t);
+        return null;
+      }
+      case 'drop-instance':
+        this.instances.drop(p.id, p.x, p.z);
+        return null;
+      case 'deposit': {
+        const r = this.instances.deposit(p.id, a.target.x, a.target.z);
+        if (!r.ok) { this.noticeLocal(r.why); return r.why; }
+        /* ⚠ THE ONLY FEEDBACK IS THE NUMBER, and a wrong object is SILENT. Saying "that
+         * one was mundane" here would delete the incident: the verification family is
+         * about noticing that the count did not move, and a game that tells you would be
+         * asking you to read a label rather than to keep an account. */
+        this.notice(r.ticked
+          ? `The case answers. ${this.instances.counted} logged.`
+          : `The case takes it. ${this.instances.counted} logged.`);
+        this.bus.emit(EVENTS.INSTANCE_LOGGED, { id: r.instance.id, counted: this.instances.counted, by: p.id }, t);
+        return null;
+      }
+      case 'purge': {
+        const out = this.instances.purge(a.target.x, a.target.z);
+        this.notice(`The case is turned out. ${out.length} back on the floor, and none of them will say which.`);
+        this.bus.emit(EVENTS.SET_PURGED, { n: out.length, by: p.id }, t);
+        return null;
+      }
       case 'retrieve': {
         const item = a.target.item;
         if (!p.take(item)) { this.notice('No slot free for that.'); return 'No slot free.'; }

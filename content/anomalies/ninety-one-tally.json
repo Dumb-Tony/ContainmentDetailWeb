@@ -1,0 +1,261 @@
+{
+  "id": "ninety-one-tally",
+  "contentRevision": "0.1.0",
+  "displayName": "The tally",
+  "licensingRecordId": null,
+  "_licensingNote": "Original, not an SCP. GDD §25 makes an attribution record a prerequisite for implementing SCP-derived content, and §25.7's questions about how ShareAlike applies to game code are unsettled. Nothing here is derived from anyone's work.",
+
+  "_designNote": "GDD §26.2's THIRD PROCEDURE FAMILY: distributed-object recovery and verification. The first two families are one thing in one place — build a wall out of heat, or keep it in view — and both end with a case closing around it. This one is not a thing, it is a SET, and the difference has to be procedure rather than numbers or §24's 'scope expands through anomaly uniqueness' risk has been paid for nothing.\n\nSo: nothing hunts you. There is no fence, there is no lure, and no operative is ever in danger from it. What there is instead is arithmetic under a clock, in the dark, with an instrument that only half works — and the failure state is not being caught, it is being WRONG and not finding out until the debrief.\n\nTHE TELL IS THE HEAT FIELD, WHICH IS THE POINT. Each object is a four-degree sink at 0.9m of falloff, so the thermal imager the squad brought to fence a draught is the instrument that reads them. Superposition does the rest without a line of code: one on its own is a smudge you have to stand over, three in a drawer add up and are obvious from the doorway. The field that is a WALL in the cold store is an INSTRUMENT here. That is the strongest argument this build makes for having exactly one field.\n\nTHE VERIFICATION IS THE CASE, NOT A LABEL. The case counts what answers. Put a real one in and the count moves; put a mundane one in and the case takes it silently and the count does not. The game never says 'that one was wrong', because a game that told you would be asking you to read a label instead of keeping an account — and §7.4 wants confidence rather than checklist completion. Noticing that the number did not move IS the mechanic.\n\nAND THE COUNT IS NOT GIVEN. How many there are is on the evidence trail, not on the HUD. A squad that seals at what it assumes is the total has established custody of a subset and will find out at the debrief.",
+
+  "presence": {
+    "field": { "kind": "none" },
+    "_fieldNote": "The anomaly itself disturbs nothing — it has no position worth speaking of, because it is not in one place. The INSTANCES are the sinks, and those are described below and applied by src/sim/instances.js.",
+    "instances": {
+      "chillCelsius": 4,
+      "falloffMetres": 0.9,
+      "depositRadiusMetres": 1.5,
+      "_note": "Four degrees is deliberately small: at ambient 6C a single object reads 2C against its surroundings, which the imager shows as a smudge and only within about three metres. Two together read colder than either; three are unmistakable. The search gradient is superposition and nothing decides it."
+    }
+  },
+
+  "states": [
+    {
+      "id": "dispersed",
+      "kind": "latent",
+      "speedMps": 0,
+      "displayName": "Dispersed",
+      "description": "The set is distributed across the floor and no part of it is doing anything. This is what it looks like for as long as the squad is wrong about where it is."
+    },
+    {
+      "id": "gathering",
+      "kind": "active",
+      "speedMps": 0,
+      "displayName": "Gathering",
+      "description": "Part of the set is in the case and the rest is not. The only state in which the arithmetic can still be got right."
+    },
+    {
+      "id": "accounted",
+      "kind": "vulnerable",
+      "speedMps": 0,
+      "displayName": "Accounted for",
+      "description": "Every one of them is in the case and nothing else is. The case can be sealed and it will hold."
+    },
+    {
+      "id": "adulterated",
+      "kind": "active",
+      "speedMps": 0,
+      "displayName": "Adulterated",
+      "description": "Something is in the case that does not belong to the set. It will not seal, and the only way back is to turn the case out and start the account again."
+    },
+    {
+      "id": "contained",
+      "kind": "contained",
+      "speedMps": 0,
+      "displayName": "Contained",
+      "description": "Sealed, complete, and leaving the floor."
+    }
+  ],
+
+  "triggers": [
+    {
+      "id": "first-logged",
+      "from": "dispersed",
+      "to": "gathering",
+      "when": { "sense": "instances-accounted", "count": 1 },
+      "condition": "at least one member of the set is in the case and answers",
+      "telegraph": "The case answers once, flatly, the way a scale settles. Whatever else is out there is now one fewer.",
+      "pressureDelta": 1,
+      "latencyToleranceMs": 1200
+    },
+    {
+      "id": "account-closed",
+      "from": "gathering",
+      "to": "accounted",
+      "when": { "sense": "instances-accounted" },
+      "condition": "every member of the set is in the case, and nothing that is not",
+      "telegraph": "The case stops answering because there is nothing left to answer. The cold goes out of the room all at once.",
+      "pressureDelta": -1,
+      "latencyToleranceMs": 1200
+    },
+    {
+      "id": "account-broken",
+      "from": "accounted",
+      "to": "gathering",
+      "when": { "sense": "instances-loose" },
+      "condition": "the case has been opened, or something has come back out of it",
+      "telegraph": "The count falls. Whatever is loose again is loose in the room you are standing in.",
+      "pressureDelta": 2,
+      "latencyToleranceMs": 1200
+    },
+    {
+      "id": "adulterated",
+      "from": "*",
+      "to": "adulterated",
+      "when": { "sense": "set-contaminated" },
+      "condition": "an object that is not part of the set has been logged into the case",
+      "telegraph": "Nothing happens at all. The case takes it, the number does not move, and the only sign is a silence somebody has to notice.",
+      "pressureDelta": 1,
+      "latencyToleranceMs": 1200
+    },
+    {
+      "id": "account-resumed",
+      "from": "adulterated",
+      "to": "gathering",
+      "when": { "sense": "set-clean" },
+      "condition": "the case has been turned out and no longer holds anything that is not part of the set",
+      "telegraph": "The floor is colder than it was a moment ago, because everything that was in the case is back on it.",
+      "pressureDelta": 0,
+      "latencyToleranceMs": 1200,
+      "_note": "⚠ THE WAY BACK, and its absence was a real bug. Authored with only the entering transition, `adulterated` was a dead end: one mundane object logged and the operation could never be completed, even after the case was emptied and refilled correctly. The draught pairs `heat-wall` with `gradient-lost` for the same reason. validateAnomaly refuses a non-terminal state with no exit now, so this cannot be forgotten again."
+    },
+    {
+      "id": "sealed",
+      "from": "accounted",
+      "to": "contained",
+      "when": { "sense": "enclosed-by", "itemId": "reinforced-transit-case", "radiusMetres": 1.5 },
+      "condition": "the transit case is sealed while the account is complete",
+      "telegraph": "The latches go over on a full set and the case is noticeably lighter than the sum of what went into it.",
+      "pressureDelta": -2,
+      "latencyToleranceMs": 400
+    }
+  ],
+
+  "capabilities": [
+    {
+      "id": "cold-to-the-touch",
+      "verb": "contact",
+      "availableInStates": ["dispersed", "gathering", "adulterated"],
+      "effect": "Handling one bare is unpleasant and cumulatively harmful, but it is not an attack and it is not what the incident is about. An operative who carries the whole set one at a time will feel it; one who shares the walk will not.",
+      "rangeMetres": 0.35,
+      "cooldownMs": 45000,
+      "latencyToleranceMs": 400,
+      "compounding": true,
+      "applies": [
+        { "condition": "exposure", "severity": "minor" }
+      ],
+      "counterableBy": ["insulated-barrier"]
+    }
+  ],
+
+  "constraints": [
+    {
+      "id": "verification-instrument",
+      "statement": "An object of the set reads below ambient. Nothing else on the floor does.",
+      "requiredEquipment": ["thermal-imager"]
+    },
+    {
+      "id": "one-at-a-time",
+      "statement": "They are carried in the hands, one to an operative. There is no way to pocket one.",
+      "requiredEquipment": []
+    },
+    {
+      "id": "the-case-counts",
+      "statement": "The transit case reports how many members of the set are inside it. It does not report how many things are inside it.",
+      "requiredEquipment": ["reinforced-transit-case"]
+    }
+  ],
+
+  "evidenceRules": [
+    {
+      "id": "thermal-void",
+      "displayName": "Cold reading with no source",
+      "rawObservation": "An object on the shelf reads 2.1C against a 6C ambient. Nothing near it is cold and nothing is running.",
+      "reliability": "confirmed",
+      "requiredEquipment": ["thermal-imager"],
+      "channel": "thermal"
+    },
+    {
+      "id": "frost-bloom",
+      "displayName": "Frost ring on a surface",
+      "rawObservation": "A ring of frost on the shelf, about the size of a hand, with a clean unfrosted patch in the middle of it.",
+      "reliability": "confirmed",
+      "requiredEquipment": [],
+      "channel": "visual"
+    },
+    {
+      "id": "frost-boundary",
+      "displayName": "Frost with a hard edge",
+      "rawObservation": "The frost stops in a straight line rather than fading, and the line does not follow anything in the room.",
+      "reliability": "probable",
+      "requiredEquipment": [],
+      "channel": "visual"
+    },
+    {
+      "id": "maintenance-log",
+      "displayName": "The stocktake",
+      "rawObservation": "A stocktake sheet, half-finished, in two different hands. The first hand counts to ninety-one and stops. The second has written 'again' under it and counted to ninety-one as well.",
+      "reliability": "confirmed",
+      "requiredEquipment": [],
+      "channel": "document",
+      "_note": "THIS IS WHERE THE COUNT COMES FROM, and it is the single most important object on the floor. A squad that does not read it does not know when it has finished, and §7.4 says the game asks for confidence rather than a checklist — so the HUD never states the total. The number in the fiction is not the number in the file; what the sheet establishes is that somebody counted twice and got the same answer, which is what makes the total knowable at all."
+    },
+    {
+      "id": "survivor-account",
+      "displayName": "The stocktaker",
+      "rawObservation": "The clerk who did the second count. She will say how many she found and that she counted twice because the first number felt wrong, and she cannot say why it felt wrong.",
+      "reliability": "probable",
+      "requiredEquipment": [],
+      "channel": "witness"
+    },
+    {
+      "id": "battery-drain",
+      "displayName": "Cells flat before their time",
+      "rawObservation": "Two torches from the same box, one left on the shelf and one carried, and the one on the shelf is flat.",
+      "reliability": "disputed",
+      "requiredEquipment": [],
+      "channel": "instrument"
+    },
+    {
+      "id": "stairwell-draught",
+      "displayName": "Cold on the stairs",
+      "rawObservation": "The stair is colder than the floor it serves, and the difference does not change with the door open or shut.",
+      "reliability": "disputed",
+      "requiredEquipment": [],
+      "channel": "sensory"
+    }
+  ],
+
+  "containment": {
+    "procedures": [
+      {
+        "id": "full-account",
+        "grade": "safe",
+        "displayName": "Complete account, single case",
+        "requiredEquipment": ["thermal-imager", "reinforced-transit-case", "trauma-kit", "remote-camera"],
+        "verbs": ["survey", "verify", "recover", "account", "seal"],
+        "statement": "Sweep every candidate site on thermal, confirm each member of the set reads below ambient before it is lifted, carry them one at a time to the case, and seal only when the case's count matches the stocktake.",
+        "_note": "The camera is on the list because a site that has been swept and a site that has not look identical, and on a large floor with a squad of three the only reliable way to know which is which is to leave something looking at the ones you have done."
+      },
+      {
+        "id": "sweep-and-lift",
+        "grade": "minimum",
+        "displayName": "Lift on sight, verify at the case",
+        "requiredEquipment": ["reinforced-transit-case"],
+        "verbs": ["survey", "recover", "account"],
+        "statement": "Take every candidate to the case and log them all, using the case's own count to sort them.",
+        "_note": "It works, it needs no instrument at all, and it is a trap: the first mundane object logged adulterates the case and the only way back is to turn it out and start again. Fast when it is right and catastrophic when it is not, which is exactly what a minimum-grade procedure should be."
+      },
+      {
+        "id": "paired-verification",
+        "grade": "research",
+        "displayName": "Paired verification with a standing count",
+        "requiredEquipment": ["thermal-imager", "reinforced-transit-case", "remote-camera", "motion-sensor", "trauma-kit"],
+        "verbs": ["survey", "verify", "recover", "account", "witness", "seal"],
+        "statement": "One operative on the imager verifies and calls; a second recovers and logs; the caller keeps the running count and never touches an object. Cameras hold the cleared sites.",
+        "_note": "Slower, needs three people and most of the cargo budget, and it is the only procedure in which nobody is ever holding an object they have not personally seen read cold. §12.1: the reward for a research-grade procedure is analytical yield, never an easier fight."
+      }
+    ],
+    "thresholds": [
+      {
+        "id": "case-count",
+        "statement": "The case counts members of the set, not objects. A silent deposit is a wrong one.",
+        "value": null
+      },
+      {
+        "id": "handling-exposure",
+        "statement": "Carrying them bare is cumulative. Sharing the walk is the counter, not a warmer glove.",
+        "value": null
+      }
+    ]
+  }
+}

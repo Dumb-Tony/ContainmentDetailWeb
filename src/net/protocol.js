@@ -43,7 +43,7 @@ export const MAX_SQUAD = 5;
 export const ACT = Object.freeze({
   INTERACT: 'i', USE: 'u', IMAGER: 'm', SLOT: 's',
   TAKE: 't', RETURN: 'r', PROCEDURE: 'p', ABORT: 'a', CLAIM: 'c',
-  /* A squad call — GDD �11.3. The client sends the phrase ID and where it aimed; it does
+  /* A squad call — GDD �11.3. The client sends the phrase ID and where it aimed; it does
    * NOT send who it is, because the host stamps the seat the link is in. Spoofing another
    * operative's callout is therefore impossible by construction rather than by validation. */
   PING: 'g',
@@ -148,6 +148,10 @@ export function encodeSnapshot(game) {
      * kind, the text nor the owner's name travels — every one of those is derived from a
      * phrase id both ends already have. */
     pg: game.comms.encode(),
+    /* The distributed set. `anomalous` does NOT travel — the client already has the
+     * incident file, so sending the truth flag would be sending it a copy of something it
+     * loaded at boot. What travels is where each object is and whose hands it is in. */
+    ix: game.instances.encode(),
     rs: game.result || 0,
   };
 }
@@ -248,6 +252,7 @@ export function applySnapshot(game, snap, { localId = null } = {}) {
 
   game.notices = snap.no.map(([atMs, text]) => ({ atMs, text }));
   game.comms.decode(snap.pg || []);
+  game.instances.decode(snap.ix || []);
   game.result = snap.rs || null;
   return true;
 }

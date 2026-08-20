@@ -235,6 +235,29 @@
       ],
       "_note": "THE SAME ANOMALY as op-cold-storage-2, on different geometry — the mirror of what the aisle B operation does. GDD 15.2 varies the incident against a constant building; this varies the building against a constant incident, and a squad that arrives with the cold store playbook has brought the right tools in the wrong quantity to the wrong end of a very long walk.",
       "incident": "ashlar-gallery-draught"
+    },
+    {
+      "id": "op-cold-storage-tally",
+      "name": "Cold storage, the stocktake",
+      "mapId": "cold-storage-l2",
+      "anomalyId": "ninety-one-tally",
+      "clearanceRequired": 1,
+      "difficulty": "Field",
+      "status": "authorised",
+      "distance": "The same forty minutes, the same stair, the third time.",
+      "mandate": "Recover the discrepancy in full, verify the count against the stocktake, and transfer it to the stair head.",
+      "optional": [
+        "Recover all issued equipment",
+        "Log nothing into the case that does not belong there",
+        "Read the second clerk's sheet before committing to a count"
+      ],
+      "conditions": [
+        "Two independent stocktakes returned the same wrong number.",
+        "Nothing on this floor has been reported as moving, and nobody has been hurt.",
+        "The clerk who ran the second count is at the stair head and has her sheet."
+      ],
+      "_note": "THE THIRD FAMILY (GDD 26.2: distributed-object recovery and verification) and the third operation on this one floor. Nothing hunts you here, there is no fence, and the failure state is arithmetic. A squad that has done the other two walks in knowing where the breakers are and which aisle is long, and none of that is the answer — familiarity is the trap.",
+      "incident": "cold-storage-tally"
     }
   ],
 

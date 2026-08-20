@@ -274,6 +274,10 @@ export class NetSession {
     /* Their markers go with the radio. A call is a claim about right now by somebody who
      * is looking at it, and neither half is true any more. */
     this.game.comms.retire(found.id);
+    /* ⚠ And whatever they were holding goes on the floor where they stood. Same rule
+     * §11.5 forces on custody of the case: an object that left the world with somebody's
+     * laptop is an operation nobody can finish. */
+    this.game.instances.releaseHeldBy(found.id, p.x, p.z);
     /* Custody is the one thing that cannot wait for them to come back. */
     if (p.hands === 'reinforced-transit-case') {
       this.game._putDownCase(p);

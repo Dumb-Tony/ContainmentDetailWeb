@@ -107,6 +107,19 @@ export class Anomaly {
     return s ? s.kind : 'latent';
   }
 
+  /**
+   * Is this a set rather than a mass? (GDD §26.2, distributed-object recovery.)
+   *
+   * ⚠ Everything that asks "where is it" has to ask this first. A distributed anomaly has
+   * an `anomalySpawn` because the map format requires one, and that coordinate means
+   * nothing: the objects are wherever the incident left them and the anomaly itself is not
+   * anywhere. Two rules read a position and both were wrong for it — the seal verb was
+   * offered only within 1.5m of a point twenty metres from where the operation finishes,
+   * and `trySeal` then refused for the same reason. Neither failed loudly; the verb simply
+   * never appeared.
+   */
+  get isDistributed() { return !!(this.def.presence && this.def.presence.instances); }
+
   get isAwake() { const k = this.stateKind; return k === 'active' || k === 'hunting'; }
   get isLoose() { return this.stateKind !== 'contained'; }
   get isHeld() { return this.stateKind === 'vulnerable'; }
@@ -447,7 +460,8 @@ export class Anomaly {
     if (!caseDep) return 'No transit case deployed.';
     if (caseDep.itemId !== t.when.itemId) return `That is not the ${t.when.itemId.replace(/-/g, ' ')}.`;
     if (!caseDep.hasPower) return 'The case heater is dead. It will not hold.';
-    if (dist(this.x, this.z, caseDep.x, caseDep.z) > t.when.radiusMetres) {
+    /* A set is already inside the box; there is no distance to check. See `isDistributed`. */
+    if (!this.isDistributed && dist(this.x, this.z, caseDep.x, caseDep.z) > t.when.radiusMetres) {
       return `The case is ${dist(this.x, this.z, caseDep.x, caseDep.z).toFixed(1)}m away. It must be within ${t.when.radiusMetres}m.`;
     }
     caseDep.sealed = true;
