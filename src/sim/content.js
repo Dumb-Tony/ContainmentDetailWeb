@@ -12,7 +12,7 @@
  * on Pages.
  */
 
-import { SENSES, EFFECT_VERBS, FIELD_KINDS, isSense, isPerformed } from './senses.js';
+import { SENSES, EFFECT_VERBS, FIELD_KINDS, HUNT_KINDS, BLOCK_KINDS, isSense, isPerformed } from './senses.js';
 
 const url = (p) => new URL(p, import.meta.url).href;
 
@@ -183,6 +183,14 @@ function validateAnomaly(doc, itemIds) {
   if (doc.presence && doc.presence.field && !FIELD_KINDS.includes(doc.presence.field.kind)) {
     p.push(`presence.field.kind "${doc.presence.field.kind}" is not one of ${FIELD_KINDS.join(', ')}`);
   }
+  if (doc.presence && doc.presence.hunts !== undefined && !HUNT_KINDS.includes(doc.presence.hunts)) {
+    p.push(`presence.hunts "${doc.presence.hunts}" is not one of ${HUNT_KINDS.join(', ')} — sensing a thing and walking toward it are different questions, and both are closed vocabularies`);
+  }
+  for (const b of (doc.presence && doc.presence.blockedBy) || []) {
+    if (!BLOCK_KINDS.includes(b)) {
+      p.push(`presence.blockedBy names "${b}", which is not one of ${BLOCK_KINDS.join(', ')}`);
+    }
+  }
 
   for (const c of doc.capabilities || []) {
     if (!EFFECT_VERBS.includes(c.verb)) {
@@ -274,6 +282,6 @@ export async function loadContent({
 }
 
 /** Every incident the build ships, for the mission board. Content, not code. */
-export const INCIDENTS = Object.freeze(['cold-storage-draught', 'cold-storage-figure', 'ashlar-gallery-draught', 'cold-storage-tally']);
+export const INCIDENTS = Object.freeze(['cold-storage-draught', 'cold-storage-figure', 'ashlar-gallery-draught', 'cold-storage-tally', 'blackthorn-caller']);
 
 export { ContentError };

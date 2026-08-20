@@ -1,0 +1,37 @@
+{
+  "id": "blackthorn-caller",
+  "contentRevision": "0.1.0",
+  "displayName": "The quiet hollow",
+  "anomaly": "blackthorn-caller",
+  "map": "blackthorn-reserve",
+  "difficulty": "field",
+
+  "_note": "THE SLICE'S FIELD MAP AND ITS LAST PROCEDURE FAMILY, in one package — GDD §26.2 names one forest research reserve and three families, and this is the forest and the auditory one.\n\nThey belong together, and not only because both were outstanding. Blackthorn's spatial argument is that there are NO LANES: 41.5% of the reserve has all twenty-four escape rays open and not one square metre of it is fenced bare. A heat fence outdoors is a ring, and two floodlights close one only while both stay within 1.9m of something moving at 2m/s. So the map cannot host a fence-family incident honestly — and the caller does not want one. It is restrained by silence, which is available everywhere and costs nothing to carry.\n\nThe reserve's own quiet is the mechanic. Mains down, one generator that is not running, seven solar waymarkers, and a drainage channel — 28dB of room tone across 2,304 square metres, which is why a walking operative carries fifteen metres here and why the four powered things in the cargo manifest are audible from most of the map.",
+
+  "anomalySpawn": [6.0, 18.0],
+  "_spawnNote": "The lookout clearing, at the top of the reserve and 38m from the vehicle. Traced to a seal by the map's own harness, and standable — several natural-looking coordinates on this map are inside solid blocks (the lookout plinth and the mast lockup both swallow a spawn and pre-fence it at 0/24). Far enough from the car park that the squad's arrival does not rouse it before anyone has learned anything.",
+
+  "briefing": {
+    "headline": "Two contractors withdrawn, Blackthorn Reserve",
+    "report": "A tree-safety contractor pulled his crew off the north plantation after one of them 'got followed by something that wasn't there'. He walked out himself and will say he crawled. The duty ranger stayed a further night in the station with everything switched off and reported nothing at all.",
+    "known": [
+      { "text": "The duty ranger is at the station and will give a statement.", "confidence": "probable" },
+      { "text": "Mains are down across the reserve. The compound generator has not been run since the withdrawal.", "confidence": "probable" },
+      { "text": "The culvert gate is on the compound circuit and is shut. The footbridge is the only other crossing.", "confidence": "probable" },
+      { "text": "The contractor puts it in the plantation north of the channel and will not be more specific.", "confidence": "disputed" }
+    ]
+  },
+
+  "evidenceSources": [
+    { "evidenceId": "survivor-account", "at": [7.0, -16.0], "label": "The duty ranger, at the station office", "prompt": "Take a statement", "requiresEquipment": [] },
+    { "evidenceId": "contractor-account", "at": [-9.6, -20.2], "label": "The contractor, waiting at the vehicles", "prompt": "Take a statement", "requiresEquipment": [] },
+    { "evidenceId": "generator-log", "at": [-8.6, -12.4], "label": "Generator log in the compound yard", "prompt": "Read the log", "requiresEquipment": [] },
+    { "evidenceId": "flat-cells", "at": [18.6, 14.8], "label": "Waymarker cells at the mast lockup", "prompt": "Check the cells", "requiresEquipment": [] },
+    { "evidenceId": "quiet-hollow", "at": [13.0, 13.8], "label": "A circle of plantation with no birds in it", "prompt": "Stand and listen", "requiresEquipment": [] },
+    { "evidenceId": "trail-scuff", "at": [-15.6, 16.0], "label": "Disturbed needle litter by the washblock", "prompt": "Follow the disturbance", "requiresEquipment": [] },
+    { "evidenceId": "audio-trace", "at": [5.8, 5.8], "label": "The culvert deck, north side", "prompt": "Sweep for a bearing", "requiresEquipment": ["directional-microphone"] },
+    { "evidenceId": "thermal-null", "at": [-10.0, 6.0], "label": "The footbridge, looking north", "prompt": "Sweep the plantation", "requiresEquipment": ["thermal-imager"] }
+  ],
+
+  "_sourcesNote": "Positions taken from the map author's measured clear list, which was swept for standability and for distance to every door, breaker, the cache and extraction. The contractor is at the vehicles on purpose: it is the one statement a squad can take before it has walked anywhere, and it is the one that says he crawled."
+}

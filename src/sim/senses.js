@@ -178,5 +178,15 @@ export const EFFECT_VERBS = Object.freeze([
 /** Field disturbance kinds an anomaly's presence may impose on a scalar field. */
 export const FIELD_KINDS = Object.freeze(['sink', 'source', 'none']);
 
+/** Which measurable quantity an anomaly MOVES TOWARD. Closed for the same reason the
+ *  senses are: an anomaly may hunt a quantity the engine can compute, and may not invent
+ *  one. Sensing a thing and walking to it are different questions and both are content. */
+export const HUNT_KINDS = Object.freeze(['heat', 'sound', 'none']);
+
+/** What an anomaly cannot cross. Also closed, and also NOT the same question as either of
+ *  the two above: the draught senses heat, hunts heat and is stopped by heat, which made
+ *  all three look like one property until an anomaly arrived that did none of them. */
+export const BLOCK_KINDS = Object.freeze(['insulation', 'gradient']);
+
 export function isSense(name) { return Object.prototype.hasOwnProperty.call(SENSES, name); }
 export function isPerformed(name) { return !!(SENSES[name] && SENSES[name].performed); }

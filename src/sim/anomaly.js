@@ -120,6 +120,22 @@ export class Anomaly {
    */
   get isDistributed() { return !!(this.def.presence && this.def.presence.instances); }
 
+  /**
+   * WHICH QUANTITY IT GOES TOWARD. Content, defaulting to heat.
+   *
+   * ⚠ SENSING A THING AND WALKING TO IT ARE TWO DIFFERENT QUESTIONS, and for three
+   * anomalies they happened to have the same answer. `step` chose a target from the HEAT
+   * sources and handed it to `_drift`, which was invisible while everything that moved was
+   * hunting heat — the caller's triggers fired correctly off the sound field, it entered
+   * its running state on hearing the lure, and then walked toward the warmest thing it
+   * could reach instead. It looked like the sound field was broken. It was not: nothing had
+   * ever told the mover which field to read.
+   */
+  get hunts() {
+    const h = this.def.presence && this.def.presence.hunts;
+    return h || 'heat';
+  }
+
   get isAwake() { const k = this.stateKind; return k === 'active' || k === 'hunting'; }
   get isLoose() { return this.stateKind !== 'contained'; }
   get isHeld() { return this.stateKind === 'vulnerable'; }
@@ -156,10 +172,31 @@ export class Anomaly {
     return this.deployables.barrierBlocksPath(ax, az, bx, bz);
   }
 
-  /** The full rule: a 40C gradient, an insulated panel, or a closed cold-store door. */
+  /**
+   * What stops it. Content, defaulting to both for anything that does not say.
+   *
+   * ⚠ THE 40°C GRADIENT IS THE DRAUGHT'S RULE, NOT A LAW OF THE WORLD, and treating it as
+   * one produced a genuinely funny failure: the caller hunts sound, its designated lure is
+   * a portable heater, and the heater's own 40°C contour fenced the caller out of reaching
+   * it. It sat six metres away in its running state for a minute, correctly hearing a thing
+   * it was correctly forbidden to approach — by a rule that has nothing to do with it.
+   *
+   * So a content file says what it cannot cross. `insulation` is walls and closed doors and
+   * deployed barriers; `gradient` is the heat rule. An anomaly that names neither is
+   * stopped by nothing and goes through the building, which is a legal thing to author and
+   * a terrifying one.
+   */
+  get blockedBy() {
+    const b = this.def.presence && this.def.presence.blockedBy;
+    return Array.isArray(b) ? b : ['insulation', 'gradient'];
+  }
+
+  /** The full rule for THIS anomaly: whichever of the two its content says stops it. */
   pathBlocked(ax, az, bx, bz) {
-    if (this.solidBlocksPath(ax, az, bx, bz)) return true;
-    return this.heat.blocksPath(ax, az, bx, bz);
+    const by = this.blockedBy;
+    if (by.includes('insulation') && this.solidBlocksPath(ax, az, bx, bz)) return true;
+    if (by.includes('gradient') && this.heat.blocksPath(ax, az, bx, bz)) return true;
+    return false;
   }
 
   /**
@@ -374,7 +411,13 @@ export class Anomaly {
     this.escapes = fence.escapes;
     this.weakestBearing = fence.weakestBearing;
 
-    const target = this.chooseTarget(ctx.sources);
+    /* What it is going toward, from the field it actually hunts on. `heard` already carries
+     * masking and occlusion, exactly as `chooseTarget` already carries heat reachability —
+     * a lure drowned by a louder one was never chosen, and neither was a target behind a
+     * 40°C wall. Both fields answer the same question in their own terms. */
+    const target = this.hunts === 'sound'
+      ? ((ctx.sound && ctx.sound.heard) || null)
+      : this.chooseTarget(ctx.sources);
     this.targetId = target ? target.id : null;
     const senseCtx = { ...ctx, target };
 

@@ -3965,6 +3965,230 @@ async function sectionAF() {
   emit();
 }
 /**
+
+/* ══ AG. auditory lure and restraint ═══════════════════════════════════════════
+ *
+ * GDD §26.2's second named procedure family, and the one that completes the slice's three.
+ *
+ * What makes it a family rather than a reskin is the RESTRAINT half. Every other
+ * containment in this build is something the squad BUILDS — a wall of heat, a cone of
+ * attention, an account in a box. This one is something they STOP DOING: you cannot make a
+ * quiet louder, you can only switch things off and crouch. So the assertions below are as
+ * much about what has to be ABSENT as about what happens.
+ */
+async function sectionAG() {
+  lines.push('--- AG. it hunts sound, and silence is what holds it ---');
+
+  const pack = await loadContent({ incident: 'blackthorn-caller' });
+  eq('AG1 the fifth incident package loads and validates', pack.anomaly.id, 'blackthorn-caller');
+  eq('AG2 on the slice forest map', pack.map.id, 'blackthorn-reserve');
+  eq('AG3 it disturbs no field of its own — an imager finds a reserve at ambient',
+    pack.anomaly.presence.field.kind, 'none');
+  ok('AG4 and reads nothing about heat, observation or a count',
+    pack.anomaly.triggers.every((t) => ['noise-above', 'loudest-noise-within', 'masked-for', 'enclosed-by'].includes(t.when.sense)),
+    pack.anomaly.triggers.map((t) => t.when.sense).join());
+
+  const g = new Game(pack, { seed: 'caller-1' });
+  const p = g.player;
+  const a = g.anomaly;
+  g.commitLoadout(recommendedManifest(pack));
+
+  /* ── the squad is a source whether it means to be or not ──────────────────── */
+  const ambient = CONFIG.sound.ambientDb;
+  /**
+   * ⚠ THE OPERATIVE HAS TO ACTUALLY WALK.
+   *
+   * The first version of this set `p.vx` directly and read the field, and every posture
+   * came back at about 30dB — because `step()` recomputes velocity from the COMMAND every
+   * tick, so a poked velocity is gone before the sample is taken. It read as "sound does
+   * not work" when what it actually demonstrated is the thing the field is built on:
+   * `operativeNoiseDb` reads SPEED and not a key, so a sprint held against a wall is
+   * silent. Driving it through commands is both the correct test and the point.
+   */
+  const posture = ({ move = false, crouch = false }) => {
+    p.x = a.x + 2.0; p.z = a.z + 2.0; p.yaw = 0;
+    g.setCommand('p1', { axis: { x: 0, y: move ? -1 : 0 }, sprint: false, crouch });
+    /* Long enough to reach terminal speed — accel is 22 m/s², so ~0.4s. */
+    g.skipMs(700);
+    const at = { x: p.x, z: p.z };
+    const db = g.sound.levelAt(a.x, a.z);
+    return { db, d: dist(at.x, at.z, a.x, a.z) };
+  };
+  const stillR = posture({});
+  const walkR = posture({ move: true });
+  const crouchR = posture({ move: true, crouch: true });
+  const still = stillR.db, walking = walkR.db, crouched = crouchR.db;
+  g.setCommand('p1', { axis: { x: 0, y: 0 }, sprint: false, crouch: false });
+  note(`heard at ~${walkR.d.toFixed(1)}m: ${still.toFixed(1)}dB standing still · ${crouched.toFixed(1)}dB crouch-walking · ${walking.toFixed(1)}dB walking (reserve ${ambient})`);
+  const thresh = pack.anomaly.triggers.find((t) => t.id === 'disturbed').when.thresholdDb;
+  ok(`AG5 walking close to it is over the ${thresh}dB threshold (${walking.toFixed(1)}dB)`, walking > thresh);
+  /* ⚠ THIS IS WHY CROUCH EXISTS. It has been in the build since the first commit and
+   * nothing has ever required it — it was a way to be shorter. Here it is the difference
+   * between sealing the thing and being what it runs at. */
+  ok(`AG6 and crouch-walking the same route is under it (${crouched.toFixed(1)}dB)`, crouched < thresh);
+  ok('AG7 moving at all is louder than standing still, and standing still is never silent',
+    walking > still && still > ambient, `${walking.toFixed(1)} > ${still.toFixed(1)} > ${ambient}`);
+
+  /* ── the squad's own kit is the lure, which is the trap ───────────────────── */
+  const hum = ['floodlight-tripod', 'portable-heater', 'power-pack', 'reinforced-transit-case']
+    .map((id) => ({ id, db: pack.itemsById.get(id).noiseOutputDb }));
+  note(`the fence-builder's kit, as heard: ${hum.map((h) => `${h.id} ${h.db}dB`).join(' · ')}`);
+  ok('AG8 every powered thing in the draught playbook is audible', hum.every((h) => h.db > ambient));
+  ok('AG9 and louder than a crouching operative, so a deployed lure hides the squad',
+    hum.every((h) => h.db > CONFIG.player.crouchNoiseDb));
+
+  /* ── lure ─────────────────────────────────────────────────────────────────── */
+  /* Kit comes out of the cargo cache at the command point, like everything else. */
+  const lureAt = { x: a.x + 9, z: a.z + 2 };
+  p.x = g.site.cache.x; p.z = g.site.cache.z;
+  g.skipMs(50);
+  eq('AG10a the heater is in the manifest and comes out of cargo', g.takeFromCache('portable-heater'), null);
+  p.selectSlot(SLOTS.findIndex((s) => p.slots.get(s.id) === 'portable-heater'));
+  p.x = lureAt.x + 0.9; p.z = lureAt.z; p.yaw = Math.PI / 2;
+  g.skipMs(50);
+  eq('AG10 and can be set down as a lure', g.deployHeld(), null);
+  /* Withdraw, so the operative is not competing with their own lure. */
+  p.x = a.x - 14; p.z = a.z - 14;
+  g.setCommand('p1', { axis: { x: 0, y: 0 }, sprint: false, crouch: false });
+  g.skipMs(2500);
+  note(`after the lure goes down: ${a.state}, ${g.sound.levelAt(a.x, a.z).toFixed(1)}dB where it stands`);
+  ok('AG11 the lure rouses it', a.state !== 'dormant');
+  let guard = 0;
+  while (a.state !== 'running' && guard < 30000) { g.skipMs(250); guard += 250; }
+  eq('AG12 and it resolves the source and comes', a.state, 'running');
+  const startD = dist(a.x, a.z, lureAt.x, lureAt.z);
+  guard = 0;
+  while (dist(a.x, a.z, lureAt.x, lureAt.z) > 2.0 && guard < 60000) { g.skipMs(250); guard += 250; }
+  const endD = dist(a.x, a.z, lureAt.x, lureAt.z);
+  note(`it crossed ${startD.toFixed(1)}m to the lure in ${(guard / 1000).toFixed(1)}s, ending ${endD.toFixed(2)}m off`);
+  ok('AG13 all the way to it', endD <= 2.0);
+
+  /* ── restraint: the thing you do is stop ──────────────────────────────────── */
+  const lure = g.deployables.byItem('portable-heater')[0];
+  lure.on = false;   // Deployable.active is a getter (on && hasPower), so this is the whole of it
+
+  const stillAt = { x: a.x, z: a.z };
+  g.skipMs(3000);
+  eq('AG14 three seconds after the lure dies it has NOT stopped yet', a.state !== 'stilled', true);
+  g.skipMs(9000);   // the state change to casting restarts the stilling sustain
+  eq('AG15 sustained silence stops it', a.state, 'stilled');
+  /* ⚠ AND IT STOPS FURTHER ALONG THE LINE. The sustain is what makes silence a procedure
+   * rather than a reflex — kill the lure at the wrong moment and it stops six seconds past
+   * where you wanted it. A squad that does not know the figure is six will be consistently
+   * a couple of metres out. */
+  const drift = dist(a.x, a.z, stillAt.x, stillAt.z);
+  note(`it travelled a further ${drift.toFixed(2)}m after the lure went quiet`);
+  ok('AG16 it is the vulnerable kind while stilled', a.isHeld);
+
+  /* ── and waking it is instant, which is the whole tension ─────────────────── */
+  /* Face the thing, then walk at it — `axis.y = -1` is forward, and forward is
+   * (-sin yaw, -cos yaw), so a yaw left at 0 walks along -z regardless of where it is. */
+  const faceIt = () => {
+    const dx = a.x - p.x, dz = a.z - p.z, L = Math.hypot(dx, dz) || 1;
+    p.yaw = Math.atan2(-dx / L, -dz / L);
+  };
+  p.x = a.x + 1.8; p.z = a.z;
+  faceIt();
+  g.setCommand('p1', { axis: { x: 0, y: -1 }, sprint: false, crouch: false });
+  g.skipMs(900);
+  /* ⚠ IT DOES NOT STOP AT "AWAKE". Waking is `disturbed` (stilled → casting) and it
+   * resolves the operative on the very next step, because the operative is the only thing
+   * making a noise — so what a squad sees is a stilled caller becoming a running one with
+   * no intermediate state they could act in. The first version of this asserted `casting`
+   * and was asserting a frame nobody will ever see. */
+  ok('AG17 walking up to a stilled caller wakes it at once — no sustain on the way back',
+    a.state !== 'stilled', a.state);
+  note(`    and it does not pause on the way: ${a.state} within a second of the first footstep`);
+
+  /* It is now running at the operative, which is the correct outcome of that mistake and
+   * the reason the mistake matters. Break contact, go quiet, and do it properly. */
+  g.setCommand('p1', { axis: { x: 0, y: 0 }, sprint: false, crouch: false });
+  p.x = a.x - 26; p.z = a.z - 26;
+  p.alive = true; p.downed = false; p.downedMs = 0;
+  g.skipMs(14000);
+  eq('AG18 breaking off and going quiet stills it again', a.state, 'stilled');
+
+  /* Crouch the last three metres. This is the endgame and it is one key. */
+  p.x = a.x + 1.8; p.z = a.z;   // the bearing AG17 already proved is clear
+  faceIt();
+  g.setCommand('p1', { axis: { x: 0, y: -1 }, sprint: false, crouch: true });
+  g.skipMs(1100);
+  g.setCommand('p1', { axis: { x: 0, y: 0 }, sprint: false, crouch: true });
+  g.skipMs(200);
+  const closed = dist(p.x, p.z, a.x, a.z);
+  note(`crouch-walked from 1.8m to ${closed.toFixed(2)}m; it is ${a.state}`);
+  ok('AG19 a crouching operative can close on it without waking it',
+    closed < 1.3 && a.state === 'stilled', `${closed.toFixed(2)}m, ${a.state}`);
+
+  /* ── the seal ─────────────────────────────────────────────────────────────── */
+  /* Fetch the case, crouching the whole way back in. */
+  p.x = g.site.cache.x; p.z = g.site.cache.z;
+  g.setCommand('p1', { axis: { x: 0, y: 0 }, sprint: false, crouch: false });
+  g.skipMs(50);
+  g.takeFromCache('reinforced-transit-case');
+  p.selectSlot(SLOTS.findIndex((s) => p.slots.get(s.id) === 'reinforced-transit-case'));
+  p.x = a.x + 1.7; p.z = a.z;
+  faceIt();
+  g.setCommand('p1', { axis: { x: 0, y: 0 }, sprint: false, crouch: true });
+  g.skipMs(50);
+  eq('AG20 the case goes down beside it', g.deployHeld(), null);
+
+  /* ⚠ THE CASE ITSELF HUMS AT 46dB, WHICH IS THE THRESHOLD. Setting the containment vessel
+   * down next to the thing being contained is the last place a squad expects the lure rules
+   * to still apply, so this asserts what actually happens rather than what would be
+   * convenient — and either answer is the incident working. */
+  g.skipMs(2500);
+  note(`with the case deployed beside it: ${a.state}, ${g.sound.levelAt(a.x, a.z).toFixed(1)}dB`);
+  const box = g.deployables.byItem('reinforced-transit-case')[0];
+  ok('AG21 the case is on the floor beside it either way', !!box);
+  if (a.state !== 'stilled' && box) {
+    note('    the case woke it. Switching the case off is the move, and it is available.');
+    box.on = false;
+    g.skipMs(12000);
+    eq('AG21b with the case switched off it stills again', a.state, 'stilled');
+  } else {
+    ok('AG21b the case did not wake it', true);
+  }
+  const act = g.contextAction();
+  ok('AG22 with it stilled and the case in reach, the verb is the seal',
+    act && act.kind === 'seal', act ? `${act.kind}: ${act.text}` : 'none');
+  eq('AG23 which takes', g.doInteract(), null);
+  g.skipMs(CONFIG.anomaly.custodyVerifySeconds * 1000 + 1200);
+  eq('AG23b and thirty seconds later it is custody', g.custody, 'verified');
+
+  /* ── masking, which is the tool and the failure ───────────────────────────── */
+  const g2 = new Game(pack, { seed: 'caller-mask' });
+  g2.commitLoadout(recommendedManifest(pack));
+  const a2 = g2.anomaly, p2 = g2.player;
+  const place = (itemId, x, z) => {
+    p2.x = g2.site.cache.x; p2.z = g2.site.cache.z; g2.skipMs(50);
+    g2.takeFromCache(itemId);
+    p2.selectSlot(SLOTS.findIndex((s) => p2.slots.get(s.id) === itemId));
+    p2.x = x; p2.z = z; p2.yaw = 0; g2.skipMs(50);
+    return g2.deployHeld();
+  };
+  /* Two similar sources, equidistant. Neither beats the other where it stands. */
+  place('power-pack', a2.x - 8, a2.z);
+  place('floodlight-tripod', a2.x + 8, a2.z);
+  p2.x = a2.x - 20; p2.z = a2.z - 20;
+  g2.setCommand('p1', { axis: { x: 0, y: 0 }, sprint: false, crouch: false });
+  g2.skipMs(1500);
+  const heard = g2.sound.loudestAudibleFrom(a2.x, a2.z);
+  note(`two lures either side: level ${g2.sound.levelAt(a2.x, a2.z).toFixed(1)}dB, resolved source ${heard ? heard.id : 'none'}`);
+  /* ⚠ THE CLAIM IS NOT "IT IS QUIET". It is loud — measurably above the reserve — and it
+   * still cannot be resolved into a direction, because neither source beats the other by
+   * the margin needed to be picked out. Loud and unusable is a different state from quiet,
+   * and it is the one that gets a squad's lure ignored. */
+  ok('AG24 two lures of similar level are audibly above the reserve',
+    g2.sound.levelAt(a2.x, a2.z) > CONFIG.sound.ambientDb + 2,
+    `${g2.sound.levelAt(a2.x, a2.z).toFixed(1)}dB vs ${CONFIG.sound.ambientDb}dB`);
+  eq('AG24b and it still cannot resolve either of them', heard, null);
+  g2.skipMs(9000);
+  ok('AG25 so a squad that runs both at once stills it where it stands, not at the case',
+    a2.state === 'stilled' || !heard, `${a2.state}, heard ${heard ? heard.id : 'none'}`);
+  emit();
+}
+/**
  * ⚠ ONE SECTION THROWING MUST NOT DELETE EVERY SECTION AFTER IT.
  *
  * This was a single try/catch around the whole run, and a suite of forty assertions can
@@ -4020,6 +4244,7 @@ async function run(name, fn) {
     await run('AD', () => sectionAD(content));
     await run('AE', () => sectionAE());
     await run('AF', () => sectionAF());
+    await run('AG', () => sectionAG());
     await run('K', () => sectionK());
     await run('L', () => sectionL());
     await run('V', () => sectionV());

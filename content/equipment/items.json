@@ -77,6 +77,7 @@
       "heatOutputCelsius": 60,
       "heatFalloffMetres": 2.2,
       "lightRadiusMetres": 6.5,
+      "noiseOutputDb": 52,
       "summary": "Light, and heat as a side effect. Its 40C contour is the cheapest fence post you have."
     },
     {
@@ -89,6 +90,7 @@
       "batteryMinutes": 4,
       "heatOutputCelsius": 78,
       "heatFalloffMetres": 2.9,
+      "noiseOutputDb": 58,
       "summary": "A wider contour than a tripod and a much shorter life. Bring a pack or bring two."
     },
     {
@@ -98,6 +100,7 @@
       "role": "support",
       "deployable": true,
       "cargoVolume": 2,
+      "noiseOutputDb": 48,
       "batteryMinutes": 9,
       "feedRadiusMetres": 5.0,
       "summary": "Feeds every emitter within 5m off its own cells instead of theirs. The difference between a fence that holds and a fence that dims in sequence."
@@ -119,6 +122,7 @@
       "role": "containment",
       "deployable": true,
       "cargoVolume": 2,
+      "noiseOutputDb": 46,
       "batteryMinutes": 12,
       "heatOutputCelsius": 39,
       "heatFalloffMetres": 1.6,

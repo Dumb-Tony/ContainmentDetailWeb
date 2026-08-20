@@ -258,6 +258,29 @@
       ],
       "_note": "THE THIRD FAMILY (GDD 26.2: distributed-object recovery and verification) and the third operation on this one floor. Nothing hunts you here, there is no fence, and the failure state is arithmetic. A squad that has done the other two walks in knowing where the breakers are and which aisle is long, and none of that is the answer — familiarity is the trap.",
       "incident": "cold-storage-tally"
+    },
+    {
+      "id": "op-blackthorn-caller",
+      "name": "Blackthorn Reserve, north plantation",
+      "mapId": "blackthorn-reserve",
+      "anomalyId": "blackthorn-caller",
+      "clearanceRequired": 1,
+      "difficulty": "Field",
+      "status": "authorised",
+      "distance": "Ninety minutes, then a forest track. Two ways across the drainage channel and one of them is gated.",
+      "mandate": "Establish custody of whatever is in the north plantation and transfer it to the vehicles.",
+      "optional": [
+        "Recover all issued equipment",
+        "Avoid a second contact",
+        "Take the contractor's statement before deploying"
+      ],
+      "conditions": [
+        "Mains down across the reserve. One generator, not running since the withdrawal.",
+        "A tree-safety crew withdrew; one of them walked out on his hands and knees.",
+        "The duty ranger spent a further night in the station with everything switched off and reported nothing at all."
+      ],
+      "_note": "THE SLICE'S FOREST MAP AND ITS AUDITORY FAMILY, which belong together. Blackthorn has no lanes — 41.5% of it has all twenty-four escape rays open and none of it is fenced bare — so it cannot host a fence incident honestly, and the caller does not want one. It is restrained by SILENCE, which is available everywhere and weighs nothing. A squad that arrives with the draught playbook deploys four humming objects and builds itself a beacon.",
+      "incident": "blackthorn-caller"
     }
   ],
 

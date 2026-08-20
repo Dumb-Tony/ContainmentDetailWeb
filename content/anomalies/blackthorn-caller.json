@@ -1,0 +1,303 @@
+{
+  "id": "blackthorn-caller",
+  "contentRevision": "0.1.0",
+  "displayName": "The caller",
+  "licensingRecordId": null,
+  "_licensingNote": "Original, not an SCP. GDD §25 makes an attribution record a prerequisite for implementing SCP-derived content and §25.7's ShareAlike questions are unsettled. Nothing here is derived from anyone's work.",
+
+  "_designNote": "GDD §26.2's SECOND NAMED PROCEDURE FAMILY: auditory lure and restraint. With this the slice has all three — perception, auditory, distributed-object — plus the heat fence the build started with.\n\nIT HUNTS SOUND AND IT IS RESTRAINED BY SILENCE, and the second half is the part that makes it a different game. Every other containment in this build is something you BUILD: a wall of heat, a cone of attention, an account in a box. This one is something you STOP DOING. You cannot make a quiet louder; you can only turn things off, put things down, and crouch. The climax of a caller operation is four people going still in the dark, which is the exact opposite of the draught's climax and uses the same keyboard.\n\nTHE LURE IS YOUR OWN KIT, AND THAT IS THE TRAP. A floodlight ballast hums at 52dB, a heater fan at 58, an inverter at 48, the transit case's own heater at 46. On the cold-store floor those four things are the fence, the bait and the power for both. Here every one of them is a beacon, and a squad running the draught playbook has built a perfect lure around itself and switched it on. §15.2 says the incident is the variable; this is what that costs when the variable changes and the habit does not.\n\nMASKING IS BOTH THE TOOL AND THE FAILURE. A source is only audible if it beats everything else at the listener's position, so a loud lure hides the squad — that is what makes the walk in survivable. But two lures of similar level mask EACH OTHER into inaudibility and it hears nothing at all, which stills it wherever it happens to be standing rather than where the case is. Nothing warns you; the thing simply stops in the wrong place.\n\nCROUCH BECOMES LOAD-BEARING FOR THE FIRST TIME. Walking is 55dB, crouching 42, standing still 34, against a room tone of 28 and a rousing threshold of 46. So an operative can crouch to within arm's reach of a stilled caller and seal it, and cannot walk within two metres without waking it. That is the whole endgame and it is one key.",
+
+  "presence": {
+    "field": { "kind": "none" },
+    "hunts": "sound",
+    "blockedBy": ["insulation"],
+    "_blockedNote": "⚠ HEAT DOES NOT STOP IT, and saying so is required rather than decorative. The 40C gradient is the DRAUGHT's rule and the engine treated it as a law of the world, so the caller — whose designated lure is a portable heater — was fenced out of its own bait by the heater's own contour. It sat six metres away in its running state for a full minute, correctly hearing a thing it was correctly forbidden to approach. Walls and closed doors stop it, which is why the reserve's buildings matter and its deer fence does not.",
+    "_huntsNote": "⚠ IT SENSES SOUND AND IT ALSO WALKS TOWARD SOUND, and those are two separate declarations because they are two separate questions. Every anomaly before this one hunted heat, so `step` chose a target from the heat sources and handed it to the mover with nothing saying so. The caller's triggers fired correctly off the sound field, it entered its running state on hearing the lure, and then walked toward the warmest thing it could reach — which looked exactly like the sound field being broken, and was not.",
+    "_fieldNote": "It is not cold and it does not read on thermal — an imager brought here shows a reserve at ambient and one warm shape that is a person. MEASURED AUDIBLE REACH, against the reserve's 28dB room tone and the 3dB margin a source must beat to be picked out of it: the portable heater at 58dB carries about 22m, the floodlight ballast at 52dB about 11m, the power pack at 48dB about 7m, and the transit case's own heater at 46dB about 5m. So the LURE is the heater and nothing else is one — a squad that sets down a power pack and withdraws has built something the caller cannot hear from across a clearing. The instrument that reads it is the directional microphone, and the field it disturbs is not one it emits into: it LISTENS. What it does to the sound field is nothing at all, which is why it can be in a clearing with you and not be found."
+  },
+
+  "states": [
+    {
+      "id": "dormant",
+      "kind": "latent",
+      "speedMps": 0,
+      "displayName": "Dormant",
+      "description": "It has heard nothing above the reserve for long enough to stop attending. Wind, and the drainage channel, and nothing else."
+    },
+    {
+      "id": "casting",
+      "kind": "active",
+      "speedMps": 0.9,
+      "displayName": "Casting",
+      "description": "Something is audible and it is working out where. It moves, slowly and wrongly, in roughly the right direction."
+    },
+    {
+      "id": "running",
+      "kind": "hunting",
+      "speedMps": 3.1,
+      "displayName": "Running",
+      "description": "It has resolved a source and is going to it directly. Faster than a walk and slower than a sprint, which is the whole of the decision about whether to run."
+    },
+    {
+      "id": "stilled",
+      "kind": "vulnerable",
+      "speedMps": 0,
+      "displayName": "Stilled",
+      "description": "Nothing beats the reserve. It has stopped where it stood, and it will stay stopped exactly as long as that remains true."
+    },
+    {
+      "id": "contained",
+      "kind": "contained",
+      "speedMps": 0,
+      "displayName": "Contained",
+      "description": "Cased. The case's own heater fan is audible inside it and that appears to be acceptable to it."
+    }
+  ],
+
+  "triggers": [
+    {
+      "id": "roused",
+      "from": "dormant",
+      "to": "running",
+      "when": { "sense": "loudest-noise-within", "radiusMetres": 40, "sustainSeconds": 1.5 },
+      "condition": "any source anywhere on the reserve can be picked out of the room tone for a second and a half",
+      "telegraph": "The wind noise in the trees stops being wind noise. Nothing is visibly different.",
+      "pressureDelta": 1,
+      "latencyToleranceMs": 1500
+    },
+    {
+      "id": "refixed",
+      "from": "casting",
+      "to": "running",
+      "when": { "sense": "loudest-noise-within", "radiusMetres": 40 },
+      "condition": "it picks a source out of the noise again",
+      "telegraph": "The casting stops. Whatever it was doing before, it is now doing one thing.",
+      "pressureDelta": 2,
+      "latencyToleranceMs": 1500
+    },
+    {
+      "id": "lost",
+      "from": "running",
+      "to": "casting",
+      "when": { "sense": "masked-for", "sustainSeconds": 2.0 },
+      "condition": "nothing is picked out of the noise any more — the source stopped, or something louder covered it",
+      "telegraph": "It slows without stopping, and starts turning again.",
+      "pressureDelta": 0,
+      "latencyToleranceMs": 1500
+    },
+    {
+      "id": "stilled",
+      "from": "*",
+      "to": "stilled",
+      "when": { "sense": "masked-for", "sustainSeconds": 6.0 },
+      "condition": "six seconds in which nothing at all beats the reserve",
+      "telegraph": "It stops. Not gradually — between one step and the next, as though it had been switched off.",
+      "pressureDelta": -2,
+      "latencyToleranceMs": 1500,
+      "_note": "⚠ SIX SECONDS AND FROM ANY STATE, INCLUDING RUNNING. The sustain is what makes silence a PROCEDURE rather than a reflex: killing the lure at the wrong moment does not stop it where you want it, it stops it six seconds further along whatever line it was on. A squad that does not know the figure is six will consistently still it two metres past the case."
+    },
+    {
+      "id": "disturbed",
+      "from": "stilled",
+      "to": "casting",
+      "when": { "sense": "noise-above", "thresholdDb": 46 },
+      "condition": "anything at all rises above 46dB where it is standing",
+      "telegraph": "It is facing you. There was no intervening movement.",
+      "pressureDelta": 3,
+      "latencyToleranceMs": 1500,
+      "_note": "NO SUSTAIN, unlike `roused`. Waking is instant and stilling takes six seconds, and the asymmetry is the tension of the whole endgame: an operative who stands up out of a crouch two metres from a stilled caller has already lost the six seconds they spent buying it."
+    },
+    {
+      "id": "sealed",
+      "from": "stilled",
+      "to": "contained",
+      "when": { "sense": "enclosed-by", "itemId": "reinforced-transit-case", "radiusMetres": 1.5 },
+      "condition": "the transit case is closed around it while it is stilled",
+      "telegraph": "The latches go over. The fan inside the case does not appear to count.",
+      "pressureDelta": -4,
+      "latencyToleranceMs": 400
+    }
+  ],
+
+  "capabilities": [
+    {
+      "id": "close-call",
+      "verb": "contact",
+      "availableInStates": ["running"],
+      "effect": "It arrives at what it was running toward. An operative who is the loudest thing on the reserve when it resolves is what it arrives at.",
+      "rangeMetres": 1.1,
+      "cooldownMs": 6000,
+      "latencyToleranceMs": 400,
+      "compounding": true,
+      "applies": [
+        { "condition": "exposure", "severity": "serious" },
+        { "condition": "mobility-injury", "severity": "minor" }
+      ],
+      "counterableBy": ["still-air", "insulated-barrier"]
+    },
+    {
+      "id": "carrier-hum",
+      "verb": "drain-power",
+      "availableInStates": ["casting", "running"],
+      "effect": "Cells near it go flat fast while it is attending to something. A lure that runs out is a lure that stops, which is the failure this capability is really about.",
+      "rangeMetres": 5,
+      "cooldownMs": 0,
+      "latencyToleranceMs": 2000
+    }
+  ],
+
+  "constraints": [
+    {
+      "id": "sound-only",
+      "statement": "It responds to sound and to nothing else. Light does not move it, heat does not stop it, and it does not read on thermal.",
+      "requiredEquipment": ["directional-microphone"]
+    },
+    {
+      "id": "silence-restrains",
+      "statement": "It stops when nothing beats the reserve, and it stops six seconds after that becomes true rather than at the moment it does.",
+      "requiredEquipment": []
+    },
+    {
+      "id": "your-own-kit",
+      "statement": "Powered equipment is audible: a floodlight ballast, a heater fan, an inverter, the transit case's own heater.",
+      "requiredEquipment": []
+    },
+    {
+      "id": "crouch-is-quiet",
+      "statement": "A crouching operative is below the threshold at any range. A walking one is above it inside about two metres.",
+      "requiredEquipment": []
+    }
+  ],
+
+  "evidenceRules": [
+    {
+      "id": "survivor-account",
+      "type": "testimonial",
+      "dimension": "behaviour",
+      "rawObservation": "The ranger says her radio kept keying itself and that it stopped when she switched the handset off. She sat in the dark for two hours and nothing came.",
+      "reliability": "probable",
+      "revealsRule": "silence-restrains",
+      "requiredEquipment": [],
+      "isFalseLead": false
+    },
+    {
+      "id": "quiet-hollow",
+      "type": "environmental",
+      "dimension": "behaviour",
+      "rawObservation": "A twelve-metre circle of the plantation with no birds in it and no birds around its edge either. The silence has a boundary.",
+      "reliability": "confirmed",
+      "revealsRule": "silence-restrains",
+      "requiredEquipment": [],
+      "isFalseLead": false
+    },
+    {
+      "id": "generator-log",
+      "type": "documentary",
+      "dimension": "behaviour",
+      "rawObservation": "The compound generator log. Someone has written run hours in one column and, in another column added later and in the same hand, the word 'nights'. Every entry in the second column is a night the generator ran.",
+      "reliability": "probable",
+      "revealsRule": "your-own-kit",
+      "requiredEquipment": [],
+      "isFalseLead": false
+    },
+    {
+      "id": "flat-cells",
+      "type": "instrumental",
+      "dimension": "capability",
+      "rawObservation": "Every cell in the waymarker on the north trail is flat, and the two either side of it are full. The flat one is the one nearest the hollow.",
+      "reliability": "confirmed",
+      "revealsRule": "your-own-kit",
+      "requiredEquipment": [],
+      "isFalseLead": false
+    },
+    {
+      "id": "audio-trace",
+      "type": "instrumental",
+      "dimension": "form",
+      "rawObservation": "On the microphone, a source at bearing 040 that is not any of the four things making noise on this reserve, and which moves between readings.",
+      "reliability": "confirmed",
+      "revealsRule": "sound-only",
+      "requiredEquipment": ["directional-microphone"],
+      "isFalseLead": false
+    },
+    {
+      "id": "thermal-null",
+      "type": "instrumental",
+      "dimension": "form",
+      "rawObservation": "Thermal sweep of the hollow at the moment the microphone has a bearing on it: reserve ambient, edge to edge, with nothing in it warmer than the ground.",
+      "reliability": "confirmed",
+      "revealsRule": "sound-only",
+      "requiredEquipment": ["thermal-imager"],
+      "isFalseLead": false
+    },
+    {
+      "id": "trail-scuff",
+      "type": "environmental",
+      "dimension": "behaviour",
+      "rawObservation": "Disturbance in the needle litter running from the hollow to the generator bay and stopping four metres short of it. Nothing runs the other way.",
+      "reliability": "probable",
+      "revealsRule": "crouch-is-quiet",
+      "requiredEquipment": [],
+      "isFalseLead": false
+    },
+    {
+      "id": "contractor-account",
+      "type": "testimonial",
+      "dimension": "behaviour",
+      "rawObservation": "The contractor says he got out by crawling and that he does not know why he crawled, only that standing up had felt wrong.",
+      "reliability": "disputed",
+      "revealsRule": "crouch-is-quiet",
+      "requiredEquipment": [],
+      "isFalseLead": false
+    }
+  ],
+
+  "containment": {
+    "procedures": [
+      {
+        "id": "lure-and-still",
+        "grade": "safe",
+        "displayName": "Lure to the case, then silence",
+        "requiredEquipment": ["directional-microphone", "reinforced-transit-case", "portable-heater", "power-pack", "trauma-kit"],
+        "verbs": ["listen", "lure", "withdraw", "silence", "approach", "seal"],
+        "statement": "Set the case down where you want it, put the heater beside it and nothing else running anywhere, withdraw until you are quieter than the lure, and let it come. Kill the lure when it is at the case, wait out the six seconds, then crouch in and seal.",
+        "_note": "The microphone is on the list because without it there is no way to know whether the lure is the loudest thing on the reserve or the second loudest, and the difference between those two decides whether the operation works. §12.1: the instrument gives context, never immunity."
+      },
+      {
+        "id": "run-silent",
+        "grade": "minimum",
+        "displayName": "Nothing on, crouch throughout",
+        "requiredEquipment": ["reinforced-transit-case"],
+        "verbs": ["silence", "approach", "seal"],
+        "statement": "Deploy nothing at all, crouch from the vehicle, and case it where it is standing.",
+        "_note": "It works, it needs one item, and it is a trap for the same reason the tally's minimum grade is: it depends on the thing already being stilled somewhere you can reach, and if it is not, you have brought no way to move it and no way to know where it is. Fast when the reserve happens to be quiet, and a two-hour crawl when it is not."
+      },
+      {
+        "id": "paired-lure",
+        "grade": "research",
+        "displayName": "Paired lure with a timed silence",
+        "requiredEquipment": ["directional-microphone", "reinforced-transit-case", "power-pack", "floodlight-tripod", "trauma-kit", "remote-camera"],
+        "verbs": ["listen", "lure", "hand-off", "withdraw", "silence", "approach", "seal", "witness"],
+        "statement": "Two sources, never running at once: the far one draws it across the reserve, and is killed as the near one at the case comes up. One operative on the microphone calls the hand-off; nobody else moves while it is running.",
+        "_note": "⚠ THE HAND-OFF IS WHERE THIS GOES WRONG, and it is the reason it is research grade rather than safe. Two lures of similar level running together mask each other, it hears nothing, and six seconds later it is stilled in open plantation halfway between them. The procedure is not 'two lures', it is 'never two lures at once' — which needs someone watching a meter and someone else's hand on a switch."
+      }
+    ],
+    "thresholds": [
+      {
+        "id": "rousing-level",
+        "statement": "46dB at the caller's own position, sustained for a second and a half.",
+        "value": 46
+      },
+      {
+        "id": "stilling-delay",
+        "statement": "Six seconds of nothing beating the reserve. It stops six seconds along its line, not where it was when the noise stopped.",
+        "value": 6
+      },
+      {
+        "id": "posture",
+        "statement": "Walking 55dB, crouching 42, still 34, reserve 28.",
+        "value": null
+      }
+    ]
+  }
+}
