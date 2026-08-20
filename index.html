@@ -219,6 +219,11 @@
   .cd-panel nav.tabs button:disabled{opacity:.35;cursor:not-allowed}
   .cd-panel .card-op{padding:12px 14px;border:1px solid var(--line);border-left:3px solid var(--amber);
     border-radius:6px;background:var(--panel2)}
+  .cd-panel .card-op{cursor:pointer;margin-bottom:8px}
+  .cd-panel .card-op:hover{border-color:#3c4a58}
+  /* The chosen one is marked by colour AND a heavier border AND its own background —
+     GDD 18.1 wants critical state on more than one channel. */
+  .cd-panel .card-op.chosen{border-left-width:5px;background:rgba(229,161,58,.07);border-color:var(--amber)}
   .cd-panel .card-op>b{font-size:14px}
   .cd-panel .card-op p{margin:4px 0 0}
   .cd-panel table.items .name span{display:block;margin-top:2px}

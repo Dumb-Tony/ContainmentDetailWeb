@@ -174,7 +174,19 @@ async function boot() {
 
   const base = new BaseScreen(document.body, {
     progression, site, items: fitted.items,
-    onDeploy: (op) => { currentOp = op; panels.showSquad(net); },
+    onDeploy: (op) => {
+      currentOp = op;
+      /* Taking an operation for a DIFFERENT incident means loading different rules and a
+       * different evidence set, so it navigates — same reasoning as the incident switcher
+       * above. Everything earned is in localStorage and survives it. */
+      if (op && op.incident && op.incident !== incidentId) {
+        const u = new URL(location.href);
+        u.searchParams.set('incident', op.incident);
+        location.href = u.toString();
+        return;
+      }
+      panels.showSquad(net);
+    },
     onClose: () => {},
   });
 

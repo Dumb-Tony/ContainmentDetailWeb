@@ -187,7 +187,31 @@
         "Mains down six days. Two circuits, both dead.",
         "One surviving crew member waiting at the stair head.",
         "Plant log reports the chiller ran eleven days against a four-hour duty cycle."
-      ]
+      ],
+      "incident": "cold-storage-draught"
+    },
+    {
+      "id": "op-cold-storage-figure",
+      "name": "Cold storage, aisle B",
+      "mapId": "cold-storage-l2",
+      "anomalyId": "stillwater-figure",
+      "clearanceRequired": 0,
+      "difficulty": "Field",
+      "status": "authorised",
+      "distance": "The same floor as the last one. You already know the way.",
+      "mandate": "Establish custody of the figure reported in aisle B and transfer it to the stair head.",
+      "optional": [
+        "Recover all issued equipment",
+        "Avoid a second contact",
+        "Preserve a dust sample from the ring"
+      ],
+      "conditions": [
+        "Repeat sighting, four calls in one shift, nothing found on four walks.",
+        "The supervisor watched it on camera instead and it stayed put for six hours.",
+        "Fourteen unexplained brownouts on the storage circuit, none over nine seconds."
+      ],
+      "_note": "The SAME MAP as op-cold-storage-2 and a completely different operation — GDD 15.2's epistemic and operational variation. The board is the one place a player sees that the building is a constant and the incident is the variable.",
+      "incident": "cold-storage-figure"
     }
   ],
 

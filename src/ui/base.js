@@ -62,6 +62,8 @@ export class BaseScreen {
     this.node.style.display = 'none';
     this.open = null;
     this.tab = 'operations';
+    /** Which board card the player has picked. Defaults to the first authorised. */
+    this.selectedOp = null;
     /* One line, from the model, shown until the next thing the player does. Refusals are
      * addressed to the person who just clicked and nothing else needs to hear them. */
     this.notice = null;
@@ -182,14 +184,16 @@ export class BaseScreen {
     const budget = this.items ? this.items.cargoVolumeBudget : null;
     const adjusted = budget === null ? null : budget + effects.cargoVolumeBudget + handicap.cargoVolume;
 
-    const board = op ? `
-      <div class="card-op">
-        <b>${escapeHtml(op.name)}</b>
-        <p>${escapeHtml(op.mandate)}</p>
-        <p class="small">${escapeHtml(op.difficulty || 'Field')} · ${escapeHtml(op.distance || '')}</p>
-        <ul>${(op.conditions || []).map((c) => `<li>${escapeHtml(c)}</li>`).join('')}</ul>
-        <p class="small">Optional: ${(op.optional || []).map((o) => escapeHtml(o)).join(' · ')}</p>
-      </div>`
+    const list = this._authorisedOperations();
+    const board = list.length
+      ? list.map((o) => `
+      <div class="card-op ${o.id === (op && op.id) ? 'chosen' : ''}" data-op="${escapeHtml(o.id)}">
+        <b>${escapeHtml(o.name)}</b>
+        <p>${escapeHtml(o.mandate)}</p>
+        <p class="small">${escapeHtml(o.difficulty || 'Field')} · ${escapeHtml(o.distance || '')}</p>
+        <ul>${(o.conditions || []).map((c) => `<li>${escapeHtml(c)}</li>`).join('')}</ul>
+        <p class="small">Optional: ${(o.optional || []).map((x) => escapeHtml(x)).join(' · ')}</p>
+      </div>`).join('')
       : '<p class="empty">No operation is authorised at your clearance.</p>';
 
     const known = op ? pr.insightsFor(op.anomalyId).filter((i) => i.unlocked) : [];
@@ -212,7 +216,9 @@ export class BaseScreen {
       <section>
         <h2>Mission board</h2>
         ${board}
-        <p class="small">${escapeHtml(this.site._boardNote ? 'One operation. The board carries what exists and nothing else.' : '')}</p>
+        <p class="small">${list.length > 1
+          ? 'The same floor twice. Everything you learned about the building still applies; nothing you learned about the anomaly does.'
+          : 'One operation. The board carries what exists and nothing else.'}</p>
         ${knownHtml}
       </section>
       <section>
@@ -505,9 +511,22 @@ export class BaseScreen {
 
   /* ── binding ─────────────────────────────────────────────────────────────── */
 
-  _authorisedOperation() {
+  /**
+   * Everything the squad's clearance authorises. ⚠ This returned the FIRST match, which was
+   * right while the site had one operation and silently wrong the moment it had two — the
+   * second incident on the cold-storage floor simply never appeared on the board. A board
+   * that shows one of the two available operations is worse than a board that shows none,
+   * because nobody goes looking for what it did not mention.
+   */
+  _authorisedOperations() {
     const pr = this.progression;
-    return (this.site.operations || []).find((o) => (o.clearanceRequired || 0) <= pr.clearance) || null;
+    return (this.site.operations || []).filter((o) => (o.clearanceRequired || 0) <= pr.clearance);
+  }
+
+  /** The one the player has selected, defaulting to the first authorised. */
+  _authorisedOperation() {
+    const list = this._authorisedOperations();
+    return list.find((o) => o.id === this.selectedOp) || list[0] || null;
   }
 
   _bind() {
@@ -519,6 +538,9 @@ export class BaseScreen {
     const close = q('[data-close]');
     if (close) close.onclick = () => this.hide();
 
+    all('[data-op]').forEach((n) => {
+      n.onclick = () => { this.selectedOp = n.dataset.op; this.refresh(); };
+    });
     const dep = q('[data-deploy]');
     if (dep) dep.onclick = () => {
       const op = this._authorisedOperation();
