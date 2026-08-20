@@ -58,8 +58,9 @@ export const EVENTS = Object.freeze({
   NOTICE: 'NOTICE',
 });
 
-/** A defensible starting manifest. Not the only one that works — GDD Pillar 4 wants more
- *  than one defensible loadout, and the suite asserts that two different ones can finish. */
+/** A defensible starting manifest for the cold-storage draught. Not the only one that
+ *  works — GDD Pillar 4 wants more than one defensible loadout, and the suite asserts that
+ *  two different ones can finish. Kept as the fallback and as the suite's fixed baseline. */
 export const RECOMMENDED_MANIFEST = Object.freeze([
   { itemId: 'thermal-imager', qty: 1 },
   { itemId: 'floodlight-tripod', qty: 3 },
@@ -67,6 +68,44 @@ export const RECOMMENDED_MANIFEST = Object.freeze([
   { itemId: 'trauma-kit', qty: 1 },
   { itemId: 'motion-sensor', qty: 1 },
 ]);
+
+/**
+ * What to put in the van for THIS incident, derived from the anomaly's own safe-grade
+ * procedure rather than hard-coded.
+ *
+ * ⚠ A CONSTANT HERE WAS A BUG WAITING FOR THE SECOND ANOMALY. The recommended manifest
+ * was the draught's kit — three floodlight tripods and an imager — and it would have been
+ * offered, unchanged, to a squad deploying against something that cannot be fenced and
+ * reads at ambient on thermal. The button says "recommended"; it has to mean it.
+ *
+ * It reads the SAFE procedure, not the minimum: the minimum is what you can get away with,
+ * and a manifest screen that opens on "what you can get away with" is not a recommendation.
+ * Quantities are the wager and stay the player's (GDD §10.7) — this only decides what is
+ * worth having one of, plus a spare fence post or camera because one is never enough.
+ */
+export function recommendedManifest(content) {
+  const safe = (content.anomaly.containment.procedures.find((p) => p.grade === 'safe')
+    || content.anomaly.containment.procedures[0]);
+  if (!safe) return RECOMMENDED_MANIFEST.slice();
+
+  const spares = { 'floodlight-tripod': 3, 'portable-heater': 2, 'remote-camera': 3, 'portable-barrier': 2 };
+  const out = safe.requiredEquipment
+    .filter((id) => content.itemsById.has(id))
+    .map((id) => ({ itemId: id, qty: spares[id] || 1 }));
+
+  /* Medical is never on a containment procedure's list and is always worth the volume. */
+  if (!out.some((x) => x.itemId === 'trauma-kit')) out.push({ itemId: 'trauma-kit', qty: 1 });
+
+  /* Trim to the cargo budget, cheapest-first, so the default always deploys. */
+  const budget = content.items.cargoVolumeBudget;
+  const vol = (list) => list.reduce((a, x) => a + content.itemsById.get(x.itemId).cargoVolume * x.qty, 0);
+  while (vol(out) > budget) {
+    const fat = out.filter((x) => x.qty > 1).sort((a, b) => b.qty - a.qty)[0];
+    if (fat) fat.qty--; else { out.pop(); }
+    if (!out.length) break;
+  }
+  return out;
+}
 
 export class Game {
   constructor(content, { seed = 'containment-detail' } = {}) {

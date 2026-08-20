@@ -1,0 +1,260 @@
+{
+  "id": "regional-site-19",
+  "displayName": "Regional Site 19",
+  "contentRevision": "0.1.0-web",
+
+  "_note": "The Foundation home base as DATA — GDD §13, cut to the compact five-room slice of §26.2: operations room, armory/logistics counter, archive terminal, small research station, containment observation corridor. §13.1 asks that preparing for a mission take minutes and not a commute, so this is a screen with tabs rather than a walkable building, and every room is one page. The eight core areas of §13.2 are folded into five: the research station carries the isolation bench that a full site would give the Medical Wing, and the logistics counter carries the Engineering Bay's repair queue. That is not a shortcut, it is the fiction — an underfunded regional facility has one room doing three jobs, and §13.3 says the site begins underfunded.",
+
+  "_effectsNote": "Every `effect` key is validated against DEFAULT_EFFECTS in src/sim/progression.js and the file REFUSES to load if it names one no system reads. An upgrade that quietly did nothing would fail §13.3's 'upgrades visibly add capability' without ever failing a test.",
+
+  "condition": "underfunded",
+  "standing": "Regional Site 19 runs on a regional grant, one vehicle, and whatever the last operation brought back. Nothing here is new and two of the rooms were something else first.",
+
+  "regionalStatus": {
+    "weather": "Overcast, 4C, wind from the north-east. No change expected before the window closes.",
+    "region": "Three counties, one duty squad, and a coroner who has stopped asking questions.",
+    "readiness": "One vehicle. One command point. Everything you take is everything you have."
+  },
+
+  "rooms": [
+    {
+      "id": "operations",
+      "name": "Operations room",
+      "purpose": "Where an incident becomes an operation. The board, the map table, the regional picture, and the readiness check that says whether the squad can actually go.",
+      "furniture": "A map table with a cracked overlay, a wall board, and a radio set that predates the site.",
+      "clearanceRequired": 0,
+      "allows": [
+        "Read the mission board and take the authorised operation",
+        "Read the regional and weather picture before committing",
+        "Check squad readiness, including who is carrying an injury"
+      ],
+      "upgrades": [
+        {
+          "id": "backup-power",
+          "name": "Backup power",
+          "department": "engineering",
+          "costRequisition": 380,
+          "costResearch": 0,
+          "clearanceRequired": 0,
+          "effect": { "equipmentBatteryBonusMinutes": 1, "requisitionPerOperation": 10 },
+          "blurb": "A generator and a proper charging bench. Cells go out full instead of go out.",
+          "visible": "The corridor lights stop dropping when the compressor cycles, and every issued item leaves with an extra minute on it."
+        },
+        {
+          "id": "vehicle-bay",
+          "name": "Additional vehicle bay",
+          "department": "logistics",
+          "costRequisition": 520,
+          "costResearch": 0,
+          "clearanceRequired": 1,
+          "effect": { "cargoVolumeBudget": 2 },
+          "blurb": "A second vehicle means the manifest stops being a single wager.",
+          "visible": "Two more volume on every cargo manifest, for good."
+        }
+      ]
+    },
+    {
+      "id": "logistics",
+      "name": "Armory and logistics counter",
+      "purpose": "Loadouts, maintenance, the cargo manifest, and equipment recovery. The counter is also the repair queue, because there is no engineering bay and the same person does both.",
+      "furniture": "A roller shutter, a parts bin, and a whiteboard listing what did not come back.",
+      "clearanceRequired": 0,
+      "allows": [
+        "Fit an equipment sidegrade, or refit the standard tool",
+        "Requisition new variants against department standing",
+        "Read what the last operation failed to recover"
+      ],
+      "upgrades": [
+        {
+          "id": "specialised-storage",
+          "name": "Specialised storage",
+          "department": "logistics",
+          "costRequisition": 460,
+          "costResearch": 120,
+          "clearanceRequired": 2,
+          "effect": { "containmentCells": 2, "replacementCostPct": -25 },
+          "blurb": "Climate-controlled racking with sensor ports, and a bonded cage for recovered gear.",
+          "visible": "Two more holding positions in the corridor, and written-off equipment costs a quarter less to reorder."
+        }
+      ]
+    },
+    {
+      "id": "archive",
+      "name": "Archive terminal",
+      "purpose": "Case files, mission history, the anomaly codex, and the attribution record. One terminal, one chair, and everything the site has ever filed.",
+      "furniture": "A terminal on a desk that was a canteen table.",
+      "clearanceRequired": 1,
+      "allows": [
+        "Read the debrief history, dimension by dimension",
+        "Read the case file on anything the site has encountered",
+        "Read the attribution and licensing record"
+      ],
+      "upgrades": [
+        {
+          "id": "expanded-archives",
+          "name": "Expanded archives",
+          "department": "research",
+          "costRequisition": 300,
+          "costResearch": 60,
+          "clearanceRequired": 1,
+          "effect": { "historyKept": 8, "researchBonusPct": 10 },
+          "blurb": "Proper indexing and a second terminal, so a case file can be cross-read against the last twenty operations.",
+          "visible": "Twenty operations on file instead of twelve, and a tenth more analytical yield from everything you bring back."
+        },
+        {
+          "id": "training-space",
+          "name": "Training and simulation space",
+          "department": "ethics",
+          "costRequisition": 420,
+          "costResearch": 0,
+          "clearanceRequired": 1,
+          "requiresUpgrade": "expanded-archives",
+          "effect": { "standingGainPct": 15 },
+          "blurb": "A room with a floor plan taped out on it and a procedure rehearsal each week. Departments notice a squad that practises.",
+          "visible": "Every standing gain is worth about a sixth more."
+        }
+      ]
+    },
+    {
+      "id": "research",
+      "name": "Research station",
+      "purpose": "Sample analysis, research projects, and the isolation bench the site uses to treat exposure because there is no medical wing.",
+      "furniture": "A fume hood, a sample fridge, and one isolation bed behind a curtain.",
+      "clearanceRequired": 1,
+      "allows": [
+        "Spend research data on prototypes and analytical unlocks",
+        "Read what the site knows about an anomaly, and what it would take to know more",
+        "Treat an injured operative, or decide not to and field them anyway"
+      ],
+      "upgrades": [
+        {
+          "id": "medical-isolation",
+          "name": "Better medical isolation",
+          "department": "medical",
+          "costRequisition": 340,
+          "costResearch": 40,
+          "clearanceRequired": 1,
+          "effect": { "treatmentCapacity": 1, "treatmentCostPct": -40 },
+          "blurb": "A second bed, a real airlock, and a supply cupboard that is not shared with the sample fridge.",
+          "visible": "Two operatives can be treated in the same rotation, and a course costs less than half again."
+        }
+      ]
+    },
+    {
+      "id": "containment",
+      "name": "Containment observation corridor",
+      "purpose": "A short run of cells and monitor feeds. Whatever the site is holding is held here, and the corridor's job is to record what holding it costs.",
+      "furniture": "Three cells, a monitor bank with one dead channel, and a clipboard nobody has replaced with a tablet.",
+      "clearanceRequired": 1,
+      "allows": [
+        "Read the operational history of everything in custody",
+        "Read the maintenance record and what the next check is due",
+        "See which holding positions are free before committing to an operation"
+      ],
+      "upgrades": [
+        {
+          "id": "perimeter-monitoring",
+          "name": "Stronger perimeter monitoring",
+          "department": "security",
+          "costRequisition": 400,
+          "costResearch": 80,
+          "clearanceRequired": 2,
+          "effect": { "maintenanceIntervalOperations": 2, "requisitionPerOperation": 10 },
+          "blurb": "Sensors on the corridor and the fence line, reporting continuously instead of when somebody walks past.",
+          "visible": "Checks fall due two operations further apart, and the regional grant goes up because the auditors can see the logs."
+        }
+      ]
+    }
+  ],
+
+  "operations": [
+    {
+      "id": "op-cold-storage-2",
+      "name": "Cold storage, level 2",
+      "mapId": "cold-storage-l2",
+      "anomalyId": "graybox-draught",
+      "clearanceRequired": 0,
+      "difficulty": "Field",
+      "status": "authorised",
+      "distance": "Forty minutes out. Sub-level, no surface exposure.",
+      "mandate": "Establish custody of the anomaly on level 2 and transfer it to the stair head.",
+      "optional": [
+        "Recover all issued equipment",
+        "Avoid a second contact",
+        "Preserve a frost sample"
+      ],
+      "conditions": [
+        "Mains down six days. Two circuits, both dead.",
+        "One surviving crew member waiting at the stair head.",
+        "Plant log reports the chiller ran eleven days against a four-hour duty cycle."
+      ]
+    }
+  ],
+
+  "_boardNote": "One operation, and the board says so rather than padding itself with contracts that do not exist. §26.3 excludes more than one field map from the slice; a mission board showing four greyed-out operations would be a promise the build cannot keep, and §18.1 does not allow the UI to lie about what is available.",
+
+  "containmentWing": {
+    "framing": "Entries record where it came from, what holding it costs, and what it has done since. They do not rank captures, do not count them as a score, and do not describe anything held here as a prize. An object in a cell is an ongoing operational commitment, not a result.",
+    "maintenanceIntervalOperations": 3,
+    "maintenanceNotes": [
+      "Scheduled check. Cell log reviewed against the sensor bus; no discrepancy recorded.",
+      "Interior temperature drifted 0.4C over the interval. Within tolerance, logged, watched.",
+      "Monitor channel two reported a two-second dropout. Cause not established. Cell inspected and re-sealed.",
+      "Consumable draw above forecast for the interval. Requisition notified."
+    ],
+    "cells": [
+      {
+        "id": "cell-1",
+        "label": "Cell 1",
+        "holding": "Insulated, heated, sensor ports on the corridor bus. The only position rated for a thermal negative.",
+        "capability": "thermal"
+      },
+      {
+        "id": "cell-2",
+        "label": "Cell 2",
+        "holding": "General holding. Sealed door, one camera, no environmental control.",
+        "capability": "general"
+      },
+      {
+        "id": "cell-3",
+        "label": "Cell 3",
+        "holding": "Locker-scale. Objects and samples, not organisms. The extract fan has been on the list since March.",
+        "capability": "object"
+      }
+    ]
+  },
+
+  "dossiers": [
+    {
+      "anomalyId": "graybox-draught",
+      "designation": "GB-04 (provisional)",
+      "_designationNote": "A provisional internal designation, not an SCP number. GDD §25.3 holds that a final designation is assigned only after the licensing record exists, and content/anomalies/graybox-draught.json carries `licensingRecordId: null`. Nothing in this build should print a number it has not earned the right to print.",
+      "classFraming": "A thermal negative that moves toward heat and cannot cross a sustained gradient above 40C. Not hostile in any sense the site can evidence; it is cold, and people are warm.",
+      "holding": "escort at 39C in a heated transit case, corridor cleared, two operatives",
+      "cellRequirement": "thermal",
+      "operationalCost": "Holding it costs a heated cell on continuous draw and a fortnightly gradient check. It has never tested the seal. It has never had to.",
+      "insights": [
+        {
+          "id": "gb-04-thermal-channel",
+          "requires": { "rules": 2 },
+          "text": "Thermal is the only reliable observation channel. It records faithfully in that band and not at all in the visible one, so a camera that sees nothing is not evidence of absence.",
+          "grants": "A line on the operation card before the squad deploys."
+        },
+        {
+          "id": "gb-04-gradient-figure",
+          "requires": { "rules": 4, "research": 180 },
+          "text": "The gradient figure is 40C, sustained and continuous. A contour with a gap in it is not a fence, and the aisles on level 2 are 4.2m across.",
+          "grants": "The figure appears on the briefing instead of being inferred in the field."
+        },
+        {
+          "id": "gb-04-lure-window",
+          "requires": { "rules": 5, "operations": 2 },
+          "text": "It goes to the warmest thing it can reach. A transit case held one degree under the threshold out-competes an operative; a tripod set down too near the case takes the case over the threshold and the lure stops working.",
+          "grants": "The archive files this as a procedure note rather than a hard-won field lesson."
+        }
+      ]
+    }
+  ],
+
+  "_insightNote": "Insights grant CONTEXT ONLY — a line the briefing did not previously carry. None of them changes a number the anomaly obeys, because GDD §12.1 says progression must not turn horror into immunity. A squad that has read all three still has to build the fence."
+}

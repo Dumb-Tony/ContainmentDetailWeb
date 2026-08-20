@@ -19,6 +19,8 @@ import { Panels } from './ui/panels.js';
 import { Audio, mixFor } from './audio/audio.js';
 import { Input } from './core/input.js';
 import { Settings, SettingsPanel } from './ui/settings.js';
+import { BaseScreen } from './ui/base.js';
+import { Progression, loadSite } from './sim/progression.js';
 import { escapeHtml } from './ui/hud.js';
 import { dist } from './sim/geometry.js';
 import { CONFIG } from './config.js';
@@ -42,9 +44,22 @@ async function boot() {
   const bootNode = document.getElementById('boot');
   const canvas = document.getElementById('view');
 
+  /**
+   * Which incident this deployment is. Two of them share the cold store, and the URL is
+   * how you pick (GDD §15: the content unit is an Incident Package, not a map).
+   *
+   * ⚠ SWITCHING INCIDENT NAVIGATES rather than rebuilding in place. It looks lazy and it
+   * is the right call for a browser build: a Game, a WebGL context, a scene graph, a
+   * thermal texture and a net session all have to come down together, and the one that
+   * gets missed leaks a context until the tab dies. A navigation is one line and cannot
+   * half-succeed. Settings and progression live in localStorage, so nothing is lost.
+   */
+  const params = new URL(location.href).searchParams;
+  const incidentId = params.get('incident') || 'cold-storage-draught';
+
   let content;
   try {
-    content = await loadContent();
+    content = await loadContent({ incident: incidentId });
   } catch (e) {
     bootNode.innerHTML = `<h1>Content refused</h1>
       <p>The mission did not load, and that is deliberate: a mission whose rules are broken
@@ -56,7 +71,34 @@ async function boot() {
   const THREE = window.THREE;
   if (!THREE) { bootNode.innerHTML = '<h1>Renderer missing</h1><p>assets/lib/r128/three.min.js did not load.</p>'; return; }
 
-  const game = new Game(content, { seed: new URL(location.href).searchParams.get('seed') || 'cold-storage-1' });
+  /**
+   * The site, and everything the squad has earned on it (GDD §12, §13).
+   *
+   * ⚠ FITTED KIT IS APPLIED TO THE CONTENT, NOT TO THE SIMULATION. A site upgrade or a
+   * sidegrade changes what an item IS, so it is folded into the content the Game is handed
+   * and nothing downstream needs to know progression exists — `game.js` still just reads
+   * `content.itemsById`. The alternative is a modifier lookup at every use site, which is
+   * the same thing with more places to forget.
+   *
+   * §12.1 is the constraint the data obeys: progression grants options, context and
+   * efficiency. Never damage, never immunity.
+   */
+  const site = await loadSite();
+  const progression = new Progression({ site });
+  const fx = progression.effects();
+  const handicap = progression.squadHandicap();
+  const issued = content.items.items.map((it) => progression.itemAsIssued(it));
+  const fitted = {
+    ...content,
+    items: {
+      ...content.items,
+      items: issued,
+      cargoVolumeBudget: content.items.cargoVolumeBudget + fx.cargoVolumeBudget + handicap.cargoVolume,
+    },
+    itemsById: new Map(issued.map((i) => [i.id, Object.freeze(i)])),
+  };
+
+  const game = new Game(fitted, { seed: new URL(location.href).searchParams.get('seed') || 'cold-storage-1' });
   const renderer = new Renderer(THREE, canvas, game);
   const hud = new Hud(document.getElementById('hud'), game, renderer);
   const audio = new Audio();
@@ -110,10 +152,30 @@ async function boot() {
   /* Cues are a table lookup, so a new simulation event is a new row in audio.js and never
    * a change here. An event with no row is silent rather than fatal. */
   game.bus.onAny((e) => { audio.cue(e.type, e); });
+  /* The debrief closes the loop: the operation's nine graded dimensions become requisition,
+   * research and standing, and the site is what carries between missions (GDD 12.6 — a
+   * failed operation still yields something for valid observations, so no run is a total
+   * loss and no run can start a debt spiral). */
+  let currentOp = null;
   game.bus.on(EVENTS.MISSION_ENDED, (e) => {
     document.exitPointerLock();
     document.body.classList.add('free');
+    progression.applyDebrief(e.result, game.mission, {
+      anomalyId: fitted.anomaly.id,
+      mapId: fitted.map.id,
+      operationId: currentOp && currentOp.id,
+      custody: game.custody,
+      minutes: game.clock.simTimeMs / 60000,
+      observations: game.ledger.entries.length,
+      squad: game.players,
+    });
     panels.showDebrief(e.result);
+  });
+
+  const base = new BaseScreen(document.body, {
+    progression, site, items: fitted.items,
+    onDeploy: (op) => { currentOp = op; panels.showSquad(net); },
+    onClose: () => {},
   });
 
   /* ── input plumbing ──────────────────────────────────────────────────── */
@@ -238,7 +300,7 @@ async function boot() {
   window.addEventListener('resize', () => renderer.resize());
   bootNode.remove();
   document.body.classList.add('free');
-  panels.showSquad(net);
+  base.show();
   requestAnimationFrame(frame);
 
   /* The debug handle. The suite and any console probe drive the game through THIS, so
@@ -248,7 +310,7 @@ async function boot() {
   game.localId = net.localPlayerId;
 
   window.__CD = { game, renderer, hud, panels, audio, input, content, mixFor, net, ROLE, ACT,
-    settings, settingsPanel,
+    settings, settingsPanel, base, progression, site,
     get paused() { return game.clock.paused; } };
   window.dispatchEvent(new CustomEvent('cd-ready', { detail: window.__CD }));
 }

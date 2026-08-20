@@ -1,0 +1,237 @@
+{
+  "id": "ashlar-house-9",
+  "displayName": "Ashlar House, ninth floor",
+  "contentRevision": "0.1.0-web",
+
+  "_incident": "A condemned crosswall slab block, stripped back to its frame, with the dead district-heating gallery running the full width behind the store rooms. The load-bearing fact is the construction. Ashlar House is a CROSSWALL block: only nineteen of this floor's fifty-seven walls carry anything — the envelope, the two structural crosswalls, the lift core and the gallery — and every partition between them is stud and plasterboard. The squad and the draught therefore walk two different buildings over one footprint. The operatives go the long way round the flats through six doorways; the thing crosses them in a straight line; and a 6.5m escape ray fired from anywhere inside a flat leaves the building without touching a surface, so nothing up here can be fenced where it stands. Two tripods in the middle of Flat 3 still leave three lanes open. The whole map is the argument for getting it DOWN into the heating gallery — 2.4m of clear width, concrete on both faces, and exactly three doors in its north wall. The cold store's problem was that its aisles are wider than one floodlight's contour. Ashlar's is the reverse: a floodlight's 40C contour is 3.37m across and the gallery is 2.4m wide, so heat down there is cheap and only the two ends of the tube need closing. What is expensive is the journey, and the one thing you cannot buy with heat is the bait — a tripod set 3.6m from the transit case pushes the case past 40C and stops it being a lure at all, which is why the last lane has to be closed with something that is cold. That is what the doors are for, and it is why the power is worth a walk. Infrastructure here is the inverse of the cold store's: nothing is locked shut, everything is stuck OPEN. All four gallery doors start open on a dead circuit, so the fence cannot be shaped at all until somebody has walked the full length of the tube they intend to fight in and thrown the contractor's temporary board at the far west end of it. The second circuit unlocks nothing — it opens the lift lobby, the only cross-link in the middle of the plan, and its breaker sits in the west stair at the opposite corner of the floor from where the squad comes up. Buying the shortcut costs one full lap of the loop, and the shortcut is a shortcut for the draught too.",
+
+  "_webNote": "Authored for the browser build against revision 0.4.0 of the anomaly file and 0.3.0 of the equipment manifest. Same bounds and ceiling order as cold-storage-l2, so the thermal floor texture resolution still suits it; same anomaly (graybox-draught); same equipment manifest; and no evidence id the anomaly file does not already define — the four static sources are the same four the cold store uses, re-sited and re-labelled for a residential block. Two circuits, six doors, twenty named rooms, four staging areas (the east landing where the squad arrives, the lift lobby, the plant store and the gallery), two entry routes (the east landing stair and the west stair), and a looped circulation path — north corridor, west link, south corridor, east link — with the lift lobby as a cross-link that starts dead. Room rects are the interior floor of each space and do not overlap; the seams between them are the wall bands, and no standable cell on this floor is further than 0.18m from the rect that names it. The intended containment site is the gallery bay directly under the contractors' store door, at (1.6, -10.8).",
+
+  "bounds": { "minX": -12.0, "maxX": 12.0, "minZ": -12.0, "maxZ": 12.0 },
+  "ceilingHeight": 2.45,
+
+  "spawn": [10.2, 7.2],
+  "spawnFacingRad": 4.7,
+  "extraction": { "x": 10.6, "z": 11.0, "radius": 2.0 },
+  "anomalySpawn": [-8.6, 10.6],
+  "cache": { "x": 9.4, "z": 9.0 },
+
+  "crates": [[-7.0, 10.4], [10.8, 8.6], [-8.2, 1.4], [2.6, -7.6]],
+
+  "statics": [
+    [-12.4, -12.4, 12.4, -12.0],
+    [-12.4, 12.0, 12.4, 12.4],
+    [-12.4, -12.0, -12.0, 12.0],
+    [12.0, -12.0, 12.4, 12.0],
+
+    [-4.2, 5.2, -3.8, 12.0],
+    [-4.2, -4.0, -3.8, 3.0],
+    [-4.2, -9.2, -3.8, -6.4],
+    [3.8, 5.2, 4.2, 12.0],
+    [3.8, -4.0, 4.2, 3.0],
+    [3.8, -9.2, 4.2, -6.4],
+
+    [-3.8, 2.6, -1.6, 3.0],
+    [0.0, 2.6, 3.8, 3.0],
+    [-3.8, -4.0, -1.6, -3.6],
+    [0.0, -4.0, 3.8, -3.6],
+    [1.4, -1.0, 3.8, 2.6],
+
+    [-12.0, -9.6, -10.8, -9.2],
+    [-9.2, -9.6, 0.8, -9.2],
+    [2.4, -9.6, 8.6, -9.2],
+    [10.2, -9.6, 12.0, -9.2],
+
+    [-9.8, 5.4, -9.6, 12.0],
+    [-0.2, 5.4, 0.0, 12.0],
+    [8.2, 5.4, 8.4, 12.0],
+
+    [-12.0, 5.2, -11.6, 5.4],
+    [-10.0, 5.2, -7.6, 5.4],
+    [-6.0, 5.2, -4.2, 5.4],
+    [-3.8, 5.2, -2.8, 5.4],
+    [-1.2, 5.2, 1.2, 5.4],
+    [2.8, 5.2, 3.8, 5.4],
+    [4.2, 5.2, 5.4, 5.4],
+    [7.0, 5.2, 9.4, 5.4],
+    [11.0, 5.2, 12.0, 5.4],
+
+    [-9.6, 2.8, -8.0, 3.0],
+    [-6.4, 2.8, -4.2, 3.0],
+    [4.2, 2.8, 6.4, 3.0],
+    [8.0, 2.8, 9.6, 3.0],
+
+    [-9.8, -4.0, -9.6, 3.0],
+    [9.6, -4.0, 9.8, 3.0],
+
+    [-9.6, -4.0, -8.0, -3.8],
+    [-6.4, -4.0, -4.2, -3.8],
+    [4.2, -4.0, 6.4, -3.8],
+    [8.0, -4.0, 9.6, -3.8],
+
+    [-12.0, -6.4, -11.0, -6.2],
+    [-9.4, -6.4, -6.8, -6.2],
+    [-5.2, -6.4, -2.8, -6.2],
+    [-1.2, -6.4, 1.4, -6.2],
+    [3.0, -6.4, 5.4, -6.2],
+    [7.0, -6.4, 9.4, -6.2],
+    [11.0, -6.4, 12.0, -6.2],
+
+    [-8.2, -9.2, -8.0, -6.4],
+    [0.0, -9.2, 0.2, -6.4],
+    [8.0, -9.2, 8.2, -6.4],
+
+    [-9.6, 8.6, -6.4, 8.8],
+    [-3.8, 8.6, -1.6, 8.8],
+    [0.0, 8.6, 2.2, 8.8],
+    [4.2, 8.6, 6.4, 8.8],
+    [-9.6, -0.6, -6.4, -0.4],
+    [6.4, -0.6, 9.6, -0.4]
+  ],
+
+  "_porousNote": "Indices into `statics` that are STUD AND PLASTERBOARD rather than concrete. The anomaly's constraint list blocks it with closed-cell insulation only — 'Portable barrier panels work; sheet metal and plasterboard do not' — so on this map the split is just the order of the list: 0 to 18 are structure and stop the draught, 19 to 56 are infill and do not. In world terms, 0-3 are the external envelope; 4-6 and 7-9 are the two structural crosswalls, each in three pieces with the gaps where the two corridors cut through them; 10-13 are the lift lobby's north and south walls either side of their doors; 14 is the lift shaft; 15-18 are the heating gallery's north wall in the four runs its three doors leave it in. Everything from 19 is infill — the west stair and east landing partitions, both corridors' walls, the two link-corridor walls, the store partitions, and the one surviving partition inside each of the six flats. Thirty-eight of the fifty-seven walls on this floor stop a person and nothing else, and that ratio IS the map. The cold store had four porous runs in a building that was otherwise a fence; this one has four fences in a building that is otherwise porous, and the four are the envelope, the crosswalls, the lift core and the gallery.",
+  "porousStatics": [19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56],
+
+  "doors": [
+    {
+      "id": "door-lobby-north",
+      "displayName": "Lift lobby, north door",
+      "aabb": [-1.6, 2.6, 0.0, 3.0],
+      "circuitId": "circuit-landing",
+      "initiallyOpen": false
+    },
+    {
+      "id": "door-lobby-south",
+      "displayName": "Lift lobby, south door",
+      "aabb": [-1.6, -4.0, 0.0, -3.6],
+      "circuitId": "circuit-landing",
+      "initiallyOpen": false
+    },
+    {
+      "id": "door-gallery-west",
+      "displayName": "Gallery door, bin store",
+      "aabb": [-10.8, -9.6, -9.2, -9.2],
+      "circuitId": "circuit-gallery",
+      "initiallyOpen": true
+    },
+    {
+      "id": "door-gallery-lane",
+      "displayName": "Gallery door, contractors' store",
+      "aabb": [0.8, -9.6, 2.4, -9.2],
+      "circuitId": "circuit-gallery",
+      "initiallyOpen": true
+    },
+    {
+      "id": "door-gallery-east",
+      "displayName": "Gallery door, old laundry",
+      "aabb": [8.6, -9.6, 10.2, -9.2],
+      "circuitId": "circuit-gallery",
+      "initiallyOpen": true
+    },
+    {
+      "id": "door-gallery-stop",
+      "displayName": "Gallery fire-stopping door",
+      "aabb": [-2.4, -12.0, -2.0, -9.6],
+      "circuitId": "circuit-gallery",
+      "initiallyOpen": true
+    }
+  ],
+
+  "circuits": [
+    {
+      "id": "circuit-gallery",
+      "displayName": "Gallery circuit",
+      "switch": [-11.0, -10.8],
+      "switchLabel": "Gallery circuit — contractor's board, west end of the heating gallery",
+      "initiallyOn": false
+    },
+    {
+      "id": "circuit-landing",
+      "displayName": "Landing circuit",
+      "switch": [-11.0, 7.4],
+      "switchLabel": "Landing circuit — meter cupboard in the west stair",
+      "initiallyOn": false
+    }
+  ],
+
+  "luminaires": [
+    { "at": [-11.0, 4.1], "circuitId": "circuit-landing" },
+    { "at": [-6.0, 4.1], "circuitId": "circuit-landing" },
+    { "at": [4.0, 4.1], "circuitId": "circuit-landing" },
+    { "at": [9.0, 4.1], "circuitId": "circuit-landing" },
+    { "at": [-11.0, -5.1], "circuitId": "circuit-landing" },
+    { "at": [-6.0, -5.1], "circuitId": "circuit-landing" },
+    { "at": [4.0, -5.1], "circuitId": "circuit-landing" },
+    { "at": [9.0, -5.1], "circuitId": "circuit-landing" },
+    { "at": [-10.9, -0.5], "circuitId": "circuit-landing" },
+    { "at": [10.9, -0.5], "circuitId": "circuit-landing" },
+    { "at": [-1.0, 0.5], "circuitId": "circuit-landing" },
+    { "at": [-10.9, 8.0], "circuitId": "circuit-landing" },
+
+    { "at": [-9.0, -10.8], "circuitId": "circuit-gallery" },
+    { "at": [-4.0, -10.8], "circuitId": "circuit-gallery" },
+    { "at": [1.0, -10.8], "circuitId": "circuit-gallery" },
+    { "at": [6.0, -10.8], "circuitId": "circuit-gallery" },
+    { "at": [10.0, -10.8], "circuitId": "circuit-gallery" },
+    { "at": [-10.0, -7.8], "circuitId": "circuit-gallery" },
+    { "at": [6.0, -7.8], "circuitId": "circuit-gallery" },
+
+    { "at": [10.2, 8.8], "circuitId": null, "emergency": true },
+    { "at": [0.0, 4.1], "circuitId": null, "emergency": true },
+    { "at": [0.0, -5.1], "circuitId": null, "emergency": true }
+  ],
+
+  "rooms": [
+    { "id": "west-stair", "name": "West stair", "rect": [-12.0, 5.4, -9.8, 12.0] },
+    { "id": "flat-1", "name": "Flat 1", "rect": [-9.6, 5.4, -4.2, 12.0] },
+    { "id": "flat-2", "name": "Flat 2", "rect": [-3.8, 5.4, -0.2, 12.0] },
+    { "id": "flat-3", "name": "Flat 3", "rect": [0.0, 5.4, 3.8, 12.0] },
+    { "id": "flat-4", "name": "Flat 4", "rect": [4.2, 5.4, 8.2, 12.0] },
+    { "id": "east-landing", "name": "East landing", "rect": [8.4, 5.4, 12.0, 12.0] },
+    { "id": "north-corridor", "name": "North corridor", "rect": [-12.0, 3.0, 12.0, 5.2] },
+    { "id": "west-link", "name": "West link", "rect": [-12.0, -4.0, -9.8, 3.0] },
+    { "id": "flat-5", "name": "Flat 5", "rect": [-9.6, -3.6, -4.2, 2.6] },
+    { "id": "lift-lobby", "name": "Lift lobby", "rect": [-3.8, -3.6, 3.8, 2.6] },
+    { "id": "flat-6", "name": "Flat 6", "rect": [4.2, -3.6, 9.6, 2.6] },
+    { "id": "east-link", "name": "East link", "rect": [9.8, -4.0, 12.0, 3.0] },
+    { "id": "south-corridor", "name": "South corridor", "rect": [-12.0, -6.2, 12.0, -4.0] },
+    { "id": "bin-store", "name": "Bin store", "rect": [-12.0, -9.2, -8.2, -6.4] },
+    { "id": "drying-room", "name": "Drying room", "rect": [-8.0, -9.2, -4.2, -6.4] },
+    { "id": "tank-room", "name": "Tank room", "rect": [-3.8, -9.2, 0.0, -6.4] },
+    { "id": "contractors-store", "name": "Contractors' store", "rect": [0.2, -9.2, 3.8, -6.4] },
+    { "id": "plant-store", "name": "Plant store", "rect": [4.2, -9.2, 8.0, -6.4] },
+    { "id": "old-laundry", "name": "Old laundry", "rect": [8.2, -9.2, 12.0, -6.4] },
+    { "id": "heating-gallery", "name": "Heating gallery", "rect": [-12.0, -12.0, 12.0, -9.6] }
+  ],
+
+  "evidenceSources": [
+    {
+      "evidenceId": "frost-bloom",
+      "at": [-8.8, 11.4],
+      "label": "Frost on a radiator bracket, Flat 1",
+      "prompt": "Examine the frost",
+      "requiresEquipment": []
+    },
+    {
+      "evidenceId": "survivor-account",
+      "at": [9.6, 6.6],
+      "label": "Site watchman on the east landing",
+      "prompt": "Take a statement",
+      "requiresEquipment": []
+    },
+    {
+      "evidenceId": "maintenance-log",
+      "at": [-9.8, -10.8],
+      "label": "Contractor's day book at the temporary board",
+      "prompt": "Read the day book",
+      "requiresEquipment": []
+    },
+    {
+      "evidenceId": "stairwell-draught",
+      "at": [-10.8, 9.8],
+      "label": "Draught in the west stair",
+      "prompt": "Note the draught",
+      "requiresEquipment": []
+    }
+  ]
+}

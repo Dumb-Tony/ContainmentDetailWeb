@@ -14,7 +14,8 @@
 
 import { CONFIG } from '../config.js';
 import { CLAIMS } from '../sim/evidence.js';
-import { RECOMMENDED_MANIFEST as RECOMMENDED } from '../game.js';
+import { recommendedManifest } from '../game.js';
+import { INCIDENTS } from '../sim/content.js';
 import { GameClock } from '../core/clock.js';
 import { escapeHtml } from './hud.js';
 
@@ -185,7 +186,7 @@ export class Panels {
   showLoadout() {
     this.open = 'loadout';
     if (this.manifest.size === 0) {
-      for (const { itemId, qty } of RECOMMENDED) this.manifest.set(itemId, qty);
+      for (const { itemId, qty } of recommendedManifest(this.game.content)) this.manifest.set(itemId, qty);
     }
     this._renderLoadout();
   }
@@ -216,22 +217,35 @@ export class Panels {
     else if (heatUnits < 2) warn.push('One heat emitter. The storage aisles are 4.2m across.');
     if (!have('trauma-kit')) warn.push('No medical capacity.');
 
-    this._shell('Operation card — Cold storage, level 2', 'Foundation regional response · solo deployment authorised', `
+    /* The briefing is the INCIDENT's, not the map's — two operations on this floor read
+     * completely differently, and that is the point of them sharing it (GDD §15.2). */
+    const inc = g.content.incident || {};
+    const brief = inc.briefing || {};
+    const known = (brief.known || []).map((k) =>
+      `<li>${escapeHtml(k.text)} <span class="conf">confidence: ${escapeHtml(k.confidence)}</span></li>`).join('');
+    const others = INCIDENTS.filter((id) => id !== inc.id);
+
+    this._shell(`Operation card — ${escapeHtml(g.site.displayName)}`,
+      `Foundation regional response · ${escapeHtml(inc.displayName || inc.id || '')}`, `
       <div class="cols">
         <section class="brief">
           <h2>Incident</h2>
-          <p>${escapeHtml(g.content.map._incident.split('.')[0])}. A maintenance crew sealed the floor after reporting <em>"cold that moves"</em>. Two of the three came back.</p>
+          <p><b>${escapeHtml(brief.headline || '')}</b></p>
+          <p>${escapeHtml(brief.report || '')}</p>
           <h2>Conditions</h2>
           <ul>
             <li>Mains down six days. Two circuits, both dead. The office breaker is on the bay wall; the storage breaker is <em>inside the office</em>.</li>
-            <li>Ambient ${CONFIG.heat.ambientC}C and falling while the anomaly is loose.</li>
-            <li>One surviving crew member is waiting at the stair head. <span class="conf">confidence: probable</span></li>
-            <li>Plant log reports the chiller ran eleven days against a four-hour duty cycle. <span class="conf">confidence: disputed</span></li>
+            <li>Ambient ${CONFIG.heat.ambientC}C.</li>
+            ${known}
           </ul>
           <h2>Mandate</h2>
           <p><b>Primary:</b> establish custody of the anomaly and transfer it to the stair head.</p>
-          <p><b>Optional:</b> recover all issued equipment · avoid a second contact · preserve a frost sample.</p>
+          <p><b>Optional:</b> recover all issued equipment · avoid a second contact · preserve a sample.</p>
           <p class="small">Reports may be incomplete. They are not deliberately false.</p>
+          ${others.length ? `<h2>Other open operations</h2>
+            <p class="small">The same floor, a different incident. Everything you learned about
+               the building still applies; nothing you learned about the anomaly does.</p>
+            ${others.map((id) => `<button class="wide" data-incident="${id}">Deploy to ${escapeHtml(id.replace(/^cold-storage-/, ''))} instead</button>`).join('')}` : ''}
         </section>
         <section class="kit">
           <h2>Cargo manifest</h2>
@@ -257,8 +271,13 @@ export class Panels {
       if (n <= 0) this.manifest.delete(id); else this.manifest.set(id, n);
       this._renderLoadout();
     });
+    this.node.querySelectorAll('[data-incident]').forEach((b) => { b.onclick = () => {
+      const u = new URL(location.href);
+      u.searchParams.set('incident', b.dataset.incident);
+      location.href = u.toString();
+    }; });
     this.node.querySelector('[data-reset]').onclick = () => {
-      this.manifest = new Map(RECOMMENDED.map((r) => [r.itemId, r.qty]));
+      this.manifest = new Map(recommendedManifest(this.game.content).map((r) => [r.itemId, r.qty]));
       this._renderLoadout();
     };
     this.node.querySelector('[data-deploy]').onclick = () => {

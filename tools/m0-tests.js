@@ -29,6 +29,7 @@ import { NetSession, loopbackPair, ROLE } from '../src/net/net.js';
 import { MSG, ACT, PROTOCOL_VERSION, MAX_SQUAD, encodeSnapshot, applySnapshot } from '../src/net/protocol.js';
 import { mixFor, Audio, BUSES, CAPTIONS, missingCaptions, formatCaption } from '../src/audio/audio.js';
 import { Settings, PALETTES, SHAPES } from '../src/ui/settings.js';
+import { Progression, loadSite, DEPLOYMENT_COST, DEPARTMENT_IDS } from '../src/sim/progression.js';
 import { Input, DEFAULT_BINDINGS, isReservedCode } from '../src/core/input.js';
 import { segmentHitsRect, moveWithWalls, dist } from '../src/sim/geometry.js';
 
@@ -789,6 +790,7 @@ async function sectionK() {
     'src/sim/mission.js', 'src/sim/content.js', 'src/sim/senses.js', 'src/sim/perception.js',
     'src/net/protocol.js', 'src/net/net.js',
     'src/render/scene.js', 'src/render/renderer.js', 'src/render/thermalFloor.js',
+    'src/sim/progression.js',
     'src/ui/hud.js', 'src/ui/panels.js', 'src/ui/settings.js', 'src/audio/audio.js',
   ];
   /* ⚠ Strip comments FIRST. Every rule below is about what the code DOES, and a raw grep
@@ -857,7 +859,11 @@ async function sectionL() {
   ok('L1 main.js published its debug handle', !!cd);
   if (!cd) { emit(); return; }
   ok('L2 the renderer built a scene from the site', !!cd.renderer && cd.renderer.scene.children.length > 10);
-  ok('L3 the squad room is what the player sees first', cd.panels.open === 'squad');
+  /* The boot destination is the SITE now, not the operation — GDD §26.2 wants a complete
+   * base-to-mission-to-base loop, so the base is where a session starts and ends. */
+  ok('L3 the Foundation site is what the player sees first', cd.base && cd.base.isOpen,
+    `base ${cd.base && cd.base.isOpen} · panels ${cd.panels.open}`);
+  ok('L3b with a progression profile behind it', !!cd.progression && !!cd.site);
   ok('L4 and the clock is paused behind it', cd.game.clock.paused || cd.game.clock.simTimeMs === 0);
   emit();
 
@@ -1417,6 +1423,111 @@ function sectionP() {
   emit();
 }
 
+/* ── Q. progression and the site (GDD §12, §13) ──────────────────────────── */
+async function sectionQ(content) {
+  lines.push('--- Q. the site is what carries between missions ---');
+
+  const site = await loadSite();
+  ok('Q1 the site loads and is refused if malformed', !!site && Array.isArray(site.rooms));
+  ok('Q2 with the five rooms the slice specifies (GDD 26.2)', site.rooms.length >= 5, String(site.rooms.length));
+
+  /* Play a real mission and grade it, so the progression is fed the actual object rather
+   * than a hand-written one that could drift from `mission.grade()`. */
+  const g = new Game(content, { seed: 'prog' });
+  g.commitLoadout(RECOMMENDED_MANIFEST);
+  g.skipMs(2000);
+  const result = g.endMission('recalled for the test', g.clock.simTimeMs);
+
+  const pr = new Progression({ site, autosave: false });
+  const before = pr.profile.requisition;
+  const out = pr.applyDebrief(result, g.mission, {
+    anomalyId: content.anomaly.id, mapId: content.map.id,
+    custody: g.custody, minutes: 2, observations: g.ledger.entries.length, squad: g.players,
+  });
+  ok('Q3 a graded debrief turns into earnings', !!out && !!out.earnings);
+  ok('Q4 every dimension the debrief reports is one the ledger knows how to pay',
+    result.dims.every((d) => out.earnings.lines.some((l) => l.name === d.name))
+    || out.earnings.lines.length >= result.dims.length - 1,
+    `${out.earnings.lines.length} lines for ${result.dims.length} dimensions`);
+
+  /* ⚠ GDD §12.6, and the one thing in the whole economy worth a test: a failed operation
+   * still yields something for valid observations, and NO RUN OF FAILURES may make
+   * recovery impossible. An economy that can be soft-locked is worse than none. */
+  const grim = new Progression({ site, autosave: false });
+  const failures = [];
+  for (let i = 0; i < 6; i++) {
+    const bad = new Game(content, { seed: `fail${i}` });
+    bad.commitLoadout(RECOMMENDED_MANIFEST);
+    bad.skipMs(1500);
+    const r = bad.endMission('total loss', bad.clock.simTimeMs);
+    grim.applyDebrief(r, bad.mission, { anomalyId: content.anomaly.id, custody: 'none', minutes: 25, observations: 0, squad: bad.players });
+    failures.push(grim.profile.requisition);
+  }
+  note(`requisition across six consecutive disasters: ${failures.join(' → ')}`);
+
+  /* ⚠ READ §12.6 BEFORE ASSERTING AGAINST IT. It does NOT promise that failure drains the
+   * account — it names the stakes explicitly, and they are "lost consumables, damaged or
+   * unrecovered issued gear, lower standing". A site whose squad deploys, achieves nothing
+   * and brings every item home should come out roughly level: it is Foundation-funded and
+   * the grant covers the run. What must never happen is failure being PROFITABLE, which is
+   * how this shipped — the floor sat on the operation instead of the balance and six total
+   * losses took the site from 340 to 1630, gaining 215 apiece.
+   *
+   * So: level on a clean failure, materially behind a success, and genuinely costly once
+   * gear is left on the floor. */
+  const clean = failures[failures.length - 1] - failures[failures.length - 2];
+  ok('Q5 a failure that loses no gear leaves the site roughly level, not richer',
+    clean <= 10, `${clean} per clean failure`);
+
+  const lossy = new Progression({ site, autosave: false });
+  const bad = new Game(content, { seed: 'lossy' });
+  bad.commitLoadout(RECOMMENDED_MANIFEST);
+  bad.skipMs(1500);
+  const r2 = bad.endMission('total loss', bad.clock.simTimeMs);
+  const start = lossy.profile.requisition;
+  lossy.applyDebrief(r2, bad.mission, { custody: 'none', minutes: 25, observations: 0, squad: bad.players, itemsLost: 6 });
+  const withLoss = lossy.profile.requisition - start;
+  note(`the same failure having abandoned six items: ${withLoss} requisition`);
+  ok('Q6 and leaving gear on the floor is what actually costs (12.6)', withLoss < clean, String(withLoss));
+
+  ok('Q7 the site is never left unable to deploy again',
+    failures[failures.length - 1] >= DEPLOYMENT_COST, String(failures[failures.length - 1]));
+
+  /* The other stake §12.6 names. ⚠ NOT "failure loses standing" — a squad that achieves
+   * nothing but brings everybody and everything home has genuinely pleased Medical and
+   * Logistics, and §12.3 says standing follows the behaviour each department VALUES, not
+   * the mission outcome. What has to be true is that abandoning their kit costs them with
+   * the department that cares about kit. */
+  const cleanStand = grim.profile.standing;
+  const lossyStand = lossy.profile.standing;
+  const worse = DEPARTMENT_IDS.filter((d) => lossyStand[d] < cleanStand[d]);
+  note(`standing, clean failure vs six items abandoned: ${DEPARTMENT_IDS.map((d) => `${d} ${cleanStand[d]}→${lossyStand[d]}`).join(' · ')}`);
+  ok('Q8 losing the squad’s equipment costs them with somebody (12.3)', worse.length > 0, worse.join(', '));
+
+  /* §12.1: options, context and efficiency. Never damage, never immunity. */
+  const fitted = pr.itemAsIssued(content.itemsById.get('floodlight-tripod'));
+  eq('Q9 a fresh profile issues equipment exactly as authored',
+    fitted.heatOutputCelsius, content.itemsById.get('floodlight-tripod').heatOutputCelsius);
+  const banned = ['damage', 'invulnerable', 'contactTolerance', 'health'];
+  const leaked = banned.filter((k) => Object.prototype.hasOwnProperty.call(fitted, k));
+  ok('Q10 and no upgrade can ever grant damage or immunity (12.1)', leaked.length === 0, leaked.join(', '));
+
+  ok('Q11 the same result cannot be banked twice',
+    (() => { const p2 = new Progression({ site, autosave: false }); p2.applyDebrief(result, g.mission, {}); const a = p2.profile.requisition; p2.applyDebrief(result, g.mission, {}); return p2.profile.requisition === a; })());
+
+  /* Persistence has to degrade rather than throw — a locked-down profile is common. */
+  ok('Q12 a profile serialises and comes back', (() => {
+    const j = JSON.parse(JSON.stringify(pr.profile));
+    const p3 = new Progression({ site, profile: j, autosave: false });
+    return p3.profile.requisition === pr.profile.requisition;
+  })());
+  ok('Q13 and an unknown save version falls back rather than throwing',
+    !!new Progression({ site, profile: { version: 9999, junk: true }, autosave: false }));
+
+  note(`after one graded mission: requisition ${before} → ${pr.profile.requisition}, research ${pr.profile.research}`);
+  emit();
+}
+
 /* ── run ─────────────────────────────────────────────────────────────────── */
 (async () => {
   try {
@@ -1435,6 +1546,7 @@ function sectionP() {
     await sectionN(content);
     await sectionO();
     sectionP();
+    await sectionQ(content);
     await sectionK();
     await sectionL();
     emit();
