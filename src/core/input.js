@@ -34,6 +34,7 @@ export const DEFAULT_BINDINGS = Object.freeze({
   tablet:    ['Tab'],
   abort:     ['KeyR'],
   settings:  ['KeyO'],
+  comms:     ['KeyZ'],
   slot1: ['Digit1'], slot2: ['Digit2'], slot3: ['Digit3'], slot4: ['Digit4'], slot5: ['Digit5'],
 });
 
@@ -80,6 +81,7 @@ export const HOLDABLE = Object.freeze({
   sprint: 'sustained',
   crouch: 'sustained',
   imager: 'edge',
+  comms: 'sustained',
 });
 
 /** GDD §19.1 defaults: nothing changes for a player who never opens the menu. */
@@ -87,6 +89,7 @@ export const DEFAULT_HOLD_MODES = Object.freeze({
   sprint: HOLD_MODE.HOLD,
   crouch: HOLD_MODE.HOLD,
   imager: HOLD_MODE.TOGGLE,
+  comms: HOLD_MODE.HOLD,
 });
 
 /* ⚠ Object.freeze is SHALLOW. DEFAULT_BINDINGS' arrays are not frozen, so a rebind that

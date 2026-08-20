@@ -246,6 +246,10 @@ export class NetSession {
       case ACT.PROCEDURE: err = g.commitProcedure(m.card || {}); break;
       case ACT.ABORT: g.abortProcedure(); break;
       case ACT.CLAIM: g.ledger.setClaim(String(m.id || ''), m.v || null); break;
+      /* `id` is the seat this link is in, never a field the client sent — so a client
+       * cannot put a callout on the board under somebody else's name. The refusal that
+       * comes back goes to this one operative, not to the squad feed. */
+      case ACT.PING: err = g.ping(id, m.p, (m.x || 0) / 100, (m.z || 0) / 100); break;
       default: err = 'unknown action'; break;
     }
     if (err && err !== 'OPEN_CACHE') {
@@ -267,6 +271,9 @@ export class NetSession {
     if (!p) return;
     p.connected = false;
     this.game.setCommand(found.id, null);      // safe autopilot: they stand still
+    /* Their markers go with the radio. A call is a claim about right now by somebody who
+     * is looking at it, and neither half is true any more. */
+    this.game.comms.retire(found.id);
     /* Custody is the one thing that cannot wait for them to come back. */
     if (p.hands === 'reinforced-transit-case') {
       this.game._putDownCase(p);

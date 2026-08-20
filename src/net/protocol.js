@@ -43,6 +43,10 @@ export const MAX_SQUAD = 5;
 export const ACT = Object.freeze({
   INTERACT: 'i', USE: 'u', IMAGER: 'm', SLOT: 's',
   TAKE: 't', RETURN: 'r', PROCEDURE: 'p', ABORT: 'a', CLAIM: 'c',
+  /* A squad call — GDD �11.3. The client sends the phrase ID and where it aimed; it does
+   * NOT send who it is, because the host stamps the seat the link is in. Spoofing another
+   * operative's callout is therefore impossible by construction rather than by validation. */
+  PING: 'g',
 });
 
 /* ── numbers ──────────────────────────────────────────────────────────────
@@ -138,6 +142,12 @@ export function encodeSnapshot(game) {
     cl: Array.from(game.ledger.claimState.entries()).filter(([, v]) => v),
 
     no: game.notices.slice(-6).map((n) => [Math.round(n.atMs), n.text]),
+    /* The ping board is HOST STATE and is replaced wholesale, which is right for it and
+     * would be wrong for `notices`: a notice feed is a per-machine accumulation and a
+     * board is a snapshot of what is currently on the floor. Neither the lifetime, the
+     * kind, the text nor the owner's name travels — every one of those is derived from a
+     * phrase id both ends already have. */
+    pg: game.comms.encode(),
     rs: game.result || 0,
   };
 }
@@ -237,6 +247,7 @@ export function applySnapshot(game, snap, { localId = null } = {}) {
   for (const [id, v] of snap.cl) game.ledger.claimState.set(id, v);
 
   game.notices = snap.no.map(([atMs, text]) => ({ atMs, text }));
+  game.comms.decode(snap.pg || []);
   game.result = snap.rs || null;
   return true;
 }

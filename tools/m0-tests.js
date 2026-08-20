@@ -30,6 +30,14 @@ import { MSG, ACT, PROTOCOL_VERSION, MAX_SQUAD, encodeSnapshot, applySnapshot } 
 import { mixFor, Audio, BUSES, CAPTIONS, missingCaptions, formatCaption } from '../src/audio/audio.js';
 import { Settings, PALETTES, SHAPES } from '../src/ui/settings.js';
 import { Hud } from '../src/ui/hud.js';
+import {
+  PHRASES, PING_KINDS, ANCHORS, COMMS_CAPTIONS, PingBoard, requestPing,
+  commsProblems, missingCommsCaptions, isPhrase, bearingWord, canMark,
+  ageFraction, expiresAt, MARK_RANGE_M,
+} from '../src/sim/comms.js';
+import {
+  CommsWheel, WHEEL_ORDER, sectorAt, sectorPos, projectPoint, aimPoint, KIND_VARS,
+} from '../src/ui/commswheel.js';
 import { Progression, loadSite, DEPLOYMENT_COST, DEPARTMENT_IDS } from '../src/sim/progression.js';
 import { Input, DEFAULT_BINDINGS, isReservedCode } from '../src/core/input.js';
 import { segmentHitsRect, moveWithWalls, dist, circleHitsRect } from '../src/sim/geometry.js';
@@ -789,6 +797,7 @@ async function sectionK() {
     'src/sim/geometry.js', 'src/sim/site.js', 'src/sim/heat.js', 'src/sim/anomaly.js',
     'src/sim/deployables.js', 'src/sim/evidence.js', 'src/sim/player.js',
     'src/sim/mission.js', 'src/sim/content.js', 'src/sim/senses.js', 'src/sim/perception.js',
+    'src/sim/comms.js', 'src/ui/commswheel.js',
     'src/net/protocol.js', 'src/net/net.js',
     'src/render/scene.js', 'src/render/renderer.js', 'src/render/thermalFloor.js',
     'src/sim/progression.js',
@@ -2640,6 +2649,513 @@ async function sectionV() {
   R.applySettings(cd.settings.effective);
   emit();
 }
+
+/* ══ W–AA. the squad's non-voice channel (GDD §11.3) ═══════════════════════════
+ *
+ * §11.3 lists voice chat first and §19.2 says no required rule may depend on a microphone
+ * or on stereo hearing. Those two are only compatible if the PRIMARY channel is the one
+ * that needs neither — so what exists is a ping-and-phrase wheel, and a squad with no
+ * microphones between them can run a whole operation on it. Voice is not built and has no
+ * stub, because a stub would say the non-voice channel is the fallback.
+ *
+ * The vocabulary is closed the way senses.js is closed, and the engine dispatches on the
+ * FIELDS of a phrase — anchor, lifetime, uniqueness — never on its id. Section W greps
+ * both modules for an id comparison and finds none.
+ */
+function sectionW() {
+  lines.push('--- W. the vocabulary (GDD 11.3, 19.2) ---');
+
+  eq('W1 the shipped tables validate clean', commsProblems().join(' | '), '');
+  eq('W2 every phrase has a caption line', missingCommsCaptions().join(', '), '');
+
+  /* GDD 11.3 names the six kinds outright. This is not a taste assertion. */
+  const want = ['danger', 'evidence', 'objective', 'move', 'watch', 'help'].sort().join(',');
+  eq('W3 the kinds are 11.3\'s six, exactly', Object.keys(PING_KINDS).sort().join(','), want);
+
+  const glyphs = Object.values(PING_KINDS).map((k) => k.glyph);
+  eq('W4 six kinds, six distinct silhouettes', new Set(glyphs).size, 6);
+  ok('W5 and every one of them is a real character', glyphs.every((g) => typeof g === 'string' && g.length > 0));
+
+  const used = new Set(Object.values(PHRASES).map((p) => p.kind));
+  eq('W6 every kind 11.3 asks for has at least one phrase', used.size, 6);
+  note(`${Object.keys(PHRASES).length} phrases over ${used.size} kinds: ${WHEEL_ORDER.join(', ')}`);
+
+  ok('W7 nothing on the wheel is an emote — every phrase has a caption with words',
+    Object.keys(PHRASES).every((id) => (COMMS_CAPTIONS[id].text || '').trim().length > 2));
+
+  /* The validator REFUSES rather than warns — content.js's contract, applied to comms. */
+  const noCaption = { ...PHRASES, 'door-jammed': { kind: 'danger', anchor: 'point', unique: false, lifeMs: 1000 } };
+  ok('W8 a phrase with no caption line is refused',
+    commsProblems(noCaption).some((s) => /door-jammed.*caption/.test(s)), commsProblems(noCaption).join(' | '));
+
+  const badKind = { bogus: { kind: 'sarcasm', anchor: 'point', unique: false, lifeMs: 1000 } };
+  ok('W9 a kind outside the closed set is refused',
+    commsProblems(badKind, { bogus: { text: 'x', kind: 'speech', priority: 1, directional: true } })
+      .some((s) => /kind "sarcasm"/.test(s)));
+
+  const badAnchor = { bogus: { kind: 'danger', anchor: 'orbit', unique: true, lifeMs: 1000 } };
+  ok('W10 an anchor outside the closed set is refused',
+    commsProblems(badAnchor, { bogus: { text: 'x', kind: 'speech', priority: 1, directional: false } })
+      .some((s) => /anchor "orbit"/.test(s)));
+
+  const twoStates = { bogus: { kind: 'move', anchor: 'none', unique: false, lifeMs: 1000 } };
+  ok('W11 a placeless phrase that is not unique is refused — nobody holds two states',
+    commsProblems(twoStates, { bogus: { text: 'x', kind: 'speech', priority: 1, directional: false } })
+      .some((s) => /must be unique/.test(s)));
+
+  const lyingBearing = { bogus: { kind: 'move', anchor: 'none', unique: true, lifeMs: 1000 } };
+  ok('W12 a bearing on a phrase with nowhere to point is refused',
+    commsProblems(lyingBearing, { bogus: { text: 'x', kind: 'speech', priority: 1, directional: true } })
+      .some((s) => /directional/.test(s)));
+
+  const orphan = commsProblems({ contact: PHRASES.contact }, { contact: COMMS_CAPTIONS.contact, ghost: COMMS_CAPTIONS.help });
+  ok('W13 a caption with no phrase behind it is refused', orphan.some((s) => /ghost/.test(s)), orphan.join(' | '));
+
+  ok('W14 isPhrase is the closed test', isPhrase('contact') && !isPhrase('contact ') && !isPhrase('toString'));
+
+  /* The caption rows are audio.js's shape, so its formatter renders them unchanged. */
+  ok('W15 every caption is a speech row with a 1-3 priority',
+    Object.values(COMMS_CAPTIONS).every((c) => c.kind === 'speech' && [1, 2, 3].includes(c.priority)));
+  ok('W16 the three that lose an operation are priority 3',
+    ['contact', 'hold', 'help'].every((id) => COMMS_CAPTIONS[id].priority === 3));
+  emit();
+}
+
+/* ── X. the board ─────────────────────────────────────────────────────────── */
+function sectionX() {
+  lines.push('--- X. the ping board: lifetimes, caps, ownership ---');
+
+  const b = new PingBoard();
+  const bad = b.add('p1', 'nuke-the-site', { atMs: 0 });
+  eq('X1 an id outside the vocabulary is refused, not passed through', bad.ok, false);
+  ok('X2 and the refusal is a sentence a player can read', /wheel/.test(bad.why), bad.why);
+  eq('X3 nothing landed on the board', b.list.length, 0);
+
+  const r = b.add('p1', 'contact', { x: 4, z: 5, atMs: 1000 });
+  ok('X4 a good call lands', r.ok && r.ping.owner === 'p1' && r.ping.phrase === 'contact');
+  near('X5 where it was called', r.ping.x, 4, 0.001);
+
+  eq('X6 it is live now', b.live(1000).length, 1);
+  eq('X7 contact expires at six seconds — a marker that outlives the mass is a lie',
+    expiresAt(r.ping), 1000 + PHRASES.contact.lifeMs);
+  eq('X8 still live at 5.9s', b.live(6900).length, 1);
+  eq('X9 gone at 7.1s', b.live(8100).length, 0);
+  ok('X10 live() is what decides; the list itself has not been swept', b.list.length === 1);
+  eq('X11 prune is the housekeeping', b.prune(8100), 1);
+  near('X12 age runs 0 to 1 over the lifetime', ageFraction(r.ping, 1000 + PHRASES.contact.lifeMs / 2), 0.5, 0.001);
+
+  /* The cap: three per operative, evicting the oldest. */
+  const c = new PingBoard({ maxPerPlayer: 3, minGapMs: 0 });
+  for (let i = 0; i < 5; i++) c.add('p1', 'set-up-here', { x: i, z: 0, atMs: i * 10 });
+  eq('X13 the per-player cap holds at three', c.forOwner('p1').length, 3);
+  near('X14 and it evicted the OLDEST, keeping what the operative just decided mattered',
+    c.forOwner('p1')[0].x, 2, 0.001);
+  near('X15 the newest is still there', c.forOwner('p1')[2].x, 4, 0.001);
+
+  for (let i = 0; i < 4; i++) c.add('p2', 'set-up-here', { x: 10 + i, z: 0, atMs: 100 + i * 10 });
+  eq('X16 one operative\'s cap does not spend another\'s', c.forOwner('p1').length, 3);
+  eq('X17 and the second gets their own three', c.forOwner('p2').length, 3);
+  eq('X18 six markers on a two-operative floor', c.list.length, 6);
+
+  /* unique versus not: four fence posts, one contact. */
+  const u = new PingBoard({ minGapMs: 0 });
+  u.add('p1', 'contact', { x: 1, z: 1, atMs: 0 });
+  u.add('p1', 'contact', { x: 2, z: 2, atMs: 100 });
+  eq('X19 re-marking the mass MOVES the marker rather than leaving a trail', u.forOwner('p1').length, 1);
+  near('X20 to where it is now', u.forOwner('p1')[0].x, 2, 0.001);
+  const f = new PingBoard({ maxPerPlayer: 5, minGapMs: 0 });
+  f.add('p1', 'set-up-here', { x: 1, z: 0, atMs: 0 });
+  f.add('p1', 'set-up-here', { x: 2, z: 0, atMs: 10 });
+  f.add('p1', 'set-up-here', { x: 3, z: 0, atMs: 20 });
+  eq('X21 a fence has four posts, so placements accumulate', f.forOwner('p1').length, 3);
+
+  /* The rate limit (GDD 20.9). */
+  const s = new PingBoard({ minGapMs: 700 });
+  ok('X22 the first call is accepted', s.add('p1', 'contact', { atMs: 0 }).ok);
+  const spam = s.add('p1', 'hold', { atMs: 300 });
+  ok('X23 a second inside the limit is refused', !spam.ok && /moment/.test(spam.why), spam.why);
+  ok('X24 and once the gap has passed it is accepted again', s.add('p1', 'hold', { atMs: 800 }).ok);
+  ok('X25 the limit is per operative, not global', s.add('p2', 'contact', { atMs: 810 }).ok);
+
+  /* Retire: the drop and the death. */
+  const d = new PingBoard({ minGapMs: 0 });
+  d.add('p1', 'set-up-here', { x: 1, z: 1, atMs: 0 });
+  d.add('p1', 'watch-this', { x: 2, z: 2, atMs: 1 });
+  d.add('p2', 'set-up-here', { x: 3, z: 3, atMs: 2 });
+  eq('X26 three markers up', d.live(10).length, 3);
+  eq('X27 a lost radio takes that operative\'s markers with it', d.retire('p1'), 2);
+  eq('X28 and touches nobody else\'s', d.live(10).length, 1);
+  eq('X29 the survivor is the other operative\'s', d.live(10)[0].owner, 'p2');
+  ok('X30 retiring clears their rate-limit history too, so a reconnect can speak at once',
+    d.add('p1', 'contact', { atMs: 3 }).ok);
+
+  /* Anchored to a person: it follows them, and it leaves with them. */
+  const a = new PingBoard({ minGapMs: 0 });
+  a.add('p1', 'help', { atMs: 0 });
+  const roster = new Map([['p1', { x: 5, z: 5 }]]);
+  const at = (id) => roster.get(id) || null;
+  near('X31 a help call sits where the caller is', a.live(10, at)[0].x, 5, 0.001);
+  roster.set('p1', { x: 12, z: 9 });
+  near('X32 and follows them while they are dragged clear', a.live(10, at)[0].x, 12, 0.001);
+  near('X33 on both axes', a.live(10, at)[0].z, 9, 0.001);
+  roster.delete('p1');
+  eq('X34 an owner who has left the roster takes their marker with them', a.live(10, at).length, 0);
+  eq('X35 a placed call is not moved by the roster', (() => {
+    const g = new PingBoard({ minGapMs: 0 });
+    g.add('p1', 'set-up-here', { x: 7, z: 7, atMs: 0 });
+    return g.live(10, () => ({ x: 0, z: 0 }))[0].x;
+  })(), 7);
+
+  /* The wire. */
+  const w = new PingBoard({ minGapMs: 0 });
+  w.add('p1', 'contact', { x: 3.21, z: -4.56, atMs: 1234 });
+  w.add('p3', 'watch-this', { x: 11, z: 2, atMs: 1250 });
+  const rows = w.encode();
+  eq('X36 the board encodes one row per call', rows.length, 2);
+  ok('X37 the phrase travels as its id, not as an index into a table somebody will reorder',
+    rows[0][2] === 'contact');
+  const mirror = new PingBoard();
+  eq('X38 a client decodes the whole board', mirror.decode(rows), 2);
+  near('X39 to the centimetre, like every other position on the wire', mirror.list[0].x, 3.21, 0.005);
+  eq('X40 with the owner intact', mirror.list[1].owner, 'p3');
+  ok('X41 and neither the lifetime nor the words travelled — both are derived from the id',
+    rows[0].length === 6 && !JSON.stringify(rows).includes('it is here'));
+
+  const first = mirror.list[0];
+  w.list[0].x = 9;
+  mirror.decode(w.encode());
+  ok('X42 a second snapshot REUSES the object where the id matches, so a marker does not restart',
+    mirror.list[0] === first);
+  near('X43 while still taking the new position', mirror.list[0].x, 9, 0.005);
+  mirror.decode([[99, 'p1', 'phrase-from-a-newer-build', 0, 0, 0]]);
+  eq('X44 a phrase this build does not have is dropped rather than drawn blank', mirror.list.length, 0);
+  emit();
+}
+
+/* ── Y. the world rules ───────────────────────────────────────────────────── */
+function sectionY() {
+  lines.push('--- Y. what an operative may mark (GDD 20.9) ---');
+
+  const caller = { id: 'p1', name: 'Vasquez', x: 0, z: 0, yaw: 0, alive: true, downed: false };
+  /* Facing yaw 0 is -Z in this game's convention, so "ahead" is negative Z. */
+  const ahead = { x: 0, z: -6 };
+  const ctx = { atMs: 0, blockers: [] };
+
+  let b = new PingBoard({ minGapMs: 0 });
+  let r = requestPing(b, caller, 'set-up-here', ahead, ctx);
+  ok('Y1 a spot in front of you, in the open, is markable', r.ok, r.why);
+  near('Y2 and the marker lands where you aimed', r.ping.z, -6, 0.001);
+
+  r = requestPing(b, caller, 'set-up-here', { x: 0, z: -(MARK_RANGE_M + 5) }, ctx);
+  ok('Y3 past the range limit is refused', !r.ok && /too far/.test(r.why), r.why);
+
+  const wall = [[-3, -5.2, 3, -4.8]];
+  r = requestPing(b, caller, 'set-up-here', ahead, { atMs: 0, blockers: wall });
+  ok('Y4 through a wall is refused — 20.9\'s line-of-sight test', !r.ok && /cannot see/.test(r.why), r.why);
+  ok('Y5 canMark is the single implementation both the host and the wheel ask',
+    canMark(caller, ahead.x, ahead.z, []) && !canMark(caller, ahead.x, ahead.z, wall));
+
+  r = requestPing(b, caller, 'set-up-here', { x: 0, z: 6 }, ctx);
+  ok('Y6 a point behind the caller is refused', !r.ok, r.ok ? 'accepted' : r.why);
+
+  r = requestPing(b, caller, 'not-a-phrase', ahead, ctx);
+  ok('Y7 an unknown phrase never reaches the board', !r.ok && /wheel/.test(r.why), r.why);
+
+  /* GDD 9.5: down is not dead, and there is exactly one thing you can still say. */
+  const floored = { ...caller, downed: true };
+  b = new PingBoard({ minGapMs: 0 });
+  ok('Y8 a downed operative can still call for help', requestPing(b, floored, 'help', {}, ctx).ok);
+  const nope = requestPing(b, floored, 'set-up-here', ahead, ctx);
+  ok('Y9 and can call nothing else', !nope.ok && /floor/.test(nope.why), nope.why);
+
+  const dead = { ...caller, alive: false };
+  ok('Y10 a lost operative calls nothing at all', !requestPing(b, dead, 'help', {}, ctx).ok);
+
+  /* An anchor with its own place ignores the aim entirely — you cannot mark a spot you
+   * cannot see by claiming it is where you are standing. */
+  b = new PingBoard({ minGapMs: 0 });
+  r = requestPing(b, caller, 'help', { x: 999, z: 999 }, { atMs: 0, blockers: wall });
+  ok('Y11 a caller-anchored call ignores the aim point it was handed', r.ok, r.why);
+  near('Y12 and sits on the caller instead', r.ping.x, 0, 0.001);
+  eq('Y13 while a placeless call has no place at all', requestPing(b, caller, 'ready', { x: 5, z: 5 }, { atMs: 1000 }).ping.x, 0);
+
+  /* Bearings, in the four quadrants, on the game's own forward convention. */
+  const me = { x: 0, z: 0, yaw: 0 };
+  eq('Y14 straight in front is "ahead"', bearingWord(me, 0, -10), 'ahead');
+  eq('Y15 straight behind is "behind"', bearingWord(me, 0, 10), 'behind');
+  eq('Y16 +X is to your right at yaw 0', bearingWord(me, 10, 0), 'right');
+  eq('Y17 and -X is to your left', bearingWord(me, -10, 0), 'left');
+  eq('Y18 turning a quarter turn turns the words with you', bearingWord({ x: 0, z: 0, yaw: Math.PI / 2 }, -10, 0), 'ahead');
+  eq('Y19 standing on it has no bearing worth printing', bearingWord(me, 0.1, 0.1), null);
+  emit();
+}
+
+/* ── Z. over the wire, with no wire ───────────────────────────────────────── */
+/* THIS SECTION CONTAINS THE PROPOSED WIRING, VERBATIM. The five fragments marked WIRING
+ * below are exactly what net.js, protocol.js and game.js need; nothing in src/ was edited
+ * to run them. */
+
+/* ══ Z. host authority over the comms channel, through the shipped wiring ══════
+ *
+ * The version of this that arrived with the modules mocked the wiring — `const ACT_PING =
+ * 'g'`, a hand-written `_hostAct` wrapper, `snap.pg = board.encode()` written by the test.
+ * That proves the DESIGN is sound and proves nothing about the build, and it is exactly the
+ * shape of test that keeps passing for a week after somebody deletes the line in
+ * `encodeSnapshot`. So this one mocks nothing: real `ACT.PING`, real `_hostAct`, real
+ * `encodeSnapshot`, real `applySnapshot`, over the same loopback rig section M uses.
+ */
+async function sectionZ(content) {
+  lines.push('--- Z. a squad call, over the wire, decided by the host ---');
+
+  const hostG = new Game(content, { seed: 'comms-host' });
+  hostG.commitLoadout(RECOMMENDED_MANIFEST);
+  const host = new NetSession(hostG);
+  const clientG = new Game(content, { seed: 'comms-client' });
+  const client = new NetSession(clientG);
+  const [hl, cl] = loopbackPair();
+  host.accept(hl);
+  client.join(cl, { name: 'Vasquez' });
+
+  const me = clientG.playerById(client.localPlayerId);
+  ok('Z1 a client has a seat', !!me, `local ${client.localPlayerId}`);
+  if (!me) { emit(); return; }
+  const mine = client.localPlayerId;
+  const hostMe = hostG.playerById(mine);
+
+  /* Somewhere the operative can actually see: three metres straight in front of them. */
+  hostMe.x = hostG.site.spawn.x; hostMe.z = hostG.site.spawn.z; hostMe.yaw = 0;
+  const aim = { x: hostMe.x - Math.sin(hostMe.yaw) * 3, z: hostMe.z - Math.cos(hostMe.yaw) * 3 };
+
+  client.act(ACT.PING, { p: 'contact', x: Math.round(aim.x * 100), z: Math.round(aim.z * 100) });
+  host.pump(1000, null);
+  const live = hostG.comms.live(hostG.clock.simTimeMs);
+  eq('Z2 the call reaches the host board', live.length, 1);
+  eq('Z3 stamped with the seat the link is in', live[0] && live[0].owner, mine);
+  eq('Z4 carrying the phrase the client chose', live[0] && live[0].phrase, 'contact');
+  ok('Z5 at the place they aimed, to the centimetre the wire carries',
+    live[0] && Math.abs(live[0].x - aim.x) < 0.02 && Math.abs(live[0].z - aim.z) < 0.02,
+    live[0] ? `${live[0].x.toFixed(3)},${live[0].z.toFixed(3)} vs ${aim.x.toFixed(3)},${aim.z.toFixed(3)}` : 'none');
+
+  /* ⚠ THE OWNER FIELD DOES NOT EXIST ON THE WIRE, which is a stronger guarantee than
+   * validating one would be. A client sending `owner` is not sending anything at all.
+   *
+   * Past the rate limit first: §20.9 wants interaction events rate-limited and the board
+   * allows one call per operative per 700ms, so firing this immediately after the last one
+   * tests the limiter and nothing else. It refused, correctly, and read as "the forgery
+   * was rejected" — a false pass in the making. */
+  hostG.skipMs(900);
+  client.act(ACT.PING, { p: 'help', owner: 'p1', id: 'p1', x: Math.round(hostMe.x * 100), z: Math.round(hostMe.z * 100) });
+  host.pump(1000, null);
+  const forged = hostG.comms.live(hostG.clock.simTimeMs).filter((p) => p.phrase === 'help');
+  ok('Z6 a forged owner field is not read, because nothing reads one',
+    forged.length > 0 && forged.every((p) => p.owner === mine),
+    forged.map((p) => p.owner).join() || 'no help call landed');
+
+  /* The board rides the snapshot and lands on the client. */
+  const snap = encodeSnapshot(hostG, hostG.clock.simTimeMs);
+  ok('Z7 the snapshot carries the board', Array.isArray(snap.pg) && snap.pg.length > 0);
+  applySnapshot(clientG, snap);
+  const seen = clientG.comms.live(hostG.clock.simTimeMs);
+  eq('Z8 which the client can read back', seen.length, hostG.comms.live(hostG.clock.simTimeMs).length);
+  ok('Z9 with the phrase, not an index into a table that will be reordered',
+    seen.length > 0 && seen.every((p) => typeof p.phrase === 'string' && isPhrase(p.phrase)));
+  ok('Z10 and nothing derivable — no text, no lifetime, no name on the wire',
+    snap.pg.every((row) => Array.isArray(row) && row.every((v) => typeof v !== 'object')),
+    JSON.stringify(snap.pg[0]));
+
+  /* A refusal is addressed to one operative and must survive the snapshots that follow it.
+   * ⚠ This is the bug two real browsers found and a loopback could not: `applySnapshot`
+   * replaced the whole notice list and destroyed a locally-generated refusal ~80ms later. */
+  const before = clientG.localNotices.length;
+  const why = hostG.ping(mine, 'contact', hostMe.x + 90, hostMe.z);
+  ok('Z11 marking something ninety metres away is refused, in a sentence',
+    !!why && String(why).length > 8, String(why));
+  clientG.noticeLocal(why);
+  for (let i = 0; i < 11; i++) applySnapshot(clientG, encodeSnapshot(hostG, hostG.clock.simTimeMs));
+  ok('Z12 and the refusal survives eleven snapshots', clientG.localNotices.length > before);
+  ok('Z13 while the squad feed never carried it', !clientG.notices.some((n) => n.text === why));
+
+  /* A dropped operative's markers go with their radio: a call is a claim about right now
+   * by somebody who is looking at it, and neither half is true any more. */
+  ok('Z14 the client has calls on the board to lose',
+    hostG.comms.live(hostG.clock.simTimeMs).some((p) => p.owner === mine));
+  hl.close();
+  host.pump(1000, null);
+  eq('Z15 and a dropped radio takes them with it',
+    hostG.comms.live(hostG.clock.simTimeMs).filter((p) => p.owner === mine).length, 0);
+  ok('Z16 but the seat is still theirs — §11.5 reserves the seat, not the claims',
+    !!hostG.playerById(mine));
+
+  /* Expiry is the host's, and `prune` runs in step() rather than in encode(). */
+  const p1 = hostG.player;
+  p1.yaw = 0;
+  const near = { x: p1.x - Math.sin(p1.yaw) * 2, z: p1.z - Math.cos(p1.yaw) * 2 };
+  eq('Z17 a host operative can call too', hostG.ping('p1', 'contact', near.x, near.z), null);
+  hostG.skipMs(PHRASES.contact.lifeMs + 500);
+  eq('Z18 and the call expires off the board on its own',
+    hostG.comms.live(hostG.clock.simTimeMs).filter((p) => p.phrase === 'contact').length, 0);
+  ok('Z19 pruned from the list itself, so the snapshot does not grow all operation',
+    !hostG.comms.list.some((p) => p.phrase === 'contact'),
+    `${hostG.comms.list.length} rows still held`);
+  emit();
+}
+
+async function sectionAA(content) {
+  lines.push('--- AA. the wheel, and what an incoming call looks like ---');
+
+  const game = new Game(content, { seed: 'wheel' });
+  game.comms = new PingBoard({ minGapMs: 0 });
+  game.commitLoadout(RECOMMENDED_MANIFEST);
+  const mate = game.addPlayer('Vasquez');
+  const me = game.player;
+  me.yaw = 0; me.pitch = 0;
+
+  const root = document.createElement('div');
+  root.style.cssText = 'position:fixed;left:0;top:0;width:1280px;height:720px;opacity:0;pointer-events:none';
+  document.body.appendChild(root);
+
+  const sent = [];
+  const refused = [];
+  const wheel = new CommsWheel(root, game, {
+    onSend: (id, aim) => sent.push({ id, aim }),
+    onRefuse: (why) => refused.push(why),
+  });
+
+  /* Layout. */
+  const wedges = wheel.node.querySelectorAll('.wedge');
+  eq('AA1 every phrase gets a wedge', wedges.length, Object.keys(PHRASES).length);
+  ok('AA2 each wedge carries the glyph, the sentence it will send, and its key',
+    Array.from(wedges).every((w) => w.querySelector('.g').textContent.length > 0
+      && w.querySelector('.t').textContent.length > 2
+      && w.querySelector('.n').textContent.length > 0));
+  const shown = Array.from(wedges).map((w) => w.querySelector('.t').textContent);
+  ok('AA3 and the wedge says exactly what the squad will read — no second wording to drift',
+    shown.every((t, i) => t === COMMS_CAPTIONS[WHEEL_ORDER[i]].text));
+  ok('AA4 the glyph is unconditional — a marker on a dark floor has no third channel',
+    !wheel.node.innerHTML.includes('cd-shapes'));
+  ok('AA5 every kind borrows one of 18.5\'s five signal colours',
+    Object.values(KIND_VARS).every((v) => ['--red', '--cyan', '--amber', '--green', '--hot'].includes(v)));
+
+  /* The radial maths. */
+  const n = WHEEL_ORDER.length;
+  eq('AA6 inside the dead zone is cancel, so an accidental press says nothing',
+    sectorAt(0, -20, n, 150), null);
+  eq('AA7 straight up is sector zero', sectorAt(0, -140, n, 150), 0);
+  eq('AA8 and it runs clockwise', sectorAt(140, 0, n, 150), Math.round(n / 4));
+  eq('AA9 all the way round', sectorAt(0, 140, n, 150), Math.round(n / 2));
+  const p0 = sectorPos(0, n);
+  near('AA10 sector zero is drawn at twelve o\'clock', p0.left, 50, 0.001);
+  ok('AA11 above the centre, in percentages that scale with the UI', p0.top < 50);
+
+  /* Opening, choosing, sending. Open floor and a downward glance, so the local pre-check
+   * has nothing to object to — it gets its own assertions at V20. */
+  const realBlockers = game.site.blockingRects;
+  game.site.blockingRects = () => [];
+  me.pitch = -0.6;
+
+  wheel.show();
+  ok('AA12 the wheel opens', wheel.isOpen && wheel.node.style.display !== 'none');
+  wheel.hide(true);
+  eq('AA13 released without moving, it sends nothing', sent.length, 0);
+
+  wheel.show();
+  wheel.aim(0, -140);
+  eq('AA14 a flick selects', wheel.selection, 0);
+  wheel.hide(true);
+  eq('AA15 and releasing sends exactly that phrase', sent.length, 1);
+  eq('AA16 the one under the thumb', sent[0].id, WHEEL_ORDER[0]);
+
+  wheel.show();
+  wheel.selectIndex(3);
+  wheel.hide(false);
+  eq('AA17 escape throws the selection away', sent.length, 1);
+
+  wheel.show();
+  window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Digit3', bubbles: true }));
+  eq('AA18 a digit key picks the same sector for anyone who would rather not flick', wheel.selection, 2);
+  wheel.hide(true);
+  eq('AA19 and sends it', sent[1].id, WHEEL_ORDER[2]);
+
+  /* The local pre-check refuses without spending a request on the wire. */
+  game.site.blockingRects = () => [[-40, me.z - 2.2, 40, me.z - 1.8]];
+  const before = sent.length;
+  wheel.show(); wheel.selectIndex(WHEEL_ORDER.indexOf('set-up-here')); wheel.hide(true);
+  eq('AA20 marking through a wall never reaches the wire', sent.length, before);
+  ok('AA21 and the operative is told, locally, in the same frame', refused.some((s) => /cannot see/.test(s)));
+  game.site.blockingRects = realBlockers;
+
+  /* Incoming: the feed. */
+  game.comms.add(mate.id, 'contact', { x: me.x, z: me.z - 5, atMs: 1000 });
+  wheel.update(1200);
+  const cl = wheel.feed.querySelectorAll('.cline');
+  eq('AA22 an incoming call prints one caption line', cl.length, 1);
+  const line = cl[0].querySelector('span').textContent;
+  ok('AA23 attributed, quoted, and with a bearing in words', /Vasquez: "it is here"/.test(line) && /ahead/.test(line), line);
+  ok('AA24 the line carries the kind glyph as well as the words', cl[0].querySelector('b').textContent === PING_KINDS.danger.glyph);
+  ok('AA25 and its priority, so the stylesheet can weight it', cl[0].classList.contains('p3'));
+
+  mate.x = me.x + 8; mate.z = me.z;
+  game.comms.add(mate.id, 'on-me', { atMs: 1100 });
+  wheel.update(1200);
+  const texts = Array.from(wheel.feed.querySelectorAll('.cline span')).map((s) => s.textContent);
+  ok('AA26 a caller-anchored call reads its bearing off where they are now',
+    texts.some((t) => /on me/.test(t) && /right/.test(t)), texts.join(' | '));
+
+  /* Over-full drops the lowest priority, not the oldest. */
+  const many = new CommsWheel(root, game, { maxLines: 2 });
+  game.comms.clear();
+  game.comms.add(mate.id, 'evidence', { x: me.x, z: me.z - 4, atMs: 10 });     // priority 1
+  game.comms.add(mate.id, 'on-me', { atMs: 20 });                              // priority 2
+  game.comms.add(mate.id, 'contact', { x: me.x, z: me.z - 4, atMs: 30 });      // priority 3
+  many.update(40);
+  const kept = Array.from(many.feed.querySelectorAll('.cline span')).map((s) => s.textContent).join(' | ');
+  ok('AA27 an over-full feed drops the lowest priority, never the newest', /it is here/.test(kept) && !/to log/.test(kept), kept);
+
+  /* Markers, and the projection behind them. */
+  const cam = { x: 0, y: 1.6, z: 0, yaw: 0, pitch: 0, fovDeg: 74 };
+  const straight = projectPoint(cam, 1280, 720, 0, 1.6, -10);
+  near('AA28 a point dead ahead projects to the centre of the screen', straight.left, 640, 0.5);
+  near('AA29 at eye level', straight.top, 360, 0.5);
+  near('AA30 ten metres out', straight.depth, 10, 0.001);
+  ok('AA31 a point to the right lands right of centre', projectPoint(cam, 1280, 720, 4, 1.6, -10).left > 640);
+  ok('AA32 and one above lands above it', projectPoint(cam, 1280, 720, 0, 4, -10).top < 360);
+  ok('AA33 a point behind the lens reports a negative depth rather than a mirrored position',
+    projectPoint(cam, 1280, 720, 0, 1.6, 10).depth < 0);
+
+  const marked = new CommsWheel(root, game, { project: (x, y, z) => projectPoint(cam, 1280, 720, x, y, z) });
+  game.comms.clear();
+  me.x = 0; me.z = 0;
+  game.comms.add(mate.id, 'set-up-here', { x: 0, z: -8, atMs: 0 });
+  game.comms.add(mate.id, 'ready', { atMs: 10 });
+  marked.update(20);
+  const pins = marked.pins.querySelectorAll('.cd-ping');
+  eq('AA34 a placed call gets a marker and a placeless one does not', pins.length, 1);
+  ok('AA35 the marker carries glyph, words and a distance', pins[0].querySelector('.g').textContent.length > 0
+    && /set up here/.test(pins[0].querySelector('.t').textContent)
+    && /m$/.test(pins[0].querySelector('.d').textContent));
+  const node0 = pins[0];
+  marked.update(30);
+  ok('AA36 the next frame moves the same node rather than rebuilding it',
+    marked.pins.querySelectorAll('.cd-ping')[0] === node0);
+  game.comms.clear();
+  marked.update(40);
+  eq('AA37 and a call that has gone takes its marker with it', marked.pins.querySelectorAll('.cd-ping').length, 0);
+
+  /* Aim. */
+  me.x = 0; me.z = 0; me.yaw = 0; me.pitch = -0.5;
+  const a = aimPoint(me);
+  ok('AA38 looking down puts the aim point on the floor in front of you', a.z < -0.5 && a.z > -10, JSON.stringify(a));
+  me.pitch = 0.4;
+  const flat = aimPoint(me);
+  near('AA39 looking up runs it out to the range limit rather than to infinity',
+    Math.hypot(flat.x - me.x, flat.z - me.z), MARK_RANGE_M, 0.001);
+
+  wheel.destroy(); many.destroy(); marked.destroy();
+  root.remove();
+  emit();
+}
+
+/* ── K2. the architectural rules, for the two new files ───────────────────── */
 (async () => {
   try {
     sectionA();
@@ -2662,6 +3178,11 @@ async function sectionV() {
     await sectionS(content);
     await sectionT(content);
     await sectionU();
+    sectionW();
+    sectionX();
+    sectionY();
+    await sectionZ(content);
+    await sectionAA(content);
     await sectionK();
     await sectionL();
     await sectionV();

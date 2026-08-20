@@ -74,10 +74,58 @@
   .cd-bezel-label{position:absolute;left:0;right:0;bottom:-21px;display:flex;justify-content:space-between;
     font-family:var(--mono);font-size:10.5px;color:var(--dim);letter-spacing:.03em}
 
+  /* ── comms: the wheel, the feed, the markers (GDD §11.3, §18.1, §19.2) ─ */
+  .cd-wheel{position:absolute;left:50%;top:50%;z-index:8;
+    width:calc(556px * var(--cd-ui-scale));height:calc(556px * var(--cd-ui-scale));
+    margin:calc(-278px * var(--cd-ui-scale)) 0 0 calc(-278px * var(--cd-ui-scale))}
+  .cd-wheel .hubline{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    width:calc(376px * var(--cd-ui-scale));height:calc(376px * var(--cd-ui-scale));
+    border:1px solid var(--line);border-radius:50%;
+    background:radial-gradient(circle,rgba(5,7,10,.86) 34%,rgba(5,7,10,.36) 72%,transparent 78%)}
+  .cd-wheel .wedge{position:absolute;transform:translate(-50%,-50%);text-align:center;line-height:1.25;
+    width:calc(110px * var(--cd-ui-scale));padding:5px 7px;border:1px solid var(--line);border-radius:6px;
+    background:rgba(10,14,19,.9);color:var(--dim)}
+  .cd-wheel .wedge .g{display:block;font-size:17px;line-height:1;color:var(--kind)}
+  .cd-wheel .wedge .t{display:block;font-size:12px}
+  .cd-wheel .wedge .n{display:block;margin-top:2px;font-style:normal;font-family:var(--mono);
+    font-size:10px;color:var(--faint)}
+  /* Selected is colour AND weight AND a heavier border AND the hub echoing the words —
+     §18.1's redundant channels, in the one place a mis-read costs a callout. */
+  .cd-wheel .wedge.on{border-color:var(--kind);border-width:2px;background:rgba(20,28,38,.97);color:var(--ink);
+    box-shadow:0 0 0 1px var(--kind) inset,0 6px 22px rgba(0,0,0,.6)}
+  .cd-wheel .wedge.on .t{font-weight:600}
+  .cd-wheel .hub{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;
+    max-width:calc(140px * var(--cd-ui-scale));font-size:12px;color:var(--faint)}
+  .cd-wheel .hub.armed{color:var(--hot);font-weight:600}
+
+  .cd-commsfeed{position:absolute;right:18px;bottom:132px;z-index:3;width:min(420px,42vw);
+    display:flex;flex-direction:column;gap:4px;align-items:flex-end}
+  .cd-commsfeed .cline{display:flex;gap:8px;align-items:baseline;padding:3px 11px;border-radius:4px;
+    background:rgba(4,7,10,var(--cd-caption-opacity));border-left:3px solid var(--kind);
+    font-size:var(--cd-caption-size);line-height:1.35;color:var(--ink);animation:fade .25s ease}
+  .cd-commsfeed .cline b{font-size:14px;line-height:1;color:var(--kind)}
+  .cd-commsfeed .cline.p3{color:var(--hot);font-weight:600;border-left-width:5px}
+  .cd-commsfeed .cline.going{opacity:.5}
+  :root.cd-no-flash .cd-commsfeed .cline{animation:none}
+
+  .cd-pings{position:absolute;inset:0;z-index:2;overflow:hidden}
+  .cd-ping{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;
+    align-items:center;gap:1px;white-space:nowrap;text-shadow:0 1px 3px #000}
+  .cd-ping .g{font-size:20px;line-height:1;color:var(--kind)}
+  .cd-ping .t{font-size:11.5px;color:var(--ink)}
+  .cd-ping .d{font-style:normal;font-family:var(--mono);font-size:10px;color:var(--faint)}
+  /* The age bar. A marker about to expire has to say so, or the squad keeps acting on it
+     for the second after it stops being true. */
+  .cd-ping .age{display:block;width:34px;height:2px;background:var(--kind);opacity:.75;
+    transform:scaleX(var(--age,1));transform-origin:left center}
+  .cd-ping.edge{opacity:.8}
+  .cd-ping.edge .t{display:none}
   /* §18.2 navigation aid — off unless an accessibility setting turns it on. */
-  .cd-navaid{position:absolute;right:18px;bottom:120px;width:180px;height:180px;
+  /* Bottom LEFT: the comms feed owns the bottom right, and 180px of minimap sat straight
+     on top of it. */
+  .cd-navaid{position:absolute;left:18px;bottom:190px;width:180px;height:180px;
     background:rgba(8,12,16,.55);border:1px solid rgba(120,150,175,.25);border-radius:3px}
-  .cd-navaid.compass{height:56px;bottom:auto;top:14px;right:50%;transform:translateX(50%);width:240px;
+  .cd-navaid.compass{height:56px;bottom:auto;top:14px;left:50%;transform:translateX(-50%);width:240px;
     background:rgba(8,12,16,.4);border:0}
   .cd-squad{position:absolute;right:18px;top:78px;display:none;flex-direction:column;gap:4px;align-items:flex-end}
   .cd-squad .mate{display:grid;grid-template-columns:auto auto;gap:2px 10px;justify-items:end;

@@ -143,6 +143,22 @@ its own feet for responsiveness and blends toward the host's answer; past 1.2 m 
 because smoothing that far is a slow lie. A client that teleports itself is simply
 overwritten on the next snapshot.
 
+**The squad's channel is not voice.** GDD §11.3 lists voice chat first and §19.2 says no
+required rule may depend on a microphone or on stereo hearing. Those two are only
+compatible if the *primary* channel is the one that needs neither, so what exists is a
+ping-and-phrase wheel on `Z`: ten phrases the loop actually requires — *it is here*, *hold,
+leave that alone*, *something to log here*, *set up here*, *bring kit here*, *I have this
+one*, *in position*, *on me*, *keep this in view*, *I am in trouble*. No greetings, no
+emotes. A squad with no microphones between them can run a whole operation on it, and a
+squad on voice still gets a marker on the floor instead of "over there, no, the OTHER one".
+
+Every call is host-decided. The client sends the phrase and where it aimed and **does not
+send who it is** — the host stamps the seat the link is in, so putting a callout on the
+board under somebody else's name is impossible by construction rather than by validation.
+You cannot mark what you cannot see, or anything over thirty metres away. Markers expire:
+*it is here* lasts six seconds, because it walks, and a nine-second-old marker points at
+where it was. Lose your radio and your markers go with it.
+
 A second operative changes the simulation, not just the roster:
 
 - **Every one of them is a heat source**, so a squad is several lures. The draught takes
@@ -172,6 +188,8 @@ down where you stood rather than leaving the floor with you.
 | `1`–`5` | select a slot |
 | `Q` | thermal imager on/off |
 | `Tab` | field tablet: evidence log, hypothesis board, procedure planner |
+| `Z` (hold) | squad comms — the wheel picks the phrase, the mouse aims it |
+| `O` | settings, remapping, accessibility |
 | `Esc` | release the mouse |
 
 Click the page to take the mouse. Two belt slots, two general, one long — a floodlight
@@ -198,7 +216,7 @@ There is no Node.js here, so the harness is a browser.
 powershell -ExecutionPolicy Bypass -File tools/smoketest.ps1 -Tests tools/m0-tests.js
 ```
 
-**358 assertions, all headless.** Section I is the one that matters: it plays a complete
+**604 assertions, all headless.** Section I is the one that matters: it plays a complete
 solo containment through the same interfaces a keyboard reaches — walks to the vehicle,
 takes kit, throws breakers, opens doors, baits, fences, seals, waits out custody and
 carries the case to the stairs. No teleports and no direct state writes, because testing

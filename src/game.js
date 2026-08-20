@@ -30,6 +30,7 @@ import {
 } from './sim/evidence.js';
 import { Mission, PHASE } from './sim/mission.js';
 import { observedBy, operativeViewer, cameraViewer } from './sim/perception.js';
+import { PingBoard, requestPing } from './sim/comms.js';
 import { dist } from './sim/geometry.js';
 
 /** A command is what one operative is asking for this step, whoever is asking. */
@@ -171,6 +172,11 @@ export class Game {
      *  dropping it because they went down) restores exactly what they picked up. */
     this._carried = new Map();
     this.notices = [];
+    /* GDD §11.3, the squad's channel — and deliberately the NON-VOICE one first. §19.2
+     * says no required rule may depend on a microphone or on stereo hearing, so the
+     * primary way a squad talks has to be something a player with neither can use to run
+     * a whole operation. It is host state, like the notices above it. */
+    this.comms = new PingBoard();
     /** Private to this machine. A snapshot replaces `notices` and never touches these. */
     this.localNotices = [];
     this.result = null;
@@ -214,6 +220,7 @@ export class Game {
     this._returnEverything(p);
     this.players.splice(i, 1);
     this.commands.delete(id);
+    this.comms.retire(id);
     this.imagerOnIds.delete(id);
     this.imagerHold.delete(id);
     this.bus.emit(EVENTS.SQUAD_CHANGED, { id, joined: false }, this.clock.simTimeMs);
@@ -260,6 +267,20 @@ export class Game {
    * and it applies to the local squad and to the anomaly's contact spacing — the solo
    * case, where "the host" and "the player who set it" are the same person.
    */
+  /**
+   * A squad call — GDD §11.3. Returns a refusal addressed to the caller, or null.
+   *
+   * ⚠ THE REFUSAL GOES TO `noticeLocal`, NEVER `notice`. "You cannot see that from here"
+   * is addressed to one operative and nobody else needs to hear it — and a refusal on the
+   * squad feed would be destroyed by the next snapshot 80ms later, which is exactly the
+   * bug two real browsers found and the two-feed split exists to prevent.
+   */
+  ping(playerId, phraseId, x, z) {
+    const res = requestPing(this.comms, this.playerById(playerId), String(phraseId || ''),
+      { x, z }, { atMs: this.clock.simTimeMs, blockers: this.site.blockingRects() });
+    return res.ok ? null : res.why;
+  }
+
   setAssists(assists, playerId = null) {
     const t = Math.max(1, Math.min(2, Number(assists && assists.procedureTiming) || 1));
     if (playerId) {
@@ -382,6 +403,7 @@ export class Game {
 
       const lost = p.stepDowned(stepMs, CONFIG.player.bleedOutMs);
       if (lost) {
+        this.comms.retire(p.id);
         this.notice(`${p.name} stopped answering.`);
         this.bus.emit(EVENTS.OPERATIVE_LOST, { id: p.id }, simTimeMs);
       }
@@ -424,6 +446,11 @@ export class Game {
       this.itemBattery.set('thermal-imager', left);
       if (left === 0) { this.imagerOnIds.delete(id); this.notice('The imager screen goes dark. Battery flat.'); }
     }
+
+    /* Expired calls leave the board. ⚠ REQUIRED, not housekeeping: `encode()` sends the
+     * raw list, so without this the snapshot grows a row per call for the whole operation
+     * and clients keep drawing markers that stopped being true minutes ago. */
+    this.comms.prune(simTimeMs);
 
     /* 4. the anomaly, reading the field built in step 1. Every operative is a candidate
      *    meal; `chooseTarget` picks the strongest it can reach, so a squad that spreads

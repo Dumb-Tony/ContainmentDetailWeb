@@ -20,6 +20,7 @@ import { Audio, mixFor } from './audio/audio.js';
 import { Input } from './core/input.js';
 import { Settings, SettingsPanel } from './ui/settings.js';
 import { BaseScreen } from './ui/base.js';
+import { CommsWheel, screenProjector } from './ui/commswheel.js';
 import { Progression, loadSite } from './sim/progression.js';
 import { escapeHtml } from './ui/hud.js';
 import { dist } from './sim/geometry.js';
@@ -209,8 +210,36 @@ async function boot() {
     pointerLocked = document.pointerLockElement === canvas;
     document.body.classList.toggle('free', !pointerLocked);
   });
+  /**
+   * The squad's non-voice channel (GDD §11.3). Held on `Z`; the mouse picks a sector.
+   *
+   * ⚠ §19.2 forbids any required rule depending on a microphone or stereo hearing, so
+   * this is the PRIMARY channel and not the accessible alternative to one. A squad with
+   * no microphones between them can run an entire operation on it.
+   */
+  const commsWheel = new CommsWheel(document.getElementById('hud'), game, {
+    project: screenProjector(renderer),
+    settings,
+    onRefuse: (why) => game.noticeLocal(why),
+    onSend: (phraseId, aim) => {
+      if (net.role === ROLE.CLIENT) {
+        net.act(ACT.PING, { p: phraseId, x: Math.round(aim.x * 100), z: Math.round(aim.z * 100) });
+      } else {
+        /* noticeLocal, not notice: "you cannot see that from here" is addressed to the
+         * person who just pressed the key, and a refusal on the squad feed is destroyed
+         * by the next snapshot anyway. */
+        const e = game.ping(net.localPlayerId, phraseId, aim.x, aim.z);
+        if (e) game.noticeLocal(e);
+      }
+    },
+  });
+
   document.addEventListener('mousemove', (e) => {
-    if (pointerLocked && !panels.isOpen && game.viewPlayer) game.viewPlayer.look(e.movementX || 0, e.movementY || 0);
+    if (!pointerLocked || panels.isOpen) return;
+    /* The wheel takes the deltas INSTEAD of the head, never as well — aiming a callout
+     * while your view spins is how you mark the ceiling. */
+    if (commsWheel.isOpen) commsWheel.aim(e.movementX || 0, e.movementY || 0);
+    else if (game.viewPlayer) game.viewPlayer.look(e.movementX || 0, e.movementY || 0);
   });
   input.onBlur = () => { game.clock.setPaused(true); };
 
@@ -284,7 +313,12 @@ async function boot() {
       }
       if (input.wasPressed('tablet')) { document.exitPointerLock(); panels.showTablet(); }
       if (input.wasPressed('settings')) { document.exitPointerLock(); settingsPanel.show(); }
+      /* Held, not pressed: the wheel is open while the key is down and sends on release,
+       * which is why `comms` is registered as a `sustained` action and gets §19.1's
+       * hold-vs-toggle for free. */
+      commsWheel.setHeld(input.isDown('comms'));
     }
+    if (paused) commsWheel.hide(false);
 
     /* THE AUTHORITY RULE, in three lines. A host (or a solo operative, which is a host
      * with nobody connected) steps the mission. A client steps nothing at all — it
@@ -302,6 +336,7 @@ async function boot() {
 
     renderer.render();
     hud.update();
+    commsWheel.update(game.clock.simTimeMs);
     drawCaptions();
 
     if (audio.ok) {
@@ -331,6 +366,7 @@ async function boot() {
   game.localId = net.localPlayerId;
 
   window.__CD = { game, renderer, hud, panels, audio, input, content, mixFor, net, ROLE, ACT,
+    commsWheel,
     settings, settingsPanel, base, progression, site,
     get paused() { return game.clock.paused; } };
   window.dispatchEvent(new CustomEvent('cd-ready', { detail: window.__CD }));
