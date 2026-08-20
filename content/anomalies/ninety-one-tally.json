@@ -5,7 +5,7 @@
   "licensingRecordId": null,
   "_licensingNote": "Original, not an SCP. GDD §25 makes an attribution record a prerequisite for implementing SCP-derived content, and §25.7's questions about how ShareAlike applies to game code are unsettled. Nothing here is derived from anyone's work.",
 
-  "_designNote": "GDD §26.2's THIRD PROCEDURE FAMILY: distributed-object recovery and verification. The first two families are one thing in one place — build a wall out of heat, or keep it in view — and both end with a case closing around it. This one is not a thing, it is a SET, and the difference has to be procedure rather than numbers or §24's 'scope expands through anomaly uniqueness' risk has been paid for nothing.\n\nSo: nothing hunts you. There is no fence, there is no lure, and no operative is ever in danger from it. What there is instead is arithmetic under a clock, in the dark, with an instrument that only half works — and the failure state is not being caught, it is being WRONG and not finding out until the debrief.\n\nTHE TELL IS THE HEAT FIELD, WHICH IS THE POINT. Each object is a four-degree sink at 0.9m of falloff, so the thermal imager the squad brought to fence a draught is the instrument that reads them. Superposition does the rest without a line of code: one on its own is a smudge you have to stand over, three in a drawer add up and are obvious from the doorway. The field that is a WALL in the cold store is an INSTRUMENT here. That is the strongest argument this build makes for having exactly one field.\n\nTHE VERIFICATION IS THE CASE, NOT A LABEL. The case counts what answers. Put a real one in and the count moves; put a mundane one in and the case takes it silently and the count does not. The game never says 'that one was wrong', because a game that told you would be asking you to read a label instead of keeping an account — and §7.4 wants confidence rather than checklist completion. Noticing that the number did not move IS the mechanic.\n\nAND THE COUNT IS NOT GIVEN. How many there are is on the evidence trail, not on the HUD. A squad that seals at what it assumes is the total has established custody of a subset and will find out at the debrief.",
+  "_designNote": "GDD §26.2's THIRD PROCEDURE FAMILY: distributed-object recovery and verification. The first two families are one thing in one place — build a wall out of heat, or keep it in view — and both end with a case closing around it. This one is not a thing, it is a SET, and the difference has to be procedure rather than numbers or §24's 'scope expands through anomaly uniqueness' risk has been paid for nothing.\n\nSo: nothing hunts you. There is no fence, there is no lure, and no operative is ever in danger from it. What there is instead is arithmetic under a clock, in the dark, with an instrument that only half works — and the failure state is not being caught, it is being WRONG and not finding out until the debrief.\n\nTHE TELL IS THE HEAT FIELD, WHICH IS THE POINT. Each object is a four-degree sink at 0.9m of falloff, so the thermal imager the squad brought to fence a draught is the instrument that reads them. Superposition does the rest without a line of code: one on its own is a smudge you have to stand over, three in a drawer add up and are obvious from the doorway. The field that is a WALL in the cold store is an INSTRUMENT here. That is the strongest argument this build makes for having exactly one field.\n\nTHE VERIFICATION IS THE CASE, NOT A LABEL. The case counts what answers. Put a real one in and the count moves; put a mundane one in and the case takes it silently and the count does not. The game never says 'that one was wrong', because a game that told you would be asking you to read a label instead of keeping an account — and §7.4 wants confidence rather than checklist completion. Noticing that the number did not move IS the mechanic.\n\nAND THE COUNT IS NOT GIVEN. How many there are is on the evidence trail, not on the HUD. A squad that seals at what it assumes is the total has established custody of a subset and will find out at the debrief. Nothing in the field stops them: `gathering` is the vulnerable state and it arrives on the FIRST clean deposit, not on completion. An earlier version had an `accounted` state that arrived when the count matched the total, which made the case check the answer — the game refused to let you seal until you were right, and the sheet in the office became decoration.",
 
   "presence": {
     "field": { "kind": "none" },
@@ -28,17 +28,11 @@
     },
     {
       "id": "gathering",
-      "kind": "active",
-      "speedMps": 0,
-      "displayName": "Gathering",
-      "description": "Part of the set is in the case and the rest is not. The only state in which the arithmetic can still be got right."
-    },
-    {
-      "id": "accounted",
       "kind": "vulnerable",
       "speedMps": 0,
-      "displayName": "Accounted for",
-      "description": "Every one of them is in the case and nothing else is. The case can be sealed and it will hold."
+      "displayName": "Gathering",
+      "description": "Something of the set is in the case and the case is clean. It can be sealed at any point from here, whether or not the account is finished — which is the entire wager of the incident.",
+      "_kindNote": "⚠ VULNERABLE FROM THE FIRST DEPOSIT, NOT FROM COMPLETION, and the difference is the whole design. There WAS an `accounted` state that arrived when the count matched the total, and it made the case check the answer: the game refused to let a squad seal until they were right, which meant the arithmetic did not matter and the stocktake sheet in the office was decoration. Nothing tells you when you are finished. You seal when you believe you are done, and the debrief is where you find out."
     },
     {
       "id": "adulterated",
@@ -68,26 +62,6 @@
       "latencyToleranceMs": 1200
     },
     {
-      "id": "account-closed",
-      "from": "gathering",
-      "to": "accounted",
-      "when": { "sense": "instances-accounted" },
-      "condition": "every member of the set is in the case, and nothing that is not",
-      "telegraph": "The case stops answering because there is nothing left to answer. The cold goes out of the room all at once.",
-      "pressureDelta": -1,
-      "latencyToleranceMs": 1200
-    },
-    {
-      "id": "account-broken",
-      "from": "accounted",
-      "to": "gathering",
-      "when": { "sense": "instances-loose" },
-      "condition": "the case has been opened, or something has come back out of it",
-      "telegraph": "The count falls. Whatever is loose again is loose in the room you are standing in.",
-      "pressureDelta": 2,
-      "latencyToleranceMs": 1200
-    },
-    {
       "id": "adulterated",
       "from": "*",
       "to": "adulterated",
@@ -110,11 +84,11 @@
     },
     {
       "id": "sealed",
-      "from": "accounted",
+      "from": "gathering",
       "to": "contained",
       "when": { "sense": "enclosed-by", "itemId": "reinforced-transit-case", "radiusMetres": 1.5 },
-      "condition": "the transit case is sealed while the account is complete",
-      "telegraph": "The latches go over on a full set and the case is noticeably lighter than the sum of what went into it.",
+      "condition": "the transit case is sealed on whatever the squad believes the set to be",
+      "telegraph": "The latches go over and the case is noticeably lighter than the sum of what went into it.",
       "pressureDelta": -2,
       "latencyToleranceMs": 400
     }

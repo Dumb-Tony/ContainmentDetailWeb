@@ -746,7 +746,22 @@ export class Game {
     const inTheCase = this.anomaly.isDistributed
       ? true
       : (caseDep && dist(this.anomaly.x, this.anomaly.z, caseDep.x, caseDep.z) <= 1.5);
-    if (caseDep && this.anomaly.isHeld && inTheCase) {
+    const sealable = caseDep && this.anomaly.isHeld && inTheCase;
+    /**
+     * ⚠ THE SEAL OUTRANKS EVERYTHING FOR A MASS, AND MUST NOT FOR A SET.
+     *
+     * For the draught the seal is a moment: it is held, it is next to the case, and if the
+     * prompt said anything else the operation would be lost while somebody read a label.
+     * An absolute early return is right.
+     *
+     * For a distributed set it is a DECISION, taken at the end, at the same case the squad
+     * has been walking back to all operation — and it becomes available on the first clean
+     * deposit. Absolute here meant that standing anywhere near the case offered SEAL and
+     * nothing else, so an object lying beside the case could not be picked up and the
+     * second one could never be logged. It goes in the candidate list and nearest-wins
+     * decides, with the tie-break preferring the smaller object.
+     */
+    if (sealable && !this.anomaly.isDistributed) {
       return { kind: 'seal', text: 'SEAL THE CASE', target: caseDep };
     }
 
@@ -768,6 +783,9 @@ export class Game {
     }
 
     const cands = [];
+    if (sealable) {
+      cands.push({ d: dist(p.x, p.z, caseDep.x, caseDep.z), kind: 'seal', text: 'SEAL THE CASE', target: caseDep });
+    }
     const dep = this.deployables.nearest(p.x, p.z, reach);
     if (dep) {
       const d = dist(p.x, p.z, dep.x, dep.z);
@@ -819,7 +837,7 @@ export class Game {
      * So a tie resolves to the more specific object. You can always step away from a case;
      * you cannot step away from a tie.
      */
-    const grain = { collect: 0, purge: 1, deposit: 1, retrieve: 2, 'carry-case': 2, blocked: 3 };
+    const grain = { collect: 0, purge: 1, deposit: 1, seal: 1, retrieve: 2, 'carry-case': 2, blocked: 3 };
     cands.sort((a, b) => (a.d - b.d) || ((grain[a.kind] ?? 2) - (grain[b.kind] ?? 2)));
     return cands[0];
   }
@@ -1149,6 +1167,7 @@ export class Game {
       players: this.players, player: this.player,
       ledger: this.ledger, deployables: this.deployables, simTimeMs,
       cargoIssued: this.cargoIssued, cargoRecovered,
+      instances: this.instances,
     });
     this.result.failReason = failReason;
     this.mission.setPhase(PHASE.DEBRIEF, simTimeMs);

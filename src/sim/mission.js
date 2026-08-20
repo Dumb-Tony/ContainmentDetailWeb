@@ -106,7 +106,7 @@ export class Mission {
    * Nine dimensions, each with a word and a one-line reason. The overall assessment is
    * derived from them — Exemplary / Controlled / Costly / Compromised / Failed (§6.4).
    */
-  grade({ custody, extracted, players, player, ledger, deployables, simTimeMs, cargoIssued, cargoRecovered }) {
+  grade({ custody, extracted, players, player, ledger, deployables, simTimeMs, cargoIssued, cargoRecovered, instances = null }) {
     const squad = players && players.length ? players : [player];
     const lostPeople = squad.filter((p) => !p.alive);
     const downed = squad.filter((p) => p.alive && p.downed);
@@ -116,13 +116,28 @@ export class Mission {
     const dims = [];
     const add = (name, word, why) => dims.push({ name, word, why });
 
+    /**
+     * ⚠ A DISTRIBUTED SET CAN BE SEALED INCOMPLETE, and this is the only place that says
+     * so. Nothing in the field stops a squad closing the case on three of five — deliberately,
+     * because a game that refused would be checking the answer for them and the stocktake
+     * sheet would be decoration. So the debrief is where the account is settled, and
+     * "Established" has to mean established over the whole set rather than over whatever
+     * happened to be in the box.
+     */
+    const partial = instances && instances.candidates
+      && instances.counted > 0 && instances.counted < instances.total;
+    const setDetail = instances && instances.candidates
+      ? ` ${instances.counted} of ${instances.total} recovered.` : '';
     add('Containment integrity',
-      custody === 'verified' ? 'Established' : custody === 'sealed' ? 'Unverified' : 'None',
-      custody === 'verified'
-        ? `Custody held ${(CONFIG.anomaly.custodyVerifySeconds)}s and the case left the floor.`
-        : custody === 'sealed'
-          ? 'The case was sealed but custody was never verified.'
-          : 'The anomaly was still loose when the operation ended.');
+      partial ? 'Partial'
+        : custody === 'verified' ? 'Established' : custody === 'sealed' ? 'Unverified' : 'None',
+      partial
+        ? `The case was sealed on an incomplete set.${setDetail} What was left on the floor is still there.`
+        : custody === 'verified'
+          ? `Custody held ${(CONFIG.anomaly.custodyVerifySeconds)}s and the case left the floor.${setDetail}`
+          : custody === 'sealed'
+            ? 'The case was sealed but custody was never verified.'
+            : 'The anomaly was still loose when the operation ended.');
 
     /* Reported for the SQUAD, and it names who — a debrief that says "Injured" when one
      * of four is on a stretcher and three walked out is not a debrief. */
@@ -173,7 +188,12 @@ export class Mission {
      * §6.4: "a Costly success remains progress but generates consequences". */
     const everyoneOut = lostPeople.length === 0 && leftBehind.length === 0;
     let overall;
-    if (custody === 'verified' && extracted && everyoneOut && injured.length === 0 && downed.length === 0
+    /* ⚠ A partial set can never be Exemplary or Controlled however cleanly it was done.
+     * The squad walked out of a building with two of the things still in it, and every
+     * other dimension reading green is exactly the report that would let them believe the
+     * operation was finished. */
+    if (partial) overall = 'Compromised';
+    else if (custody === 'verified' && extracted && everyoneOut && injured.length === 0 && downed.length === 0
       && lost === 0 && claims.wrong === 0) overall = 'Exemplary';
     else if (custody === 'verified' && extracted && lostPeople.length === 0) {
       overall = (injured.length || downed.length || lost > 0 || leftBehind.length) ? 'Costly' : 'Controlled';

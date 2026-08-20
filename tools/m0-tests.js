@@ -3342,14 +3342,19 @@ async function sectionAB() {
   eq('AB27 every member of the set can be recovered', set.counted, set.total);
   ok('AB28 with nothing else in the box', !set.contaminated);
   g.skipMs(200);
-  eq('AB29 and the account being closed is what makes it holdable', g.anomaly.state, 'accounted');
-  ok('AB30 which the engine reads as the vulnerable kind, exactly like the other two families',
-    g.anomaly.isHeld);
+  /* ⚠ NOTHING TELLS YOU THE ACCOUNT IS CLOSED, and that is the design.
+   *
+   * There was an `accounted` state that arrived when the count matched the total, and it
+   * made the CASE check the answer: the game refused to let a squad seal until they were
+   * right, so the arithmetic did not matter and the stocktake sheet in the office was
+   * decoration. It is sealable from the first clean deposit now — the seal is a decision
+   * made on two numbers the squad has to have found, and the debrief settles it. */
+  eq('AB29 the state does not change when the last one goes in — no announcement', g.anomaly.state, 'gathering');
+  ok('AB30 and it has been sealable since the first clean deposit', g.anomaly.isHeld);
 
-  /* ⚠ THE SEAL IS STILL PERFORMED. §8.4: containment is a state the squad CREATES, and a
-   * climax that happens to you is not a climax. Closing the account does not close the
-   * case — somebody still has to put the latches over. */
-  ok('AB31 closing the account does NOT seal the case by itself', g.custody === 'none');
+  /* §8.4: containment is a state the squad CREATES, and a climax that happens to you is
+   * not a climax. Nothing seals itself. */
+  ok('AB31 a full account does NOT seal the case by itself', g.custody === 'none');
   p.x = box.x + 0.9; p.z = box.z + 0.5;
   g.skipMs(50);
   const seal = g.contextAction();
@@ -3378,6 +3383,47 @@ async function sectionAB() {
   eq('AB39 and a client reads the same account back', client.instances.counted, set.counted);
   eq('AB40 with every object where the host says it is',
     client.instances.list.filter((i) => i.deposited).length, set.inCase.length);
+
+  /* ── sealing on an incomplete set ──────────────────────────────────────────
+   * The failure this whole family exists to make possible. A squad that never found the
+   * stocktake sheet does not know the total, seals on what it has, and walks out of a
+   * building with two of the things still in it. Nothing in the field stops them, and the
+   * debrief is the only place that says so. */
+  const g2 = new Game(tally, { seed: 'tally-partial' });
+  g2.commitLoadout(RECOMMENDED_MANIFEST);
+  const p2 = g2.player;
+  p2.x = g2.site.cache.x; p2.z = g2.site.cache.z; g2.skipMs(50);
+  g2.takeFromCache('reinforced-transit-case');
+  p2.selectSlot(SLOTS.findIndex((s) => p2.slots.get(s.id) === 'reinforced-transit-case'));
+  p2.x = -6.0; p2.z = -9.0; p2.yaw = Math.PI / 2; g2.skipMs(50);
+  g2.deployHeld();
+  const box2 = g2.deployables.byItem('reinforced-transit-case')[0];
+  const real2 = g2.instances.list.filter((i) => i.anomalous);
+  for (const i of real2.slice(0, 3)) {
+    p2.x = i.x; p2.z = i.z; g2.skipMs(50); g2.doInteract();
+    p2.x = box2.x + 0.6; p2.z = box2.z; g2.skipMs(50); g2.doInteract();
+    g2.skipMs(100);
+  }
+  eq('AB41 three of five logged', g2.instances.counted, 3);
+  ok('AB42 and the case can be sealed anyway — nothing refuses an incomplete account',
+    g2.anomaly.isHeld);
+  p2.x = box2.x + 0.9; p2.z = box2.z + 0.5; g2.skipMs(50);
+  const sealAct2 = g2.contextAction();
+  eq('AB43 the seal is offered', sealAct2 && sealAct2.kind, 'seal');
+  eq('AB44 and takes', g2.doInteract(), null);
+  g2.skipMs(CONFIG.anomaly.custodyVerifySeconds * 1000 + 1200);
+  eq('AB45 custody verifies on a partial set, because the case is sealed and holding',
+    g2.custody, 'verified');
+  const partialGrade = g2.mission.grade({
+    custody: g2.custody, extracted: true, players: g2.players, player: g2.player,
+    ledger: g2.ledger, deployables: g2.deployables, simTimeMs: g2.clock.simTimeMs,
+    cargoIssued: g2.cargoIssued, cargoRecovered: 0, instances: g2.instances,
+  });
+  const integrity = partialGrade.dims.find((d) => d.name === 'Containment integrity');
+  note(`partial debrief: ${partialGrade.overall} — ${integrity.word}: ${integrity.why}`);
+  eq('AB46 the debrief calls it Partial, not Established', integrity.word, 'Partial');
+  ok('AB47 and says how many were left behind', /3 of 5/.test(integrity.why), integrity.why);
+  eq('AB48 an incomplete set can never grade above Compromised', partialGrade.overall, 'Compromised');
   emit();
 }
 

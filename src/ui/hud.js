@@ -322,13 +322,15 @@ export class Hud {
      * and the number does not move; noticing THAT is the mechanic.
      */
     if (g.anomaly.isDistributed) {
-      if (g.anomaly.isHeld) return 'The account is closed. Seal the case.';
       const n = g.instances.counted;
       const carrying = g.instances.carriedBy(me.id);
       if (carrying) return `Logged: ${n}. Carry it to the case.`;
-      return n === 0
-        ? 'Logged: 0. Sweep on thermal — they read colder than the floor.'
-        : `Logged: ${n}. Keep sweeping until the sheet is satisfied.`;
+      if (n === 0) return 'Logged: 0. Sweep on thermal — they read colder than the floor.';
+      /* ⚠ "The account is closed. Seal it." was here, and it was the game answering the
+       * question. Nothing tells you when you are finished: the case reports what it holds,
+       * the sheet in the office says how many there should be, and the seal is a decision
+       * you make on those two numbers. */
+      return `Logged: ${n}. Seal when the sheet is satisfied.`;
     }
 
     if (g.anomaly.isHeld) return 'It is held. Get the case within 1.5m and seal it.';
