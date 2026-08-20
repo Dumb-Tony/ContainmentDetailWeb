@@ -42,7 +42,7 @@ power puzzle matters — the office breaker is out on the bay wall, the storage 
 The mission ends when the case is sealed, has held for thirty seconds, and is carried up
 the stairs. It can be lost at any point in that sentence.
 
-## Three incidents, two buildings
+## Five incidents, three buildings, four things
 
 The content unit is an **Incident Package**, not a map — an anomaly file holds rules and
 nothing about where; a map holds geometry and nothing about what happened;
@@ -83,6 +83,37 @@ puzzle.
 
 Neither the building nor the thing in it is the constant. You learn both, separately, and
 neither answer transfers whole.
+
+**The stocktake.** Eleven identical brass discs on the cold-store floor; five of them are
+the anomaly. Nothing hunts you, there is no fence, and the failure state is arithmetic. The
+tell is the heat field again, used as an *instrument* rather than a wall — each disc is a
+four-degree sink, so superposition does the search gradient without a line of code deciding
+it: the three in the office read 7.9 °C below ambient and are obvious from the doorway, the
+singletons read 3.8 and have to be stood over.
+
+Verification is the case, not a label. Log a real one and the count moves; log a mundane
+one and the case takes it **silently** and the number does not. The game never says "that
+was the wrong one" — noticing the silence is the mechanic. And the total is on a stocktake
+sheet in the office, not on the HUD, so you can seal on three of five and find out at the
+debrief.
+
+**The caller.** In a condemned forest reserve, a thing that hunts *sound* and is restrained
+by *silence*. Every other containment here is something you build; this one is something
+you stop doing. You cannot make a quiet louder — you switch things off, put things down,
+and crouch.
+
+The lure is your own kit, which is the trap. A heater carries 22 m, a floodlight ballast
+11, a power pack 7. On the cold-store floor those are the fence and the bait; here every
+one is a beacon, and a squad running the draught playbook has built a perfect lure around
+itself and switched it on. Two lures at once mask each other into unresolvable and it stops
+in the wrong place.
+
+Crouch stops being a way to be shorter. At two metres: 29.6 dB standing still, 35.1
+crouch-walking, 48.0 walking, against a 46 dB threshold. Walk at a stilled caller and it is
+running within a second. Crouch and you can get to arm's reach and close the case.
+
+That is GDD §26.2's three procedure families — perception, auditory, distributed-object —
+plus the heat fence the build started with, over three buildings.
 
 **The engine does not know what either of them is called.** States, triggers, capabilities
 and field disturbance are all read from content, through a closed vocabulary of senses and
@@ -130,6 +161,31 @@ an image rather than a blank.
 An accessibility control that silently does nothing is worse than one that is absent,
 because a player who needs it will believe they have already tried it. So consumption is
 asserted, not presence.
+
+**Controller.** Nothing above `input.js` has ever asked about a key — the whole build asks
+for *actions* — so a pad button is a synthetic code through the same path, and it inherits
+the binding table, the conflict checker, hold-versus-toggle and remapping for free. The
+sticks are analog, with a squared response after a radial deadzone: half deflection reads
+0.179, so the first half of the travel is fine control, which is what makes placing a
+tripod in a 1.5 m doorway possible on a pad. Look is a rate times the frame's duration, not
+a delta, so turn speed is not a function of frame rate.
+
+## Does the game do what the document says
+
+`GAME_BIBLE/GDD.md` §27.2 lists ten criteria an anomaly must meet to be release-ready and
+§26.4 lists eight metrics the slice is judged on. Section AC runs them as a scorecard across
+every anomaly in the build.
+
+The five that need external testers report **OPEN**. A suite that quietly asserted `true`
+for "80% can use the evidence board without facilitator help" would be worse than one that
+omitted it — it would look like the criterion had been met. Median mission duration reports
+OPEN too, with the bot times printed as the lower bound they are: a bot does not search or
+hesitate.
+
+It has found real gaps rather than confirming what was already believed. §27.2 asks for at
+least two evidence paths per required rule; measured, the build had **3 of 12**. With one
+path a squad that walks past a single pickup can never learn that rule — not "finds it
+harder", cannot — which fails Pillar 1's design test outright. It is 16 of 16 now.
 
 ## One to five operatives
 
@@ -216,7 +272,7 @@ There is no Node.js here, so the harness is a browser.
 powershell -ExecutionPolicy Bypass -File tools/smoketest.ps1 -Tests tools/m0-tests.js
 ```
 
-**604 assertions, all headless.** Section I is the one that matters: it plays a complete
+**746 assertions, all headless.** Section I is the one that matters: it plays a complete
 solo containment through the same interfaces a keyboard reaches — walks to the vehicle,
 takes kit, throws breakers, opens doors, baits, fences, seals, waits out custody and
 carries the case to the stairs. No teleports and no direct state writes, because testing
