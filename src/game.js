@@ -102,13 +102,39 @@ export function recommendedManifest(content) {
   /* Medical is never on a containment procedure's list and is always worth the volume. */
   if (!out.some((x) => x.itemId === 'trauma-kit')) out.push({ itemId: 'trauma-kit', qty: 1 });
 
-  /* Trim to the cargo budget, cheapest-first, so the default always deploys. */
+  /* Trim to the cargo budget, cheapest-first, so the default always deploys.
+   *
+   * ⚠ SPARES FIRST, THEN THE BIGGEST SINGLE ITEM — never `pop()`. Dropping the last row
+   * meant dropping whatever was pushed most recently, which is the TRAUMA KIT the two
+   * lines above deliberately added: the recommended manifest's own medical cover was the
+   * first thing it threw away. It never fired with the content that existed when it was
+   * written, because both incidents happened to trim to budget on quantities alone, so it
+   * sat there waiting for the first manifest that needed one row removed. */
   const budget = content.items.cargoVolumeBudget;
-  const vol = (list) => list.reduce((a, x) => a + content.itemsById.get(x.itemId).cargoVolume * x.qty, 0);
-  while (vol(out) > budget) {
+  const volOf = (x) => content.itemsById.get(x.itemId).cargoVolume * x.qty;
+  const vol = (list) => list.reduce((a, x) => a + volOf(x), 0);
+  while (vol(out) > budget && out.length) {
     const fat = out.filter((x) => x.qty > 1).sort((a, b) => b.qty - a.qty)[0];
-    if (fat) fat.qty--; else { out.pop(); }
-    if (!out.length) break;
+    if (fat) { fat.qty--; continue; }
+    /**
+     * Everything is down to one, so a whole row has to go. Biggest first — except that
+     * two rows are not interchangeable with the rest.
+     *
+     * ⚠ THE CONTAINMENT VESSEL IS LAST, AND IT WAS GOING FIRST. Dropping the largest item
+     * meant dropping the transit case, because at three volume it IS the largest — so a
+     * squeezed budget produced a recommended manifest with no way to establish custody at
+     * all. A recommendation that cannot succeed is worse than a short one; it is a wrong
+     * answer given confidently, on the screen §18.1 says may not misrepresent the game.
+     *
+     * Which item that is comes from the ANOMALY, not from a name in this file: the seal
+     * trigger states what it must be closed into. A future anomaly contained in something
+     * else is protected by the same line.
+     */
+    const seal = content.anomaly.triggers.find((t) => t.when && t.when.sense === 'enclosed-by');
+    const vessel = seal && seal.when.itemId;
+    const rank = (x) => (x.itemId === vessel ? 2 : x.itemId === 'trauma-kit' ? 1 : 0);
+    const drop = out.slice().sort((a, b) => rank(a) - rank(b) || volOf(b) - volOf(a))[0];
+    out.splice(out.indexOf(drop), 1);
   }
   return out;
 }

@@ -23,7 +23,7 @@ import { Site } from '../src/sim/site.js';
 import { DeployableSet } from '../src/sim/deployables.js';
 import { Anomaly, ANOMALY_STATE } from '../src/sim/anomaly.js';
 import { EvidenceLedger, CLAIMS } from '../src/sim/evidence.js';
-import { Game, RECOMMENDED_MANIFEST, EMPTY_COMMAND } from '../src/game.js';
+import { Game, RECOMMENDED_MANIFEST, EMPTY_COMMAND, recommendedManifest } from '../src/game.js';
 import { PHASE } from '../src/sim/mission.js';
 import { NetSession, loopbackPair, ROLE } from '../src/net/net.js';
 import { MSG, ACT, PROTOCOL_VERSION, MAX_SQUAD, encodeSnapshot, applySnapshot } from '../src/net/protocol.js';
@@ -3550,6 +3550,57 @@ async function sectionAC() {
   ok('AC8 the scorecard reports the human criteria as OPEN rather than asserting them', true);
   emit();
 }
+
+/* ══ AD. the recommended manifest, under pressure ══════════════════════════════
+ *
+ * The trim loop is the part of this that has never been exercised: both shipped incidents
+ * happen to fit the budget once quantities come down, so the branch that removes a whole
+ * ROW had never run in anger. It was `out.pop()`, which drops the most recently pushed
+ * item — the trauma kit the function deliberately adds two lines earlier. The manifest's
+ * own medical cover was the first thing it would have thrown away, and it was waiting for
+ * the first incident whose safe procedure named one more item than would fit.
+ *
+ * So this squeezes the budget artificially and watches what it gives up.
+ */
+async function sectionAD(content) {
+  lines.push('--- AD. what the recommended manifest gives up first ---');
+  const squeeze = (budget) => {
+    const c = { ...content, items: { ...content.items, cargoVolumeBudget: budget } };
+    return recommendedManifest(c);
+  };
+  const full = recommendedManifest(content);
+  const volOf = (m) => m.reduce((a, x) => a + content.itemsById.get(x.itemId).cargoVolume * x.qty, 0);
+  note(`at the shipped budget of ${content.items.cargoVolumeBudget}: ${full.map((x) => `${x.itemId}×${x.qty}`).join(', ')} = ${volOf(full)}`);
+  ok('AD1 the recommendation fits the budget it is offered against', volOf(full) <= content.items.cargoVolumeBudget);
+  ok('AD2 and includes medical cover, which no containment procedure ever asks for',
+    full.some((x) => x.itemId === 'trauma-kit'));
+
+  for (const b of [9, 7, 5, 4, 3]) {
+    const m = squeeze(b);
+    note(`  budget ${b}: ${m.map((x) => `${x.itemId}×${x.qty}`).join(', ') || '(nothing)'} = ${volOf(m)}`);
+    ok(`AD3.${b} a budget of ${b} still produces a manifest that fits`, volOf(m) <= b, `${volOf(m)} > ${b}`);
+  }
+  const tight = squeeze(5);
+  ok('AD4 medical cover survives the squeeze that starts dropping whole items',
+    tight.some((x) => x.itemId === 'trauma-kit'),
+    tight.map((x) => x.itemId).join());
+
+  /* ⚠ The vessel is the one item without which there is no operation, and it was going
+   * FIRST because at three volume it is the largest thing on the list. A recommendation
+   * that cannot establish custody is a wrong answer given confidently. */
+  const sealTrigger = content.anomaly.triggers.find((t) => t.when && t.when.sense === 'enclosed-by');
+  const vessel = sealTrigger && sealTrigger.when.itemId;
+  ok('AD5 the anomaly states what it has to be sealed into', !!vessel, String(vessel));
+  for (const b of [4, 3]) {
+    const m = squeeze(b);
+    ok(`AD6.${b} at a budget of ${b} the recommendation still carries the vessel`,
+      m.some((x) => x.itemId === vessel), m.map((x) => x.itemId).join() || '(nothing)');
+  }
+  const tiny = squeeze(2);
+  ok('AD7 and a budget too small for anything terminates rather than looping', Array.isArray(tiny));
+  note(`  budget 2: ${tiny.map((x) => `${x.itemId}×${x.qty}`).join(', ') || '(nothing)'}`);
+  emit();
+}
 (async () => {
   try {
     sectionA();
@@ -3579,6 +3630,7 @@ async function sectionAC() {
     await sectionAA(content);
     await sectionAB();
     await sectionAC();
+    await sectionAD(content);
     await sectionK();
     await sectionL();
     await sectionV();
