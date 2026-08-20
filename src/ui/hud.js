@@ -138,9 +138,9 @@ export class Hud {
       this.bezel.style.width = `${r.size}px`;
       this.bezel.style.height = `${r.size}px`;
       const state = a.isLoose ? a.state : 'contained';
-      const held = a.state === ANOMALY_STATE.BANKED;
+      const held = a.isHeld;
       this.bezel.classList.toggle('held', held);
-      this.bezel.classList.toggle('hot', a.state === ANOMALY_STATE.DRAWN);
+      this.bezel.classList.toggle('hot', a.stateKind === 'hunting');
       const lanes = a.escapes === undefined ? '—' : a.escapes;
       this.bezelLabel.innerHTML = `<span>${CONFIG.heat.gradientThresholdC}C contour · white</span>`
         + `<span>${held ? 'HELD' : `${lanes} lane${lanes === 1 ? '' : 's'} open`} · ${state}</span>`;
@@ -162,7 +162,7 @@ export class Hud {
       const held = g.anomaly.sealedIn ? g.anomaly.sealedIn.custodyHeldMs / 1000 : 0;
       return `Hold custody — ${held.toFixed(0)}s of ${CONFIG.anomaly.custodyVerifySeconds}s. Keep the case powered.`;
     }
-    if (g.anomaly.state === ANOMALY_STATE.BANKED) return 'It is held. Get the case within 1.5m and seal it.';
+    if (g.anomaly.isHeld) return 'It is held. Get the case within 1.5m and seal it.';
     if (g.mission.procedure) return 'Execute the committed procedure.';
     return 'Establish what it is and what stops it. Plan on the tablet (TAB).';
   }

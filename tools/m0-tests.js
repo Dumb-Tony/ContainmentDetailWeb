@@ -116,7 +116,9 @@ async function sectionB(content) {
     const orig = window.fetch;
     window.fetch = async (u) => {
       const s = String(u);
-      const body = s.includes('anomalies') ? broken : s.includes('maps') ? content.map : content.items;
+      const body = s.includes('incidents') ? content.incident
+        : s.includes('anomalies') ? broken
+          : s.includes('maps') ? content.map : content.items;
       return { ok: true, status: 200, json: async () => body };
     };
     try { await loadContent(); } catch (e) { refused = e instanceof ContentError && /nowhere/.test(e.message); }
@@ -782,7 +784,7 @@ async function sectionK() {
     'src/core/rng.js', 'src/core/clock.js', 'src/core/input.js', 'src/core/eventBus.js',
     'src/sim/geometry.js', 'src/sim/site.js', 'src/sim/heat.js', 'src/sim/anomaly.js',
     'src/sim/deployables.js', 'src/sim/evidence.js', 'src/sim/player.js',
-    'src/sim/mission.js', 'src/sim/content.js', 'src/sim/senses.js',
+    'src/sim/mission.js', 'src/sim/content.js', 'src/sim/senses.js', 'src/sim/perception.js',
     'src/net/protocol.js', 'src/net/net.js',
     'src/render/scene.js', 'src/render/renderer.js', 'src/render/thermalFloor.js',
     'src/ui/hud.js', 'src/ui/panels.js', 'src/audio/audio.js',
@@ -1184,7 +1186,9 @@ async function sectionN(content) {
     mutate(doc);
     window.fetch = async (u) => {
       const s = String(u);
-      const body = s.includes('anomalies') ? doc : s.includes('maps') ? content.map : content.items;
+      const body = s.includes('incidents') ? content.incident
+        : s.includes('anomalies') ? doc
+          : s.includes('maps') ? content.map : content.items;
       return { ok: true, status: 200, json: async () => body };
     };
     try { await loadContent(); return null; } catch (e) { return e.message; } finally { window.fetch = orig; }
@@ -1217,6 +1221,106 @@ async function sectionN(content) {
   emit();
 }
 
+/* ── O. a second incident package, on the same floor ─────────────────────── */
+async function sectionO() {
+  lines.push('--- O. two incidents, one map, two procedures ---');
+
+  const draught = await loadContent({ incident: 'cold-storage-draught' });
+  const figure = await loadContent({ incident: 'cold-storage-figure' });
+
+  eq('O1 both incidents load', !!(draught.anomaly && figure.anomaly), true);
+  eq('O2 and they are the same floor', draught.map.id, figure.map.id);
+  ok('O3 with different anomalies', draught.anomaly.id !== figure.anomaly.id);
+  ok('O4 different starting positions', draught.map.anomalySpawn.join() !== figure.map.anomalySpawn.join());
+  ok('O5 and completely different evidence on the ground',
+    figure.map.evidenceSources.every((s) => !draught.map.evidenceSources.some((d) => d.evidenceId === s.evidenceId)));
+  note(`draught: ${draught.map.evidenceSources.length} sources · figure: ${figure.map.evidenceSources.length} sources, same ${figure.map.id}`);
+
+  /* The engine required NO new code for the second one beyond two senses. */
+  const g = new Game(figure, { seed: 'fig' });
+  eq('O6 the second anomaly starts in its own first state', g.anomaly.state, 'standing');
+  eq('O7 which the engine knows only as a latent kind', g.anomaly.stateKind, 'latent');
+  eq('O8 it disturbs no field at all — the imager is useless on it', g.anomaly.asSink(), null);
+  ok('O9 and it has no enclosure trigger, so a heat fence is irrelevant to it',
+    !figure.anomaly.triggers.some((t) => t.when.sense === 'path-blocked-by-gradient'));
+
+  g.commitLoadout([
+    { itemId: 'remote-camera', qty: 2 },
+    { itemId: 'reinforced-transit-case', qty: 1 },
+    { itemId: 'power-pack', qty: 1 },
+    { itemId: 'trauma-kit', qty: 1 },
+  ]);
+
+  /* Put an operative where they can see it, and it stops. That is the whole rule. */
+  const p = g.player;
+  const a = g.anomaly;
+  /* Six metres down the aisle, looking at it. Forward is (-sin yaw, -cos yaw), so yaw = PI
+   * faces +z — the same convention the camera, the movement code and the cones all use.
+   * Getting this backwards puts the operative staring at the far wall with their back to
+   * the thing, which is exactly what a player would experience if the cone were wrong. */
+  p.x = a.x; p.z = a.z - 6;
+  p.yaw = Math.PI;
+  g.setCommand('p1', { axis: { x: 0, y: 0 }, sprint: false, crouch: false });
+  g.skipMs(300);
+  eq('O10 an operative looking at it holds it still', a.state, 'held');
+  eq('O11 which is a vulnerable kind, so it can be sealed', a.stateKind, 'vulnerable');
+  ok('O12 and the HUD can say who is holding it', g.observation.by.includes('p1'), JSON.stringify(g.observation));
+
+  /* Look away and it comes, after the sustain the content authored — not instantly. */
+  p.yaw = 0;                                       // turn to face south, away from it
+  g.skipMs(900);
+  eq('O13 a moment of lost coverage does not release it', a.state, 'held');
+  g.skipMs(1200);
+  eq('O14 but a second and a half does', a.state, 'closing');
+  ok('O15 and it is fast — much faster than the draught', a.speedMps > 3);
+  const before = dist(p.x, p.z, a.x, a.z);
+  g.skipMs(1000);
+  const after = dist(p.x, p.z, a.x, a.z);
+  ok('O16 it closes while nobody is looking', after < before, `${before.toFixed(1)}m -> ${after.toFixed(1)}m`);
+
+  /* A camera holds it just as well as a person, which is the actual procedure: the squad
+   * hands coverage to something that does not need to stand there. */
+  /* ⚠ Take the operative out of the picture entirely before testing the camera. Leaving
+   * them anywhere near it makes every assertion below ambiguous — the thing had already
+   * closed most of the six metres, so "looking away" stopped meaning "cannot see it" the
+   * moment it walked around them. Park them in the loading bay, two rooms away. */
+  p.x = 8.0; p.z = -9.0; p.yaw = 0;
+  const cam = g.deployables.place(figure.itemsById.get('remote-camera'), a.x, a.z - 5, Math.PI);
+  g.skipMs(300);
+  eq('O17 a deployed camera holds it exactly as a person does', a.state, 'held');
+  ok('O18 and the coverage is attributed to the camera, with nobody looking',
+    g.observation.by.includes(cam.uid) && !g.observation.by.includes('p1'), JSON.stringify(g.observation.by));
+
+  /* Line of sight is geometric: put it somewhere with no sightline and it holds nothing. */
+  cam.x = -10.0; cam.z = -10.0;                    // into the office, walls in the way
+  g.skipMs(2500);
+  eq('O19 a camera with no sightline holds nothing', a.state, 'closing');
+
+  /* And the custody move is the same verb with a different meaning: sealed while HELD. */
+  cam.x = a.x; cam.z = a.z - 5; cam.yaw = Math.PI;
+  g.skipMs(400);
+  eq('O20 coverage restored, it stops again', a.state, 'held');
+  const kase = g.deployables.place(figure.itemsById.get('reinforced-transit-case'), a.x + 0.8, a.z, 0);
+  eq('O21 and it can be cased while held', g.anomaly.trySeal(kase, g.clock.simTimeMs), null);
+  eq('O22 leaving it contained, through a trigger the engine never heard of', a.stateKind, 'contained');
+
+  /* The two incidents genuinely demand different kit. */
+  /* Compare the MINIMUM procedures, not the safe ones. A safe-grade kit is a superset that
+   * covers what might go wrong, so two of them overlap heavily and comparing them says
+   * nothing. What each anomaly cannot be contained WITHOUT is the real contrast. */
+  const dr = draught.anomaly.containment.procedures[0].requiredEquipment;
+  const fg = figure.anomaly.containment.procedures[0].requiredEquipment;
+  note(`minimum kit — draught: ${dr.join(', ')}`);
+  note(`minimum kit — figure:  ${fg.join(', ')}`);
+  ok('O23 the cheapest way to contain each one wants different equipment',
+    dr.some((x) => !fg.includes(x)) && fg.some((x) => !dr.includes(x)));
+  ok('O24 the draught cannot be held without heat', dr.includes('portable-heater') && !fg.includes('portable-heater'));
+  ok('O25 the figure cannot be held without an eye on it', fg.includes('remote-camera') && !dr.includes('remote-camera'));
+
+  await yieldToLoop();
+  emit();
+}
+
 /* ── run ─────────────────────────────────────────────────────────────────── */
 (async () => {
   try {
@@ -1233,6 +1337,7 @@ async function sectionN(content) {
     sectionJ();
     await sectionM(content);
     await sectionN(content);
+    await sectionO();
     await sectionK();
     await sectionL();
     emit();

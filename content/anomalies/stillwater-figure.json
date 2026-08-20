@@ -1,0 +1,310 @@
+{
+  "id": "stillwater-figure",
+  "contentRevision": "0.1.0",
+  "licensingRecordId": null,
+  "incidentPremise": "The night supervisor reported 'a man standing at the end of aisle B' four times in one shift and walked the aisle four times to find nothing. On the fifth call she stopped walking and watched the camera instead, and it was still there. She kept the feed up for six hours until the shift ended, and it did not move once. It has been eleven days.",
+
+  "_designNote": "The SECOND incident package for this map, and it exists to prove the engine is content rather than one anomaly (GDD 15, 26.2 — three packages testing distinct procedure families). It shares the cold store, the equipment manifest and the evidence ledger with the graybox-draught, and it plays nothing like it.\n\nThe draught is a HEAT problem: you build a wall out of a field and it cannot cross. This is an OBSERVATION problem: it does not move while anyone is looking at it, so the squad's resource is not heat but attention — and attention is the thing you run out of when you also have to carry, place, power and seal. The whole procedure is therefore about handing coverage from a person to a camera and back without ever dropping it.\n\nIt needs no new engine code beyond the two perception senses. There is no 'heat-wall' trigger in this file at all: enclosure is irrelevant to it, and the engine simply never evaluates a wildcard it was not given.",
+
+  "presence": {
+    "field": {
+      "kind": "none",
+      "_note": "It is not a temperature. The thermal imager shows it as an ordinary room-temperature mass — which is precisely the false lead, because a squad that has read the draught's file arrives expecting the imager to be the answer and it tells them nothing at all."
+    }
+  },
+
+  "perception": {
+    "channels": ["visible", "instrumental", "recorded"],
+    "recordingInterference": "None, and that is the point. It records perfectly. It is visible to the naked eye and to every camera; what it will not do is move while it is being recorded or watched. An anomaly that also corrupted its own recording would remove the only tool that works on it.",
+    "accessibilityAlternatives": [
+      "Coverage is reported as a count and a named source ('held by camera 2'), never by colour alone.",
+      "The release warning is a sustained rising tone AND a caption AND the coverage count falling to zero, so it does not require hearing, colour vision, or reading fast."
+    ]
+  },
+
+  "states": [
+    {
+      "id": "standing",
+      "kind": "latent",
+      "description": "Motionless at the end of an aisle. It has been there for eleven days. It does not react to being approached.",
+      "presentation": {
+        "visualTell": "A figure at the limit of the light, facing away, at the wrong scale for the distance",
+        "audioCue": "Nothing at all. The room noise drops out around it, which is itself the cue",
+        "environmentalTell": "Dust does not settle within about a metre of it"
+      }
+    },
+    {
+      "id": "closing",
+      "kind": "hunting",
+      "speedMps": 3.4,
+      "description": "Unobserved, it closes. Fast, in a straight line, and it stops the instant anything sees it again.",
+      "presentation": {
+        "visualTell": "It is nearer than it was, in a posture nobody watched it take",
+        "audioCue": "A single footfall's worth of sound, arriving after it has already stopped",
+        "environmentalTell": "Loose paper lifts in its wake"
+      }
+    },
+    {
+      "id": "held",
+      "kind": "vulnerable",
+      "description": "Under continuous observation. It cannot move and it cannot act. This is not a weakness the squad found; it is the only reason anyone survived the eleven days.",
+      "presentation": {
+        "visualTell": "Perfectly still, in whatever posture it was caught in",
+        "audioCue": "The room noise returns",
+        "environmentalTell": "Dust begins to settle on it"
+      }
+    },
+    {
+      "id": "cased",
+      "kind": "contained",
+      "description": "Inside a sealed transit case with its interior camera running and recording to two separate stores. Custody is the camera, not the box.",
+      "presentation": {
+        "visualTell": "Case-mounted indicator steady; the interior feed shows it exactly as it was sealed",
+        "audioCue": "Recorder cycling, roughly every twenty seconds",
+        "environmentalTell": "None. It is a box."
+      }
+    }
+  ],
+
+  "triggers": [
+    {
+      "id": "seen",
+      "from": "*",
+      "to": "held",
+      "when": { "sense": "observed", "viewers": 1 },
+      "condition": "at least one operative or powered remote camera has it in view, unobstructed",
+      "telegraph": "It stops mid-stride, without decelerating, the instant coverage is established.",
+      "pressureDelta": -2,
+      "latencyToleranceMs": 300
+    },
+    {
+      "id": "unwatched",
+      "from": "held",
+      "to": "closing",
+      "when": { "sense": "unobserved-for", "sustainSeconds": 1.5 },
+      "condition": "no operative and no powered camera has held it in view for longer than 1.5s",
+      "telegraph": "The room noise drops away about three quarters of a second before it moves — the only warning, and it is the same one the night supervisor described.",
+      "pressureDelta": 3,
+      "latencyToleranceMs": 300
+    },
+    {
+      "id": "roused",
+      "from": "standing",
+      "to": "closing",
+      "when": { "sense": "heat-within", "radiusMetres": 9, "sustainSeconds": 3 },
+      "condition": "a warm body within 9m for longer than 3s, while nothing is watching it",
+      "telegraph": "The dust stops settling. Nothing else changes.",
+      "pressureDelta": 1,
+      "latencyToleranceMs": 1200
+    },
+    {
+      "id": "cased",
+      "from": "held",
+      "to": "cased",
+      "when": { "sense": "enclosed-by", "itemId": "reinforced-transit-case", "radiusMetres": 1.5 },
+      "condition": "transit case closed around it while it is under observation, interior camera live",
+      "telegraph": "The lid comes over and the interior feed picks it up before the daylight goes.",
+      "pressureDelta": -4,
+      "latencyToleranceMs": 2500
+    }
+  ],
+
+  "capabilities": [
+    {
+      "id": "reach",
+      "verb": "contact",
+      "availableInStates": ["closing"],
+      "effect": "It arrives at arm's length and takes hold. Serious mobility injury and cognitive stress; survivable once, and nobody has been recorded surviving it twice.",
+      "rangeMetres": 1.4,
+      "cooldownMs": 4000,
+      "latencyToleranceMs": 300,
+      "compounding": true,
+      "applies": [
+        { "condition": "mobility-injury", "severity": "serious" },
+        { "condition": "exposure", "severity": "serious" }
+      ],
+      "counterableBy": ["continuous-observation"]
+    },
+    {
+      "id": "kill-the-lights",
+      "verb": "drain-power",
+      "availableInStates": ["closing"],
+      "effect": "Powered equipment within range browns out while it is moving. A camera that dies is a camera that stops holding it, which is the trap: the fence you built is also the thing it eats.",
+      "rangeMetres": 6,
+      "cooldownMs": 0,
+      "counterableBy": ["power-pack"]
+    }
+  ],
+
+  "constraints": [
+    {
+      "id": "continuous-observation",
+      "effect": "blocks",
+      "description": "It cannot move while observed. Any single unobstructed viewer is enough — a person, a deployed remote camera, it does not distinguish. This is the whole procedure: the squad does not fence it, they never stop looking at it.",
+      "requiredEquipment": ["remote-camera"]
+    },
+    {
+      "id": "line-of-sight",
+      "effect": "weakens",
+      "description": "Observation is geometric. Racking, panel walls and closed doors break it, and the aisles are long straight runs — which is why coverage in this building is a matter of standing in the right place rather than owning enough cameras.",
+      "requiredEquipment": []
+    },
+    {
+      "id": "light-independence",
+      "effect": "reveals",
+      "description": "Darkness is irrelevant to it and to the cameras' ability to hold it. Restoring the mains helps the squad see each other and nothing else. A team that spends its whole operation on the breakers has solved the previous incident, not this one.",
+      "requiredEquipment": []
+    }
+  ],
+
+  "evidenceRules": [
+    {
+      "id": "supervisor-statement",
+      "type": "testimonial",
+      "dimension": "constraint",
+      "rawObservation": "Night supervisor states she called it in four times and walked the aisle four times, and on the fifth she watched the camera instead and it stayed. She says she did not blink for six hours, which is not possible, and she says it anyway.",
+      "reliability": "probable",
+      "revealsRule": "seen",
+      "requiredEquipment": [],
+      "isFalseLead": false
+    },
+    {
+      "id": "camera-still",
+      "type": "instrumental",
+      "dimension": "capability",
+      "rawObservation": "Eleven days of recorded footage. In every frame in which it appears it is stationary. Every change of position falls in a gap between recordings, or behind a passing shelf.",
+      "reliability": "confirmed",
+      "revealsRule": "unwatched",
+      "requiredEquipment": ["remote-camera"],
+      "isFalseLead": false
+    },
+    {
+      "id": "thermal-null",
+      "type": "instrumental",
+      "dimension": "form",
+      "rawObservation": "Thermal imager reads it at ambient, to within the instrument's error. It is exactly as warm as the wall behind it.",
+      "reliability": "confirmed",
+      "revealsRule": "",
+      "requiredEquipment": ["thermal-imager"],
+      "isFalseLead": true
+    },
+    {
+      "id": "dust-ring",
+      "type": "environmental",
+      "dimension": "presence",
+      "rawObservation": "A circle of bare floor roughly one metre across where dust has not settled, in a room that has been shut for eleven days.",
+      "reliability": "confirmed",
+      "revealsRule": "roused",
+      "requiredEquipment": [],
+      "isFalseLead": false
+    },
+    {
+      "id": "brownout-log",
+      "type": "documentary",
+      "dimension": "capability",
+      "rawObservation": "Site electrical log shows fourteen unexplained brownouts on the storage circuit, none of them matching a load event, all of them under nine seconds.",
+      "reliability": "probable",
+      "revealsRule": "kill-the-lights",
+      "requiredEquipment": [],
+      "isFalseLead": false
+    },
+    {
+      "id": "night-shift-roster",
+      "type": "documentary",
+      "dimension": "anchor",
+      "rawObservation": "Roster shows the same three names on every night shift for two years. One of them stopped signing in eleven days ago and was not reported absent.",
+      "reliability": "disputed",
+      "revealsRule": "",
+      "requiredEquipment": [],
+      "isFalseLead": true
+    }
+  ],
+
+  "containment": {
+    "goal": "The figure sealed inside a transit case with its interior camera live and recording, verified by thirty seconds of continuous interior coverage. Custody is the camera. A case with a dead recorder is a box with something in it.",
+
+    "procedures": [
+      {
+        "id": "handover-minimum",
+        "grade": "minimum",
+        "verbs": ["detect", "observe", "sequence", "enclose", "verify"],
+        "concurrentRoles": 2,
+        "requiredEquipment": ["remote-camera", "reinforced-transit-case"],
+        "abortConditions": [
+          "Coverage falls to zero at any point after it has begun closing",
+          "Any operative takes a second contact"
+        ]
+      },
+      {
+        "id": "handover-safe",
+        "grade": "safe",
+        "verbs": ["detect", "observe", "isolate", "stabilize", "sequence", "enclose", "verify"],
+        "concurrentRoles": 3,
+        "requiredEquipment": ["remote-camera", "power-pack", "reinforced-transit-case", "portable-barrier"],
+        "abortConditions": [
+          "A camera holding it browns out with no second viewer covering the same lane",
+          "Coverage depends on one viewer for longer than 10s",
+          "Power pack drops below the reserve needed to carry the cameras through the seal"
+        ]
+      },
+      {
+        "id": "handover-research",
+        "grade": "research-grade",
+        "verbs": ["detect", "observe", "isolate", "stabilize", "sequence", "enclose", "verify"],
+        "concurrentRoles": 4,
+        "requiredEquipment": ["remote-camera", "power-pack", "reinforced-transit-case", "portable-barrier", "sample-kit", "motion-sensor"],
+        "abortConditions": [
+          "Dust sample taken from the ring is compromised before the case is sealed",
+          "Any condition from the safe procedure"
+        ]
+      }
+    ],
+
+    "integrityConditions": [
+      {
+        "id": "interior-camera",
+        "measure": "observation-coverage",
+        "failureSignal": "The interior feed drops to static, and the case gets appreciably heavier.",
+        "recoveryWindowMs": 20000
+      },
+      {
+        "id": "coverage-redundancy",
+        "measure": "observation-coverage",
+        "failureSignal": "The coverage count falls to one, and the room noise thins.",
+        "recoveryWindowMs": 10000
+      },
+      {
+        "id": "camera-power",
+        "measure": "power",
+        "failureSignal": "A camera indicator dips amber a second or so before the feed goes.",
+        "recoveryWindowMs": 9000
+      }
+    ]
+  },
+
+  "difficultyProfiles": [
+    {
+      "preset": "orientation",
+      "squadSize": { "min": 1, "max": 4 },
+      "timingScale": 1.6,
+      "evidenceAvailability": "generous",
+      "automationAllowed": ["automated-observation-unit"]
+    },
+    {
+      "preset": "field",
+      "squadSize": { "min": 2, "max": 5 },
+      "timingScale": 1,
+      "evidenceAvailability": "standard",
+      "automationAllowed": ["automated-observation-unit"]
+    },
+    {
+      "preset": "severe",
+      "squadSize": { "min": 3, "max": 5 },
+      "timingScale": 0.8,
+      "evidenceAvailability": "sparse",
+      "automationAllowed": []
+    }
+  ],
+
+  "behaviourModule": null
+}

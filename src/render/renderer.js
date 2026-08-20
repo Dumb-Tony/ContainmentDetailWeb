@@ -329,7 +329,7 @@ export class Renderer {
     this.anomalyMesh.visible = show;
     this.anomalyHalo.visible = show;
     if (show) {
-      const pulse = 1 + Math.sin(t / 340) * 0.05 + (a.state === 'drawn' ? 0.12 : 0);
+      const pulse = 1 + Math.sin(t / 340) * 0.05 + (a.stateKind === 'hunting' ? 0.12 : 0);
       this.anomalyMesh.position.set(a.x, 0.9, a.z);
       this.anomalyMesh.scale.setScalar(pulse);
       this.anomalyHalo.position.copy(this.anomalyMesh.position);

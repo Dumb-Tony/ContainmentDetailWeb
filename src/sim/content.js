@@ -181,10 +181,18 @@ function validateAnomaly(doc, itemIds) {
  * @returns {Promise<{items:object, map:object, anomaly:object, itemsById:Map}>}
  */
 export async function loadContent({
+  incident = 'cold-storage-draught',
   itemsPath = '../../content/equipment/items.json',
-  mapPath = '../../content/maps/cold-storage-l2.json',
-  anomalyPath = '../../content/anomalies/graybox-draught.json',
 } = {}) {
+  const incidentPath = `../../content/incidents/${incident}.json`;
+  const pack = await fetchJson(incidentPath);
+
+  for (const k of ['id', 'anomaly', 'map']) {
+    if (!pack[k]) throw new ContentError(incidentPath, [`missing ${k}`]);
+  }
+
+  const mapPath = `../../content/maps/${pack.map}.json`;
+  const anomalyPath = `../../content/anomalies/${pack.anomaly}.json`;
   const [items, map, anomaly] = await Promise.all([
     fetchJson(itemsPath), fetchJson(mapPath), fetchJson(anomalyPath),
   ]);
@@ -198,11 +206,35 @@ export async function loadContent({
   if (problems.length) throw new ContentError(anomalyPath, problems);
 
   const evidenceIds = new Set(anomaly.evidenceRules.map((e) => e.id));
-  problems = validateMap(map, itemIds, evidenceIds);
-  if (problems.length) throw new ContentError(mapPath, problems);
+
+  /**
+   * ⚠ THE INCIDENT IS AUTHORITATIVE OVER THE MAP, AND THIS IS WHERE THAT IS DECIDED.
+   *
+   * A map may ship a default `anomalySpawn` and `evidenceSources` — the incident it was
+   * authored around — because a map with nothing in it is hard to test. But the moment two
+   * incidents share a floor those belong to the incident, not the geometry: they are what
+   * happened here, and a different thing happened here last week. GDD §15.1 lists "compatible
+   * map zones and anchors" and "evidence set and witness variants" as parts of the Incident
+   * Package for exactly this reason.
+   *
+   * So the map's copies are merged UNDER the incident's, and every surviving evidence source
+   * is then validated against THIS anomaly's rules. A source left over from another incident
+   * naming an evidence id this anomaly does not define is a refusal, not a silent skip.
+   */
+  const bound = {
+    ...map,
+    anomalySpawn: pack.anomalySpawn || map.anomalySpawn,
+    evidenceSources: pack.evidenceSources || map.evidenceSources || [],
+  };
+
+  problems = validateMap(bound, itemIds, evidenceIds);
+  if (problems.length) throw new ContentError(`${incidentPath} + ${mapPath}`, problems);
 
   const itemsById = new Map(items.items.map((i) => [i.id, Object.freeze(i)]));
-  return { items, map, anomaly, itemsById };
+  return { items, map: bound, anomaly, incident: pack, itemsById };
 }
+
+/** Every incident the build ships, for the mission board. Content, not code. */
+export const INCIDENTS = Object.freeze(['cold-storage-draught', 'cold-storage-figure']);
 
 export { ContentError };

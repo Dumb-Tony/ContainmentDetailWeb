@@ -29,6 +29,7 @@ import {
   frostBoundaryObserved, batteryDrainObserved,
 } from './sim/evidence.js';
 import { Mission, PHASE } from './sim/mission.js';
+import { observedBy, operativeViewer, cameraViewer } from './sim/perception.js';
 import { dist } from './sim/geometry.js';
 
 /** A command is what one operative is asking for this step, whoever is asking. */
@@ -135,6 +136,8 @@ export class Game {
     this.localNotices = [];
     this.result = null;
     this.custody = 'none';        // none | sealed | verified
+    this.observation = { observed: false, by: [], count: 0 };
+    this.viewers = [];
     this.extracted = false;
   }
 
@@ -369,9 +372,21 @@ export class Game {
     for (const d of this.deployables.list) {
       if (d.isEmitter && d.active) sources.push({ id: d.uid, x: d.x, z: d.z, peakC: d.item.heatOutputCelsius });
     }
+    /* Who is watching it. Judged on the host, like everything else it might be decided by
+     * (GDD §20.3) — a client's camera feed is 80ms stale and must never be what loses the
+     * operation. An operative who is down is not watching anything. */
+    const viewers = [];
+    for (const p of this.players) if (p.alive && !p.downed) viewers.push(operativeViewer(p));
+    for (const d of this.deployables.list) {
+      if (d.itemId === 'remote-camera' && d.active) viewers.push(cameraViewer(d));
+    }
+    this.observation = observedBy(this.anomaly.x, this.anomaly.z, viewers, this.site.blockingRects());
+    this.viewers = viewers;
+
     const prevState = this.anomaly.state;
     const res = this.anomaly.step(stepMs, simTimeMs, {
       sources, operatives: this.players.filter((p) => p.alive), pressureStage: m.stage,
+      observation: this.observation,
     });
     if (this.anomaly.state !== prevState) {
       const t = this.anomaly.transitions[this.anomaly.transitions.length - 1];
@@ -554,7 +569,7 @@ export class Game {
     /* The seal comes first: when it is available it is the only thing that matters. */
     const caseDep = this.deployables.byItem('reinforced-transit-case')
       .find((d) => !d.sealed && dist(p.x, p.z, d.x, d.z) <= reach);
-    if (caseDep && this.anomaly.state === ANOMALY_STATE.BANKED
+    if (caseDep && this.anomaly.isHeld
       && dist(this.anomaly.x, this.anomaly.z, caseDep.x, caseDep.z) <= 1.5) {
       return { kind: 'seal', text: 'SEAL THE CASE', target: caseDep };
     }
@@ -768,7 +783,7 @@ export class Game {
       return null;
     }
     if (id === 'sample-kit') {
-      if (!this.anomaly.icePatches.length && this.anomaly.state !== ANOMALY_STATE.BANKED) return 'No frost worth taking.';
+      if (!this.anomaly.icePatches.length && !this.anomaly.isHeld) return 'No frost worth taking.';
       this.notice('Frost sample sealed. Research will want this.');
       p.drop(p.heldSlot);
       return null;

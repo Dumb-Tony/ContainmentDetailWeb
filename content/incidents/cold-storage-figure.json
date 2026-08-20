@@ -1,0 +1,31 @@
+{
+  "id": "cold-storage-figure",
+  "contentRevision": "0.1.0",
+  "displayName": "The figure in aisle B",
+  "anomaly": "stillwater-figure",
+  "map": "cold-storage-l2",
+  "difficulty": "field",
+
+  "_note": "The SAME FLOOR as cold-storage-draught, and a completely different operation. The squad walks in with the map already learned and every instinct wrong: the imager reads nothing, the breakers do not matter, and the aisles they used as fencing lanes last time are now sightlines they have to hold. GDD 15.2 calls this epistemic and operational variation; this is what it looks like when the map is a constant and the incident is the variable.\n\nIt starts in Aisle B, at the far end, because the supervisor's statement says so and because the aisle is a long straight run — a single camera at the south end holds the whole lane, and that is the discovery the procedure turns on.",
+
+  "anomalySpawn": [-0.5, 9.0],
+
+  "briefing": {
+    "headline": "Repeat sighting, cold storage aisle B",
+    "report": "The night supervisor called in 'a man standing at the end of aisle B' four times in one shift, walked the aisle four times, and found nothing. On the fifth she watched the camera instead and it stayed. That was eleven days ago.",
+    "known": [
+      { "text": "The supervisor is at the stair head and will give a statement.", "confidence": "probable" },
+      { "text": "Site electrical log shows fourteen unexplained brownouts on the storage circuit.", "confidence": "probable" },
+      { "text": "A night-shift name stopped signing in eleven days ago and was not reported absent.", "confidence": "disputed" }
+    ]
+  },
+
+  "evidenceSources": [
+    { "evidenceId": "supervisor-statement", "at": [7.6, -8.2], "label": "Night supervisor", "prompt": "Take a statement", "requiresEquipment": [] },
+    { "evidenceId": "dust-ring", "at": [-0.5, 8.4], "label": "A ring of bare floor", "prompt": "Examine the floor", "requiresEquipment": [] },
+    { "evidenceId": "brownout-log", "at": [-11.2, -11.4], "label": "Electrical log on the office desk", "prompt": "Read the log", "requiresEquipment": [] },
+    { "evidenceId": "night-shift-roster", "at": [-10.4, -9.2], "label": "Roster pinned by the office door", "prompt": "Read the roster", "requiresEquipment": [] },
+    { "evidenceId": "camera-still", "at": [-0.5, -3.0], "label": "The aisle B camera position", "prompt": "Review the recorded feed", "requiresEquipment": ["remote-camera"] },
+    { "evidenceId": "thermal-null", "at": [-0.5, 6.0], "label": "Thermal reading at the sighting", "prompt": "Take a thermal reading", "requiresEquipment": ["thermal-imager"] }
+  ]
+}

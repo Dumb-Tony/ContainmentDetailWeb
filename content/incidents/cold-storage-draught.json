@@ -1,0 +1,28 @@
+{
+  "id": "cold-storage-draught",
+  "contentRevision": "0.1.0",
+  "displayName": "Cold that moves",
+  "anomaly": "graybox-draught",
+  "map": "cold-storage-l2",
+  "difficulty": "field",
+
+  "_note": "THE CONTENT UNIT IS AN INCIDENT PACKAGE, NOT AN ANOMALY (GDD 15.1). An anomaly file holds rules and nothing about where; a map file holds geometry and nothing about what happened. This binds the two, and it is the only reason two different incidents can share one floor — which is exactly what the vertical slice asks for (26.2). It carries the things that belong to neither on their own: where the thing starts, what is lying about to be found, and the briefing the squad is read.",
+
+  "anomalySpawn": [-10.0, 10.0],
+
+  "briefing": {
+    "headline": "Missing maintenance crew, sub-level 2",
+    "report": "A maintenance crew sealed the floor after reporting 'cold that moves'. Two of the three came back. Mains have been down six days.",
+    "known": [
+      { "text": "One surviving crew member is waiting at the stair head.", "confidence": "probable" },
+      { "text": "Plant log reports the chiller ran eleven days against a four-hour duty cycle.", "confidence": "disputed" }
+    ]
+  },
+
+  "evidenceSources": [
+    { "evidenceId": "frost-bloom", "at": [-10.2, 9.2], "label": "Frost on a stanchion", "prompt": "Examine the frost", "requiresEquipment": [] },
+    { "evidenceId": "survivor-account", "at": [7.6, -8.2], "label": "Surviving crew member", "prompt": "Take a statement", "requiresEquipment": [] },
+    { "evidenceId": "maintenance-log", "at": [-11.2, -11.4], "label": "Plant log on the office desk", "prompt": "Read the log", "requiresEquipment": [] },
+    { "evidenceId": "stairwell-draught", "at": [10.8, -11.2], "label": "Draught at the stair head", "prompt": "Note the draught", "requiresEquipment": [] }
+  ]
+}

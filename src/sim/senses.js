@@ -59,6 +59,26 @@ export const SENSES = Object.freeze({
 
   /** Satisfied by an operative closing a case around it. See `Anomaly.trySeal`. */
   'enclosed-by': { performed: true, poll: () => false },
+
+  /* ── perception (GDD §8.6, §11.2) ───────────────────────────────────────────
+   * The second measurable quantity in the game, and the reason a second anomaly can be a
+   * different PROCEDURE rather than the same one with different numbers. Heat is a field
+   * you build walls out of; observation is a resource you have to keep pointed at
+   * something while you do other work.
+   *
+   * ⚠ These two are deliberately NOT symmetric. `observed` fires the moment coverage
+   * exists, so a fence of eyes closes as fast as a fence of heat. `unobserved` carries a
+   * sustain in the content, so coverage that flickers — someone turning their head, a
+   * camera that clipped a passing teammate — does not release it. §8.2 requires that
+   * network delay never decides an exact-frame failure, and this is where that is paid. */
+  observed: {
+    poll: (a, w, ctx) => {
+      const n = ctx.observation ? ctx.observation.count : 0;
+      return n >= (w.viewers || 1);
+    },
+  },
+
+  'unobserved-for': { poll: (a, w, ctx) => !ctx.observation || ctx.observation.count === 0 },
 });
 
 /**

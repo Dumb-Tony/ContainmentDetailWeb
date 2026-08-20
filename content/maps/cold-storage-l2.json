@@ -11,6 +11,8 @@
   "spawn": [8.5, -8.5],
   "spawnFacingRad": 2.4,
   "extraction": { "x": 9.5, "z": -9.5, "radius": 2.0 },
+  "_spawnNote": "Kept as the map default for the incident it was authored around. An incident package overrides it — see src/sim/content.js loadContent.",
+
   "anomalySpawn": [-10.0, 10.0],
   "cache": { "x": 6.4, "z": -7.2 },
 
