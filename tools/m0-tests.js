@@ -141,6 +141,20 @@ async function sectionB(content) {
   eq('B11 the stair head is where extraction is', site.roomNameAt(site.extraction.x, site.extraction.z), 'Stair head');
   eq('B12 spawn is inside the site', site.inBounds(site.spawn.x, site.spawn.z), true);
 
+  /* Every square metre a person can stand on has a name they could say over the radio.
+   * Room rects stop at the walls, so the doorways between them are a seam — and standing
+   * in a doorway is exactly when you are most likely to be telling somebody where you are. */
+  const nameless = [];
+  for (let x = site.bounds.minX + 0.5; x <= site.bounds.maxX - 0.5; x += 0.5) {
+    for (let z = site.bounds.minZ + 0.5; z <= site.bounds.maxZ - 0.5; z += 0.5) {
+      const inWall = site.blockingRects().some((r) => x > r[0] - 0.34 && x < r[2] + 0.34 && z > r[1] - 0.34 && z < r[3] + 0.34);
+      if (inWall) continue;
+      if (site.roomNameAt(x, z) === 'Unmarked floor') nameless.push(`${x.toFixed(1)},${z.toFixed(1)}`);
+    }
+  }
+  ok('B16 every standable point on the floor has a name a player could say aloud',
+    nameless.length === 0, `${nameless.length} nameless cells, e.g. ${nameless.slice(0, 4).join(' · ')}`);
+
   /* Geometry primitives the movement code stands on. */
   ok('B13 a segment across a rect is detected', segmentHitsRect([-1, -1, 1, 1], -3, 0, 3, 0));
   ok('B14 a segment beside it is not', !segmentHitsRect([-1, -1, 1, 1], -3, 5, 3, 5));

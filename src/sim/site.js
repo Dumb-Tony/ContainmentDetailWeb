@@ -131,8 +131,30 @@ export class Site {
     return null;
   }
 
-  /** Name for a callout. GDD §14.3 wants readable landmarks; this is where they live. */
-  roomNameAt(x, z) { const r = this.roomAt(x, z); return r ? r.name : 'Unmarked floor'; }
+  /**
+   * Name for a callout. GDD §14.3 wants landmarks a player can say aloud — so this must
+   * always answer, and the answer must be the room a person would say they are in.
+   *
+   * ⚠ ROOM RECTS DO NOT TILE THE FLOOR. They stop at the walls, which leaves a seam the
+   * width of every doorway between them, and standing in a doorway is exactly when you
+   * are most likely to be telling somebody where you are. Measured on the shipped map:
+   * fifty standable cells fell in a seam and reported "Unmarked floor". Falling back to
+   * the nearest rect costs one loop and cannot leave a gap anywhere, at any map.
+   */
+  roomNearest(x, z) {
+    const inside = this.roomAt(x, z);
+    if (inside) return inside;
+    let best = null, bestD = Infinity;
+    for (const r of this.rooms) {
+      const cx = Math.max(r.rect[0], Math.min(x, r.rect[2]));
+      const cz = Math.max(r.rect[1], Math.min(z, r.rect[3]));
+      const d = (x - cx) * (x - cx) + (z - cz) * (z - cz);
+      if (d < bestD) { bestD = d; best = r; }
+    }
+    return best;
+  }
+
+  roomNameAt(x, z) { const r = this.roomNearest(x, z); return r ? r.name : 'Unmarked floor'; }
 
   inExtraction(x, z) {
     return dist(x, z, this.extraction.x, this.extraction.z) <= this.extraction.radius;
