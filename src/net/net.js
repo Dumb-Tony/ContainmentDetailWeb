@@ -90,7 +90,7 @@ export class NetSession {
     this.game = game;
     this.role = ROLE.SOLO;
     this.code = null;
-    this.status = 'offline';
+    this.status = 'not connected';
     this.snapshotEveryMs = 1000 / snapshotHz;
     this._sinceSnapMs = 0;
     this.onStatus = null;
@@ -319,7 +319,7 @@ export class NetSession {
       return;
     }
     if (m.t === MSG.REFUSE) { this._say(m.why || 'refused'); return; }
-    if (m.t === MSG.EVENT) { this.game.notice(m.text); return; }
+    if (m.t === MSG.EVENT) { this.game.noticeLocal(m.text); return; }
     if (m.t === MSG.SNAP) {
       this.snapsReceived++;
       this.lastSnapshot = m;
@@ -369,7 +369,7 @@ export class NetSession {
     this.link = null; this.peer = null;
     this.role = ROLE.SOLO;
     this.localPlayerId = 'p1';
-    this._say('offline');
+    this._say('not connected');
   }
 
   /* ── PeerJS, the real transport ───────────────────────────────────────── */

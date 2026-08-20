@@ -131,6 +131,8 @@ export class Game {
      *  dropping it because they went down) restores exactly what they picked up. */
     this._carried = new Map();
     this.notices = [];
+    /** Private to this machine. A snapshot replaces `notices` and never touches these. */
+    this.localNotices = [];
     this.result = null;
     this.custody = 'none';        // none | sealed | verified
     this.extracted = false;
@@ -808,15 +810,36 @@ export class Game {
     return Math.min(1, l);
   }
 
+  /** Squad-wide, and therefore the HOST'S to own: it travels in the snapshot. */
   notice(text) {
     this.notices.push({ text, atMs: this.clock.simTimeMs });
     if (this.notices.length > 40) this.notices.shift();
     this.bus.emit(EVENTS.NOTICE, { text }, this.clock.simTimeMs);
   }
 
+  /**
+   * Private to this machine, and NEVER carried by a snapshot.
+   *
+   * ⚠ THIS EXISTS BECAUSE THE SNAPSHOT ATE THE REFUSALS. A client that asks for something
+   * the host will not allow is told why — and `applySnapshot` replaced `notices` wholesale
+   * with the host's list, so the reason was destroyed within about 80ms and the player saw
+   * nothing at all. Found in two real browsers over a real connection, because a loopback
+   * test that reads the notice immediately never gets far enough to lose it. A refusal is
+   * addressed to ONE operative; the squad feed is addressed to all of them; they cannot
+   * share a list.
+   */
+  noticeLocal(text) {
+    this.localNotices.push({ text, atMs: this.clock.simTimeMs, local: true });
+    if (this.localNotices.length > 20) this.localNotices.shift();
+    this.bus.emit(EVENTS.NOTICE, { text, local: true }, this.clock.simTimeMs);
+  }
+
   recentNotices(n = 4, windowMs = 9000) {
     const t = this.clock.simTimeMs;
-    return this.notices.filter((x) => t - x.atMs < windowMs).slice(-n);
+    return this.notices.concat(this.localNotices)
+      .filter((x) => t - x.atMs < windowMs)
+      .sort((a, b) => a.atMs - b.atMs)
+      .slice(-n);
   }
 
   endMission(failReason, simTimeMs) {

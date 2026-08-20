@@ -944,29 +944,44 @@ async function sectionM(content) {
   eq('M13 an action with nothing in reach changes nothing', host.g.ledger.entries.length, evBefore);
   ok('M14 and the host told them why rather than silently dropping it', host.n.actsRefused >= 1);
 
+  /* ⚠ THE SNAPSHOT USED TO EAT THIS. A refusal is addressed to one operative; the squad
+   * feed is addressed to all of them. They shared a list, so `applySnapshot` replaced the
+   * client's reason with the host's notices about 80ms later and the player saw nothing.
+   * Found in two real browsers, because a loopback test that reads the notice immediately
+   * never survives long enough to lose it — so this one deliberately reads it AFTER. */
+  ok('M15 the refusal reached the client', c1.g.recentNotices(9).some((n) => /reach/i.test(n.text)));
+  host.n.pump(1000, null);
+  host.n.pump(1000, null);
+  ok('M16 and survives the snapshots that follow it',
+    c1.g.recentNotices(9).some((n) => /reach/i.test(n.text)),
+    c1.g.recentNotices(9).map((n) => n.text).join(' | '));
+  ok('M17 while the squad-wide feed still comes from the host',
+    (host.g.notice('all-hands test line'), host.n.pump(1000, null),
+      c1.g.recentNotices(9).some((n) => /all-hands/.test(n.text))));
+
   /* Discrete actions go through the same verbs the host's own keyboard uses. */
   const p2 = host.g.playerById('p2');
   p2.x = host.g.site.cache.x; p2.z = host.g.site.cache.z;
   c1.n.act(ACT.TAKE, { id: 'thermal-imager' });
-  ok('M15 a client can take from cargo, validated by the host', p2.carrying('thermal-imager'));
+  ok('M18 a client can take from cargo, validated by the host', p2.carrying('thermal-imager'));
   c1.n.act(ACT.IMAGER);
-  ok('M16 and switch it on', host.g.imagerOnIds.has('p2'));
-  ok('M17 which the host tells everyone about', (host.n.pump(1000, null), c1.g.imagerOnIds.has('p2')));
+  ok('M19 and switch it on', host.g.imagerOnIds.has('p2'));
+  ok('M20 which the host tells everyone about', (host.n.pump(1000, null), c1.g.imagerOnIds.has('p2')));
 
   /* A third operative, and the squad cap. */
   const c2 = mkClient();
   const [hl2, cl2] = loopbackPair();
   host.n.accept(hl2); c2.n.join(cl2, { name: 'Drake' });
-  eq('M18 a third operative joins', host.g.players.length, 3);
-  eq('M19 and lands in their own seat', c2.n.localPlayerId, 'p3');
+  eq('M21 a third operative joins', host.g.players.length, 3);
+  eq('M22 and lands in their own seat', c2.n.localPlayerId, 'p3');
   const extras = [];
   for (let i = 0; i < 3; i++) {
     const c = mkClient(); const [a, b] = loopbackPair();
     host.n.accept(a); c.n.join(b, { name: `Extra${i}` });
     extras.push(c);
   }
-  eq(`M20 the squad caps at ${MAX_SQUAD} (GDD 11.1)`, host.g.players.length, MAX_SQUAD);
-  ok('M21 and the one over the cap is told why', /full/i.test(extras[extras.length - 1].n.status), extras[extras.length - 1].n.status);
+  eq(`M23 the squad caps at ${MAX_SQUAD} (GDD 11.1)`, host.g.players.length, MAX_SQUAD);
+  ok('M24 and the one over the cap is told why', /full/i.test(extras[extras.length - 1].n.status), extras[extras.length - 1].n.status);
 
   /* A version mismatch is refused with a sentence a human can act on. */
   const oldClient = mkClient();
@@ -974,36 +989,36 @@ async function sectionM(content) {
   host.n.accept(ho);
   co.onMessage = (m) => { oldClient.n.status = m.why || m.t; };
   co.send({ t: MSG.HELLO, v: PROTOCOL_VERSION + 99, name: 'Stale' });
-  ok('M22 a protocol mismatch is refused, in words', /reload/i.test(oldClient.n.status), oldClient.n.status);
+  ok('M25 a protocol mismatch is refused, in words', /reload/i.test(oldClient.n.status), oldClient.n.status);
 
   /* ── the drop, the reserved slot, and the reconnect (GDD 11.5) ── */
   const drakeSeat = host.n.seats.get('p3');
   const drakeToken = drakeSeat.token;
   host.g.playerById('p3').take(content.itemsById.get('floodlight-tripod'));
   hl2.close();
-  eq('M23 a dropped operative keeps their seat on the roster', host.g.players.length, MAX_SQUAD);
-  eq('M24 and is marked off the radio rather than deleted', host.g.playerById('p3').connected, false);
-  ok('M25 their kit is still theirs', host.g.playerById('p3').carrying('floodlight-tripod'));
-  ok('M26 and they stand still rather than running off — safe autopilot',
+  eq('M26 a dropped operative keeps their seat on the roster', host.g.players.length, MAX_SQUAD);
+  eq('M27 and is marked off the radio rather than deleted', host.g.playerById('p3').connected, false);
+  ok('M28 their kit is still theirs', host.g.playerById('p3').carrying('floodlight-tripod'));
+  ok('M29 and they stand still rather than running off — safe autopilot',
     host.g.commandFor('p3') === EMPTY_COMMAND || !host.g.commands.has('p3'));
 
   const back = mkClient();
   const [hb, cb] = loopbackPair();
   host.n.accept(hb);
   back.n.join(cb, { name: 'Drake', token: drakeToken });
-  eq('M27 a resume token buys back the same seat', back.n.localPlayerId, 'p3');
-  eq('M28 with the squad unchanged in size', host.g.players.length, MAX_SQUAD);
-  eq('M29 and the kit still in their hands (11.5: "restores character state and inventory")',
+  eq('M30 a resume token buys back the same seat', back.n.localPlayerId, 'p3');
+  eq('M31 with the squad unchanged in size', host.g.players.length, MAX_SQUAD);
+  eq('M32 and the kit still in their hands (11.5: "restores character state and inventory")',
     host.g.playerById('p3').carrying('floodlight-tripod'), true);
-  eq('M30 back on the radio', host.g.playerById('p3').connected, true);
+  eq('M33 back on the radio', host.g.playerById('p3').connected, true);
 
   /* ── the join-in-progress gate ── */
   host.g.commitProcedure({ target: 'The cold mass itself' });
   const late = mkClient();
   const [hlate, clate] = loopbackPair();
   host.n.accept(hlate); late.n.join(clate, { name: 'Late' });
-  ok('M31 nobody joins after the squad commits to a procedure', /committed/i.test(late.n.status), late.n.status);
-  eq('M32 and the roster did not grow', host.g.players.length, MAX_SQUAD);
+  ok('M34 nobody joins after the squad commits to a procedure', /committed/i.test(late.n.status), late.n.status);
+  eq('M35 and the roster did not grow', host.g.players.length, MAX_SQUAD);
 
   /* ── custody cannot leave with somebody who lost their radio ── */
   host.g.mission.setPhase(PHASE.CONTAINMENT_ACTIVE, host.g.clock.simTimeMs);
@@ -1014,9 +1029,9 @@ async function sectionM(content) {
   host.g._carried.set('p2', { sealed: true, custodyHeldMs: 5000, batteryMs: kase.batteryMs });
   host.g.deployables.remove(kase);
   hl.close();
-  eq('M33 a dropped carrier puts custody down rather than taking it offline with them',
+  eq('M36 a dropped carrier puts custody down rather than taking it offline with them',
     host.g.playerById('p2').hands, null);
-  ok('M34 and the case is on the floor, still sealed',
+  ok('M37 and the case is on the floor, still sealed',
     host.g.deployables.byItem('reinforced-transit-case').some((d) => d.sealed));
 
   /* ── prediction and reconciliation (GDD 20.4) ── */
@@ -1031,13 +1046,13 @@ async function sectionM(content) {
   const x0 = mine.x, z0 = mine.z;
   for (let i = 0; i < 20; i++) pred.g.predictLocal(pred.n.localPlayerId, 16);
   const predicted = dist(x0, z0, mine.x, mine.z);
-  ok('M35 a client predicts its own feet rather than waiting for a snapshot', predicted > 0.3, `${predicted.toFixed(2)}m`);
+  ok('M38 a client predicts its own feet rather than waiting for a snapshot', predicted > 0.3, `${predicted.toFixed(2)}m`);
   mine.netX = mine.x + 0.2; mine.netZ = mine.z;
   const err = pred.g.reconcileLocal(pred.n.localPlayerId);
-  ok('M36 a small disagreement is blended, not snapped', err < CONFIG.net.snapErrorM && Math.abs(mine.x - mine.netX) > 0.01);
+  ok('M39 a small disagreement is blended, not snapped', err < CONFIG.net.snapErrorM && Math.abs(mine.x - mine.netX) > 0.01);
   mine.netX = mine.x + 5;
   pred.g.reconcileLocal(pred.n.localPlayerId);
-  near('M37 a large one is snapped, because smoothing that far is just a slow lie', mine.x, mine.netX, 0.001);
+  near('M40 a large one is snapped, because smoothing that far is just a slow lie', mine.x, mine.netX, 0.001);
 
   /* ── the squad changes the SIMULATION, not just the roster ── */
   const two = new Game(content, { seed: 'two' });
@@ -1047,12 +1062,12 @@ async function sectionM(content) {
   b.x = 6; b.z = 6;
   two.skipMs(120);
   const em = two.heat.emitters.filter((e) => e.peakC === CONFIG.player.bodyHeatC);
-  eq('M38 every operative is a heat source, so a squad is several lures', em.length, 2);
+  eq('M41 every operative is a heat source, so a squad is several lures', em.length, 2);
 
   two.anomaly.x = 5.4; two.anomaly.z = 6.0;
   two.anomaly.state = 'drawn';
   two.skipMs(400);
-  ok('M39 the draught takes the operative it can reach, not the one with seat one',
+  ok('M42 the draught takes the operative it can reach, not the one with seat one',
     two.anomaly.targetId === b.id, `targeted ${two.anomaly.targetId}`);
 
   /* ── down, and rescued (GDD 9.5) — the reason a second operative exists ── */
@@ -1062,27 +1077,27 @@ async function sectionM(content) {
   const hurt = med.player;
   hurt.applyCondition('exposure', 'serious');
   hurt.applyCondition('exposure', 'serious');
-  ok('M40 a second serious contact puts an operative DOWN, not dead', hurt.downed && hurt.alive);
+  ok('M43 a second serious contact puts an operative DOWN, not dead', hurt.downed && hurt.alive);
   med.skipMs(4000);
-  ok('M41 and a bleed-out clock starts', hurt.downedMs > 3000, `${hurt.downedMs.toFixed(0)}ms`);
+  ok('M44 and a bleed-out clock starts', hurt.downedMs > 3000, `${hurt.downedMs.toFixed(0)}ms`);
 
   mate.x = hurt.x + 0.8; mate.z = hurt.z;
   mate.take(content.itemsById.get('trauma-kit'));
   const rescue = med.contextAction(mate.id);
-  ok('M42 a teammate with a trauma kit is offered the rescue above everything else',
+  ok('M45 a teammate with a trauma kit is offered the rescue above everything else',
     rescue && rescue.kind === 'revive', rescue ? `${rescue.kind}: ${rescue.text}` : 'none');
   med.doInteract(mate.id);
-  ok('M43 which puts them back on their feet, stabilised rather than healed',
+  ok('M46 which puts them back on their feet, stabilised rather than healed',
     !hurt.downed && hurt.alive && hurt.conditions.exposure.stabilised && hurt.conditions.exposure.severity > 0);
-  eq('M44 and the debrief counts it', med.mission.tally.rescues, 1);
+  eq('M47 and the debrief counts it', med.mission.tally.rescues, 1);
 
   const solo = new Game(content, { seed: 'solo' });
   solo.commitLoadout(RECOMMENDED_MANIFEST);
   solo.player.applyCondition('exposure', 'serious');
   solo.player.applyCondition('exposure', 'serious');
   solo.skipMs(CONFIG.player.bleedOutMs + 1000);
-  ok('M45 alone, nobody comes, and the floor takes them', !solo.player.alive);
-  ok('M46 which ends the operation', !!solo.result && solo.result.overall === 'Failed', solo.result && solo.result.overall);
+  ok('M48 alone, nobody comes, and the floor takes them', !solo.player.alive);
+  ok('M49 which ends the operation', !!solo.result && solo.result.overall === 'Failed', solo.result && solo.result.overall);
 
   /* ── two on the case (GDD 9.2, 11.2) ── */
   const carry = new Game(content, { seed: 'carry' });
@@ -1094,8 +1109,8 @@ async function sectionM(content) {
   helper.x = carry.player.x + 1.0;
   const together = carry.player.speedFactor(false, { assisted: !!carry._assistFor(carry.player) });
   note(`carrying the case: ${(alone * 100).toFixed(0)}% alone, ${(together * 100).toFixed(0)}% with a second pair of hands`);
-  ok('M47 a second pair of hands on the case is worth having', together > alone);
-  ok('M48 but solo is never gated on it', alone > 0.5);
+  ok('M50 a second pair of hands on the case is worth having', together > alone);
+  ok('M51 but solo is never gated on it', alone > 0.5);
 
   await yieldToLoop();
   emit();

@@ -162,10 +162,10 @@ export class Panels {
         </section>
       </div>`,
       hosting
-        ? `<button class="go" data-deploy>Everyone is here — brief us</button>`
+        ? `<span class="waiting">Share the code, then brief the squad when everyone is on the roster.</span><button class="go" data-deploy>Brief us</button>`
         : joined
           ? `<span class="waiting">Waiting for the host to brief the squad…</span>`
-          : '');
+          : `<span class="waiting">Deploy alone, open a room for friends, or join one with a code.</span>`);
 
     const q = (s) => this.node.querySelector(s);
     const nameField = q('[data-name]');
