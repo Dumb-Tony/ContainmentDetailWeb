@@ -12,6 +12,8 @@
  * on Pages.
  */
 
+import { SENSES, EFFECT_VERBS, FIELD_KINDS, isSense, isPerformed } from './senses.js';
+
 const url = (p) => new URL(p, import.meta.url).href;
 
 class ContentError extends Error {
@@ -97,7 +99,6 @@ function validateAnomaly(doc, itemIds) {
     if (doc[k] === undefined) p.push(`missing ${k}`);
   }
   const stateIds = new Set((doc.states || []).map((s) => s.id));
-  if (!stateIds.has('contained')) p.push('no `contained` state — there is nothing to win');
 
   for (const t of doc.triggers || []) {
     if (t.from !== '*' && !stateIds.has(t.from)) p.push(`trigger ${t.id}: from-state ${t.from} does not exist`);
@@ -118,7 +119,39 @@ function validateAnomaly(doc, itemIds) {
     if (!reachable.has(s.id)) p.push(`state ${s.id} is unreachable — no trigger arrives at it`);
   }
 
+  /* ⚠ THE VOCABULARIES ARE CLOSED, AND THIS IS WHERE THAT IS ENFORCED. A trigger naming a
+   * sense the engine does not implement, or a capability naming a verb it cannot dispatch,
+   * is not a warning and not an inert no-op — it is a rule the player can never learn, and
+   * the whole design rests on rules being learnable (Pillar 1). Refuse it at load. */
+  for (const t of doc.triggers || []) {
+    const s = t.when && t.when.sense;
+    if (!s) p.push(`trigger ${t.id}: no sense named`);
+    else if (!isSense(s)) {
+      p.push(`trigger ${t.id}: sense "${s}" is not in the closed vocabulary (${Object.keys(SENSES).join(', ')})`);
+    }
+  }
+  const performed = (doc.triggers || []).filter((t) => t.when && isPerformed(t.when.sense));
+  if (performed.length > 1) {
+    p.push(`${performed.length} performed triggers (${performed.map((t) => t.id).join(', ')}) — an anomaly has exactly one custody move`);
+  }
+
+  const kinds = new Set(['latent', 'active', 'hunting', 'vulnerable', 'contained']);
+  for (const s of doc.states || []) {
+    if (!kinds.has(s.kind)) p.push(`state ${s.id}: kind "${s.kind}" is not one of ${[...kinds].join(', ')}`);
+  }
+  if (!(doc.states || []).some((s) => s.kind === 'contained')) p.push('no state of kind `contained` — there is nothing to win');
+  if (!(doc.states || []).some((s) => s.kind === 'vulnerable')) {
+    p.push('no state of kind `vulnerable` — nothing can ever be sealed');
+  }
+
+  if (doc.presence && doc.presence.field && !FIELD_KINDS.includes(doc.presence.field.kind)) {
+    p.push(`presence.field.kind "${doc.presence.field.kind}" is not one of ${FIELD_KINDS.join(', ')}`);
+  }
+
   for (const c of doc.capabilities || []) {
+    if (!EFFECT_VERBS.includes(c.verb)) {
+      p.push(`capability ${c.id}: verb "${c.verb}" is not in the closed vocabulary (${EFFECT_VERBS.join(', ')})`);
+    }
     for (const st of c.availableInStates || []) {
       if (!stateIds.has(st)) p.push(`capability ${c.id}: available in ${st}, which does not exist`);
     }

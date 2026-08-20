@@ -782,7 +782,7 @@ async function sectionK() {
     'src/core/rng.js', 'src/core/clock.js', 'src/core/input.js', 'src/core/eventBus.js',
     'src/sim/geometry.js', 'src/sim/site.js', 'src/sim/heat.js', 'src/sim/anomaly.js',
     'src/sim/deployables.js', 'src/sim/evidence.js', 'src/sim/player.js',
-    'src/sim/mission.js', 'src/sim/content.js',
+    'src/sim/mission.js', 'src/sim/content.js', 'src/sim/senses.js',
     'src/net/protocol.js', 'src/net/net.js',
     'src/render/scene.js', 'src/render/renderer.js', 'src/render/thermalFloor.js',
     'src/ui/hud.js', 'src/ui/panels.js', 'src/audio/audio.js',
@@ -1116,6 +1116,107 @@ async function sectionM(content) {
   emit();
 }
 
+/* ── N. the engine is data, not this anomaly ─────────────────────────────── */
+async function sectionN(content) {
+  lines.push('--- N. a second anomaly is content, not a code change ---');
+
+  /* THE PROOF THAT MATTERS. Take the shipped anomaly, rename every state and every trigger
+   * to something meaningless, and run it. If the engine still drives it identically, then
+   * nothing is keyed on what this particular anomaly is called — which is the whole claim.
+   * A grep for hard-coded ids would only prove they are absent from one file; this proves
+   * the behaviour does not depend on them anywhere. */
+  const renamed = JSON.parse(JSON.stringify(content.anomaly));
+  const stateMap = { latent: 'q0', aware: 'q1', drawn: 'q2', banked: 'q3', contained: 'q4' };
+  const trigMap = {};
+  renamed.id = 'renamed-draught';
+  renamed.states.forEach((s) => { s.id = stateMap[s.id]; });
+  renamed.triggers.forEach((t, i) => {
+    trigMap[t.id] = `t${i}`;
+    t.id = `t${i}`;
+    if (t.from !== '*') t.from = stateMap[t.from];
+    t.to = stateMap[t.to];
+  });
+  renamed.capabilities.forEach((c) => { c.availableInStates = c.availableInStates.map((s) => stateMap[s]); });
+  renamed.containment.procedures.forEach(() => {});
+
+  const site = new Site(content.map);
+  const heat = new HeatField();
+  const deps = new DeployableSet();
+  const a = new Anomaly(renamed, site, heat, deps);
+  eq('N1 a renamed anomaly starts in its own first state', a.state, 'q0');
+  eq('N2 and the engine reads its KIND rather than its name', a.stateKind, 'latent');
+
+  const op = { id: 'op', x: a.x + 8, z: a.z, peakC: 37 };
+  heat.setEmitters([{ ...op, falloffM: 1.15, active: true }]);
+  let T = 0;
+  const run = (ms, ctx) => { for (let i = 0; i < ms / CONFIG.sim.stepMs; i++) { T += CONFIG.sim.stepMs; heat.setSinks([a.asSink()].filter(Boolean)); a.step(CONFIG.sim.stepMs, T, ctx); } };
+
+  run(3000, { sources: [op], operatives: [], pressureStage: 0 });
+  eq('N3 three seconds of proximity is still not four', a.state, 'q0');
+  run(1500, { sources: [op], operatives: [], pressureStage: 0 });
+  eq('N4 four wakes it, through a trigger called t0', a.state, 'q1');
+  ok('N5 and the transition kept the content telegraph', /frost bloom elongates/.test(a.transitions[0].telegraph));
+  run(9000, { sources: [op], operatives: [], pressureStage: 0 });
+  eq('N6 it closes and locks on, with no id the engine recognises', a.state, 'q2');
+  ok('N7 which is a hunting state, so it moves', a.speedMps > 0 && a.isAwake);
+
+  const tripod = content.itemsById.get('floodlight-tripod');
+  const ring = [];
+  for (let i = 0; i < 8; i++) {
+    const ang = (i / 8) * Math.PI * 2;
+    ring.push({ id: `r${i}`, x: a.x + Math.cos(ang) * 1.6, z: a.z + Math.sin(ang) * 1.6, peakC: tripod.heatOutputCelsius, falloffM: tripod.heatFalloffMetres, active: true });
+  }
+  heat.setEmitters(ring);
+  run(200, { sources: [], operatives: [], pressureStage: 0 });
+  eq('N8 enclosure still banks it, via the wildcard trigger', a.state, 'q3');
+  eq('N9 which the engine knows only as kind `vulnerable`', a.stateKind, 'vulnerable');
+
+  const kase = content.itemsById.get('reinforced-transit-case');
+  const near1 = deps.place(kase, a.x + 0.8, a.z, 0);
+  eq('N10 and the performed trigger is found by its SENSE, not its id', a.trySeal(near1, T), null);
+  eq('N11 leaving it contained', a.stateKind, 'contained');
+
+  /* Now the validator: the closed vocabulary has to be enforced at load, because a sense
+   * the engine cannot evaluate is a rule the player can never learn. */
+  const orig = window.fetch;
+  const tryLoad = async (mutate) => {
+    const doc = JSON.parse(JSON.stringify(content.anomaly));
+    mutate(doc);
+    window.fetch = async (u) => {
+      const s = String(u);
+      const body = s.includes('anomalies') ? doc : s.includes('maps') ? content.map : content.items;
+      return { ok: true, status: 200, json: async () => body };
+    };
+    try { await loadContent(); return null; } catch (e) { return e.message; } finally { window.fetch = orig; }
+  };
+
+  let msg = await tryLoad((d) => { d.triggers[0].when.sense = 'smells-fear'; });
+  ok('N12 a sense outside the vocabulary is REFUSED at load', msg && /smells-fear/.test(msg), msg);
+  msg = await tryLoad((d) => { d.capabilities[0].verb = 'explode'; });
+  ok('N13 so is an effect verb the engine cannot dispatch', msg && /explode/.test(msg), msg);
+  msg = await tryLoad((d) => { d.states[1].kind = 'peckish'; });
+  ok('N14 and a state kind the rest of the game cannot reason about', msg && /peckish/.test(msg), msg);
+  msg = await tryLoad((d) => { d.triggers.push({ ...d.triggers.find((t) => t.id === 'sealed'), id: 'sealed-twice' }); });
+  ok('N15 two custody moves are refused — an anomaly has exactly one', msg && /custody move/.test(msg), msg);
+  msg = await tryLoad((d) => { d.states = d.states.filter((s) => s.kind !== 'vulnerable'); });
+  ok('N16 an anomaly with nothing sealable is refused', msg && /vulnerable/.test(msg), msg);
+  msg = await tryLoad((d) => { d.presence.field.kind = 'wormhole'; });
+  ok('N17 as is a field disturbance the heat layer cannot represent', msg && /wormhole/.test(msg), msg);
+
+  /* And the field itself is content now, not a constant. */
+  const quiet = JSON.parse(JSON.stringify(content.anomaly));
+  quiet.presence.field.kind = 'none';
+  const b = new Anomaly(quiet, new Site(content.map), new HeatField(), new DeployableSet());
+  eq('N18 an anomaly that disturbs nothing has no field presence at all', b.asSink(), null);
+  const strong = JSON.parse(JSON.stringify(content.anomaly));
+  strong.presence.field.magnitude = 40;
+  const c = new Anomaly(strong, new Site(content.map), new HeatField(), new DeployableSet());
+  eq('N19 and its magnitude comes from the file, not from CONFIG', c.asSink().chillC, 40);
+
+  await yieldToLoop();
+  emit();
+}
+
 /* ── run ─────────────────────────────────────────────────────────────────── */
 (async () => {
   try {
@@ -1131,6 +1232,7 @@ async function sectionM(content) {
     await sectionI(content);
     sectionJ();
     await sectionM(content);
+    await sectionN(content);
     await sectionK();
     await sectionL();
     emit();

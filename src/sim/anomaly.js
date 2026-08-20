@@ -25,7 +25,15 @@
 
 import { CONFIG } from '../config.js';
 import { dist, segmentHitsRect } from './geometry.js';
+import { SENSES, isPerformed } from './senses.js';
 
+/**
+ * ⚠ THESE ARE THE GRAYBOX-DRAUGHT'S STATE NAMES, KEPT ONLY FOR READABILITY AT CALL SITES.
+ * The engine no longer switches on them — it reads `states[].kind` and `states[].speedMps`
+ * out of the content. A second anomaly may name its states anything it likes; what it may
+ * not do is invent a KIND, because the kinds are what the rest of the game reasons about
+ * ("is it loose", "is it awake", "can it be sealed").
+ */
 const STATE = Object.freeze({
   LATENT: 'latent', AWARE: 'aware', DRAWN: 'drawn', BANKED: 'banked', CONTAINED: 'contained',
 });
@@ -52,12 +60,18 @@ export class Anomaly {
   reset() {
     this.x = this.site.anomalySpawn.x;
     this.z = this.site.anomalySpawn.z;
-    this.state = STATE.LATENT;
+    /* ⚠ The starting state is the content's FIRST state, not a state called "latent".
+     * This line said `STATE.LATENT` and was the last hard-coded id left in the engine —
+     * caught by the suite renaming every state in a copy of the shipped anomaly and
+     * finding it still woke up somewhere else. */
+    this.state = (this.def.states[0] && this.def.states[0].id) || STATE.LATENT;
     this.stateEnteredMs = 0;
     this.targetId = null;
-    this.heatSustainMs = 0;      // heat-detected
-    this.gradientLostMs = 0;     // gradient-lost
-    this.lastContactMs = -1e9;
+    /** triggerId -> ms its sense has held continuously. Replaces the per-trigger fields
+     *  the hard-coded engine kept, so a content file can add a sustain to any trigger. */
+    this.sustain = new Map();
+    /** capabilityId -> when it last fired, for the content's own cooldowns. */
+    this.lastUsed = new Map();
     this.contactCount = 0;
     this.fenced = false;
     this.blockedThisStep = false;
@@ -72,19 +86,38 @@ export class Anomaly {
     this._stuckMs = 0;
   }
 
-  get isAwake() { return this.state === STATE.AWARE || this.state === STATE.DRAWN; }
-  get isLoose() { return this.state !== STATE.CONTAINED; }
+  /* Everything the rest of the game asks about an anomaly is answered from the state's
+   * KIND, never its name — so a second anomaly can call its states whatever suits it. */
+  get stateKind() {
+    const s = this.stateDef.get(this.state);
+    return s ? s.kind : 'latent';
+  }
+
+  get isAwake() { const k = this.stateKind; return k === 'active' || k === 'hunting'; }
+  get isLoose() { return this.stateKind !== 'contained'; }
+  get isHeld() { return this.stateKind === 'vulnerable'; }
+
   get speedMps() {
     const s = this.stateDef.get(this.state);
     return s && s.speedMps ? s.speedMps : 0;
   }
 
-  /** The cold mass the heat field subtracts. Absent once it is in the box. */
+  /**
+   * How this anomaly disturbs the scalar field, read from its own content.
+   *
+   * The graybox-draught is a cold mass, so it is a SINK on the heat field — and the fact
+   * that it lowers the wall it is leaning on is most of what makes a marginal fence fail.
+   * A different anomaly might be a source, or disturb nothing at all; that is a content
+   * decision, and CONFIG only supplies the fallback for a file that predates the field block.
+   */
   asSink() {
-    if (this.state === STATE.CONTAINED) return null;
+    if (!this.isLoose) return null;
+    const f = this.def.presence && this.def.presence.field;
+    if (f && f.kind === 'none') return null;
     return {
       id: 'anomaly', x: this.x, z: this.z,
-      chillC: CONFIG.heat.anomalyChillC, falloffM: CONFIG.heat.anomalyChillFalloffM,
+      chillC: f && f.magnitude !== undefined ? f.magnitude : CONFIG.heat.anomalyChillC,
+      falloffM: f && f.falloffMetres !== undefined ? f.falloffMetres : CONFIG.heat.anomalyChillFalloffM,
     };
   }
 
@@ -277,13 +310,28 @@ export class Anomaly {
     });
     this.state = stateId;
     this.stateEnteredMs = simTimeMs;
-    this.heatSustainMs = 0;
-    this.gradientLostMs = 0;
+    /* ⚠ Every sustain resets on a transition. Carrying one across means a trigger that was
+     * half-satisfied in the old state fires immediately in the new one, which reads to a
+     * player as the rule going off for no reason — and §5.4 forbids exactly that. */
+    this.sustain.clear();
     return true;
   }
 
   /**
-   * One simulation step.
+   * One simulation step, driven entirely by the content's own tables.
+   *
+   * ⚠ THIS USED TO BE A SWITCH ON HARD-CODED TRIGGER IDS — `heat-detected`, `lock-on`,
+   * `heat-wall`, `gradient-lost`. It worked, and it meant the first anomaly WAS the engine:
+   * a second one could not be written without editing this method, so GDD §15's "the
+   * content unit is an Incident Package" and §23's three packages sharing one map were
+   * both unreachable. Nothing here now knows what this particular anomaly is called.
+   *
+   * What drives what:
+   *   · whether it MOVES      — the state's own `speedMps` in the content. No speed, no drift.
+   *   · when it CHANGES state — every trigger whose `from` matches, evaluated through the
+   *                             closed sense vocabulary in senses.js.
+   *   · what it DOES          — capabilities whose `availableInStates` includes this state,
+   *                             dispatched on their `verb`.
    *
    * @param {number} stepMs
    * @param {number} simTimeMs
@@ -292,7 +340,7 @@ export class Anomaly {
    */
   step(stepMs, simTimeMs, ctx) {
     const out = { transitioned: false, contacts: [] };
-    if (this.state === STATE.CONTAINED) return out;
+    if (this.stateKind === 'contained') return out;
 
     const fence = this.isFenced();
     this.fenced = fence.fenced;
@@ -301,74 +349,63 @@ export class Anomaly {
 
     const target = this.chooseTarget(ctx.sources);
     this.targetId = target ? target.id : null;
+    const senseCtx = { ...ctx, target };
 
-    /* heat-wall — from any state, enclosure banks it. Checked FIRST so a fence completed
-     * during a hunt takes effect on the same step the last lane closes, rather than after
-     * one more metre of travel. That metre is the difference between a seal and a contact. */
-    if (this.state !== STATE.BANKED && this.fenced) {
-      out.transitioned = this._enter(STATE.BANKED, 'heat-wall', simTimeMs) || out.transitioned;
+    /* Move first, if this state moves at all. */
+    if (this.speedMps > 0) this._drift(stepMs, target, ctx.pressureStage);
+    else this.blockedThisStep = false;
+
+    /* ⚠ WILDCARD TRIGGERS ARE EVALUATED FIRST. A fence completed during a hunt has to take
+     * effect on the same step the last lane closes, not after one more metre of travel —
+     * and that metre is the difference between a seal and a contact. `from: "*"` is how the
+     * content says "this outranks whatever it is currently doing". */
+    const ordered = this.def.triggers
+      .filter((t) => t.from === '*' || t.from === this.state)
+      .filter((t) => !isPerformed(t.when && t.when.sense))
+      .sort((a, b) => (a.from === '*' ? -1 : 0) - (b.from === '*' ? -1 : 0));
+
+    this.telegraph = null;
+    for (const t of ordered) {
+      if (t.to === this.state) continue;
+      const sense = SENSES[t.when && t.when.sense];
+      if (!sense) continue;
+
+      const holds = sense.poll(this, t.when, senseCtx);
+      const needMs = (t.when.sustainSeconds || 0) * 1000;
+      const soFar = holds ? (this.sustain.get(t.id) || 0) + stepMs : 0;
+      this.sustain.set(t.id, soFar);
+
+      /* GDD §5.4: the director may choose timing; it may never spring an untelegraphed
+       * power. Half way through a sustain is when the content's telegraph goes up — and a
+       * trigger with no sustain telegraphs on the step it fires, which is the best a
+       * zero-duration rule can do. */
+      if (holds && soFar >= needMs / 2) this.telegraph = t.telegraph;
+
+      if (holds && soFar >= needMs) {
+        out.transitioned = this._enter(t.to, t.id, simTimeMs) || out.transitioned;
+        break;                         // one transition per step: states must not chain
+      }
     }
 
-    switch (this.state) {
-      case STATE.LATENT: {
-        /* heat-detected: any source within 12m for longer than 4s. */
-        const t = this.trigger.get('heat-detected');
-        const near = ctx.sources.some((s) => dist(this.x, this.z, s.x, s.z) <= t.when.radiusMetres);
-        this.heatSustainMs = near ? this.heatSustainMs + stepMs : 0;
-        this.telegraph = near && this.heatSustainMs > t.when.sustainSeconds * 500 ? t.telegraph : null;
-        if (this.heatSustainMs >= t.when.sustainSeconds * 1000) {
-          out.transitioned = this._enter(STATE.AWARE, 'heat-detected', simTimeMs) || out.transitioned;
-        }
-        break;
-      }
+    /* Capabilities, dispatched on the verb the content names. */
+    for (const cap of this.def.capabilities) {
+      if (!(cap.availableInStates || []).includes(this.state)) continue;
+      const last = this.lastUsed.get(cap.id) || -1e9;
+      if (simTimeMs - last < (cap.cooldownMs || 0)) continue;
 
-      case STATE.AWARE: {
-        this._drift(stepMs, target, ctx.pressureStage);
-        const t = this.trigger.get('lock-on');
-        if (target && dist(this.x, this.z, target.x, target.z) <= t.when.radiusMetres) {
-          this.telegraph = t.telegraph;
-          out.transitioned = this._enter(STATE.DRAWN, 'lock-on', simTimeMs) || out.transitioned;
-        } else this.telegraph = null;
-        break;
+      if (cap.verb === 'contact') {
+        const op = ctx.operatives.find((o) => dist(this.x, this.z, o.x, o.z) <= cap.rangeMetres);
+        if (!op) continue;
+        this.lastUsed.set(cap.id, simTimeMs);
+        this.contactCount++;
+        out.contacts.push({ operative: op, applies: cap.applies, count: this.contactCount, capability: cap.id });
+      } else if (cap.verb === 'surface-hazard') {
+        this.lastUsed.set(cap.id, simTimeMs);
+        this.icePatches.push({ x: this.x, z: this.z, r: cap.rangeMetres ? cap.rangeMetres / 2 : 1.4, atMs: simTimeMs });
+        if (this.icePatches.length > 40) this.icePatches.shift();
       }
-
-      case STATE.DRAWN: {
-        this._drift(stepMs, target, ctx.pressureStage);
-        this.telegraph = null;
-        /* chill-contact. Cooldown is in content; compounding is in content. */
-        const cap = this.def.capabilities.find((c) => c.id === 'chill-contact');
-        if (simTimeMs - this.lastContactMs >= cap.cooldownMs) {
-          for (const op of ctx.operatives) {
-            if (dist(this.x, this.z, op.x, op.z) <= cap.rangeMetres) {
-              this.lastContactMs = simTimeMs;
-              this.contactCount++;
-              out.contacts.push({ operative: op, applies: cap.applies, count: this.contactCount });
-              break;
-            }
-          }
-        }
-        /* ice-surface: a slip hazard that outlives the visit. */
-        const ice = this.def.capabilities.find((c) => c.id === 'ice-surface');
-        if (ice && simTimeMs - this.lastIceMs >= ice.cooldownMs) {
-          this.lastIceMs = simTimeMs;
-          this.icePatches.push({ x: this.x, z: this.z, r: 1.4, atMs: simTimeMs });
-          if (this.icePatches.length > 40) this.icePatches.shift();
-        }
-        break;
-      }
-
-      case STATE.BANKED: {
-        /* gradient-lost: the fence has a hole and has had one for 3s. The grace is what
-         * makes a momentary flicker — someone walking through their own fence — survivable. */
-        const t = this.trigger.get('gradient-lost');
-        this.gradientLostMs = this.fenced ? 0 : this.gradientLostMs + stepMs;
-        this.telegraph = !this.fenced ? t.telegraph : null;
-        if (this.gradientLostMs >= t.when.sustainSeconds * 1000) {
-          out.transitioned = this._enter(STATE.DRAWN, 'gradient-lost', simTimeMs) || out.transitioned;
-        }
-        break;
-      }
-      default: break;
+      /* 'drain-power' is consumed by DeployableSet.stepPower, which reads the anomaly's
+       * own awake state — there is nothing for this loop to do about it. */
     }
     return out;
   }
@@ -378,11 +415,18 @@ export class Anomaly {
    * GDD §8.4 says containment is a state the squad creates, and a climax that happens to
    * you is not a climax. Returns a refusal string, or null on success.
    */
+  /** The trigger the squad PERFORMS rather than the engine polling — there is exactly one
+   *  per anomaly, and it is how the content says "this is the custody move". */
+  get performedTrigger() {
+    return this.def.triggers.find((t) => isPerformed(t.when && t.when.sense)) || null;
+  }
+
   trySeal(caseDep, simTimeMs) {
-    const t = this.trigger.get('sealed');
-    if (this.state !== STATE.BANKED) return 'It is not held. Close the fence first.';
+    const t = this.performedTrigger;
+    if (!t) return 'This anomaly has no custody procedure.';
+    if (t.from !== '*' && this.state !== t.from) return 'It is not held. Close the fence first.';
     if (!caseDep) return 'No transit case deployed.';
-    if (caseDep.itemId !== t.when.itemId) return 'That is not a transit case.';
+    if (caseDep.itemId !== t.when.itemId) return `That is not the ${t.when.itemId.replace(/-/g, ' ')}.`;
     if (!caseDep.hasPower) return 'The case heater is dead. It will not hold.';
     if (dist(this.x, this.z, caseDep.x, caseDep.z) > t.when.radiusMetres) {
       return `The case is ${dist(this.x, this.z, caseDep.x, caseDep.z).toFixed(1)}m away. It must be within ${t.when.radiusMetres}m.`;
@@ -391,20 +435,26 @@ export class Anomaly {
     caseDep.custodyHeldMs = 0;
     this.sealedIn = caseDep;
     this.x = caseDep.x; this.z = caseDep.z;
-    this._enter(STATE.CONTAINED, 'sealed', simTimeMs);
+    this._enter(t.to, t.id, simTimeMs);
     return null;
   }
 
   /** Custody is a state, not a cutscene (GDD §8.4). It can be lost. */
   stepCustody(stepMs, simTimeMs) {
     const c = this.sealedIn;
-    if (this.state !== STATE.CONTAINED || !c) return { verified: false, lost: false };
+    if (this.isLoose || !c) return { verified: false, lost: false };
     if (!c.hasPower) {
       /* The heater cycle lengthens, then frost creeps from the seams — the failure signal
-       * the content authored for integrity condition `case-heater`. */
+       * the content authored for integrity condition `case-heater`.
+       *
+       * Where it comes back OUT is content too: whichever state the escape trigger leads
+       * to. Hard-coding "drawn" was fine while there was one anomaly and wrong the moment
+       * there were two. */
       c.sealed = false;
       this.sealedIn = null;
-      this._enter(STATE.DRAWN, 'gradient-lost', simTimeMs);
+      const escape = this.def.triggers.find((t) => t.from === 'banked' && this.stateDef.get(t.to)
+        && this.stateDef.get(t.to).kind === 'hunting');
+      this._enter(escape ? escape.to : STATE.DRAWN, escape ? escape.id : 'gradient-lost', simTimeMs);
       return { verified: false, lost: true };
     }
     c.custodyHeldMs += stepMs;

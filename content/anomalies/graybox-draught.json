@@ -1,8 +1,20 @@
 {
   "id": "graybox-draught",
-  "contentRevision": "0.3.0",
+  "contentRevision": "0.4.0",
   "licensingRecordId": null,
   "incidentPremise": "A maintenance crew sealed a basement plant room after reporting 'cold that moves'. Two of the three came back. The site has been without mains power for six days and the anomaly has spread as far as the stairwell.",
+
+  "_engineNote": "This file is now read by a generic engine: src/sim/anomaly.js switches on nothing this anomaly is called. `presence.field` says how it disturbs the scalar field, each trigger names a `sense` from the closed vocabulary in src/sim/senses.js, and each capability names a `verb` from the same file. A JSON key may name a QUANTITY, never an OPERATOR (GDD 20.6).",
+
+  "presence": {
+    "field": {
+      "kind": "sink",
+      "quantity": "heat",
+      "magnitude": 26,
+      "falloffMetres": 2.6,
+      "_note": "It is a cold mass, so it SUBTRACTS from the heat field. This is why a fence that was exactly good enough on the way in is not good enough at contact: the thing you are fencing is actively lowering the wall."
+    }
+  },
 
   "perception": {
     "channels": ["instrument-only", "thermal", "physical-trace"],
@@ -124,6 +136,7 @@
   "capabilities": [
     {
       "id": "chill-contact",
+      "verb": "contact",
       "availableInStates": ["drawn"],
       "effect": "Rapid heat loss on contact: exposure condition plus mobility injury. Survivable once; compounding on repeat.",
       "rangeMetres": 1.2,
@@ -138,6 +151,7 @@
     },
     {
       "id": "drain-battery",
+      "verb": "drain-power",
       "availableInStates": ["aware", "drawn"],
       "effect": "Battery-powered equipment within range loses charge at roughly four times the normal rate.",
       "rangeMetres": 5,
@@ -146,6 +160,7 @@
     },
     {
       "id": "ice-surface",
+      "verb": "surface-hazard",
       "availableInStates": ["drawn"],
       "effect": "Freezes standing water into a slip hazard that persists after the anomaly moves on.",
       "rangeMetres": 3,
