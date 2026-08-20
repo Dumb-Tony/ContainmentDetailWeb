@@ -2282,6 +2282,364 @@ async function sectionU() {
     ['Exemplary', 'Controlled', 'Costly', 'Compromised', 'Failed'].includes(g.result.overall));
   emit();
 }
+
+/* ══ V. the six camera sliders, measured ═══════════════════════════════════════
+ *
+ * Authored against the renderer by the agent that wired the sliders up, and folded in
+ * here rather than left in a scratch file — a suite proving an accessibility control does
+ * something is worth exactly as much as the control, and neither survives in a temp
+ * directory. The sub-labels keep their original grouping.
+ *
+ * The one honest approximation is named in the renderer and named again here: motion blur
+ * is an ACCUMULATION buffer, not a velocity buffer. It smears where the image changed and
+ * leaves alone where it did not, which trails the motion rather than straddling it.
+ * Per-pixel blur wants a velocity target and a gather pass, and this build does not vendor
+ * a composer. Grain and distortion are the actual named effects, not stand-ins.
+ */
+async function sectionV() {
+  lines.push('--- V. the six camera sliders do something, measurably ---');
+  const cd = window.__CD;
+  if (!cd) { ok('V0 the page booted, so the renderer can be measured', false); emit(); return; }
+  const deg = (r) => (r * 180 / Math.PI);
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const R = cd.renderer, g = cd.game, p = g.viewPlayer;
+
+  /* ── 1. applySettings is total ─────────────────────────────────────── */
+  ok('V1.1 the renderer exposes applySettings', typeof R.applySettings === 'function');
+
+  const d = R.applySettings(null);
+  eq('V1.2 no argument falls back to the shipped fov', d.fov, CONFIG.render.fov);
+  eq('V1.3 and to full strength on the other five',
+    [d.shake, d.headBob, d.motionBlur, d.filmGrain, d.distortion].join(), '1,1,1,1,1');
+  ok('V1.4 an empty object does not throw', !!R.applySettings({}));
+  ok('V1.5 nor an object with no camera key', !!R.applySettings({ vision: {} }));
+
+  const junk = R.applySettings({ camera: { fov: 'wide', shake: null, headBob: -3, motionBlur: 5, filmGrain: NaN, distortion: Infinity } });
+  eq('V1.6 a non-numeric fov falls back rather than poisoning the projection', junk.fov, CONFIG.render.fov);
+  eq('V1.7 null falls back', junk.shake, 1);
+  eq('V1.8 negative clamps to 0', junk.headBob, 0);
+  eq('V1.9 over-range clamps to 1', junk.motionBlur, 1);
+  eq('V1.10 NaN falls back', junk.filmGrain, 1);
+  eq('V1.11 Infinity clamps to 1', junk.distortion, 1);
+  eq('V1.12 a fov from the future clamps to the slider maximum',
+    R.applySettings({ camera: { fov: 400 } }).fov, 110);
+  eq('V1.13 and below the minimum to 60', R.applySettings({ camera: { fov: 5 } }).fov, 60);
+
+  const eff = Object.freeze({ camera: Object.freeze({ fov: 96, shake: 0.4, headBob: 0.2, motionBlur: 0, filmGrain: 0.5, distortion: 0.75 }) });
+  const a1 = R.applySettings(eff), m1 = R.camera.projectionMatrix.elements.join();
+  const a2 = R.applySettings(eff), m2 = R.camera.projectionMatrix.elements.join();
+  eq('V1.14 applying the same object twice resolves the same numbers', JSON.stringify(a1), JSON.stringify(a2));
+  eq('V1.15 and leaves the projection matrix untouched the second time', m1, m2);
+  emit();
+
+  /* ── 2. fov ────────────────────────────────────────────────────────── */
+  R.applySettings({ camera: { fov: 96 } });
+  eq('V2.1 the eye camera takes the setting', R.camera.fov, 96);
+  eq('V2.2 the imager keeps its own instrument fov', R.thermalCam.fov, CONFIG.render.thermalFov);
+  const m96 = R.camera.projectionMatrix.elements[5];
+  R.applySettings({ camera: { fov: 60 } });
+  eq('V2.3 and 60 lands', R.camera.fov, 60);
+  eq('V2.4 the imager still does not follow', R.thermalCam.fov, CONFIG.render.thermalFov);
+  const m60 = R.camera.projectionMatrix.elements[5];
+  ok('V2.5 the projection actually changed with it', m60 > m96, `${m60} vs ${m96}`);
+  note(`projection [1][1]: ${m60.toFixed(4)} at 60deg, ${m96.toFixed(4)} at 96deg`);
+  /* 1/tan(fov/2) is the whole of it — assert the renderer's number against the maths. */
+  near('V2.6 and it is 1/tan(fov/2) exactly', m60, 1 / Math.tan(30 * Math.PI / 180), 1e-6);
+  emit();
+
+  /* ── 3. shake ──────────────────────────────────────────────────────── */
+  /* Pose the operative: some stress (so the breath sway is live) and a jolt on the bus. */
+  g.clock.setPaused(false);
+  p.stress = CONFIG.stress.max;
+  p.vx = 0; p.vz = 0;
+  const T = 400000;
+  g.clock.simTimeMs = T;
+
+  const pose = (t) => { g.clock.simTimeMs = t; R.render(); };
+
+  R.applySettings({ camera: { fov: CONFIG.render.fov, shake: 0, headBob: 0, motionBlur: 0, filmGrain: 0, distortion: 0 } });
+  R.game.bus.emit('CONTACT', { count: 1, id: p.id }, T);
+  pose(T + 20);
+  eq('V3.1 shake 0 leaves pitch bit-equal to the operative pitch', R.camera.rotation.x, p.pitch);
+  eq('V3.2 and yaw bit-equal', R.camera.rotation.y, p.yaw);
+  eq('V3.3 and roll exactly zero', R.camera.rotation.z, 0);
+  eq('V3.4 and the eye exactly at eye height, at full stress, mid-jolt',
+    R.camera.position.y, p.eyeHeight());
+
+  /* Same jolt, shake back up. Sweep the ring and take the peak. */
+  const peak = (mult) => {
+    R.applySettings({ camera: { shake: mult, headBob: 0, motionBlur: 0, filmGrain: 0, distortion: 0 } });
+    R._jolts.length = 0;
+    R.game.bus.emit('CONTACT', { count: 1, id: p.id }, T);
+    let mx = 0, my = 0, mz = 0;
+    for (let dt = 0; dt <= 240; dt += 4) {
+      pose(T + dt);
+      mx = Math.max(mx, Math.abs(R.camera.rotation.x - p.pitch));
+      my = Math.max(my, Math.abs(R.camera.rotation.y - p.yaw));
+      mz = Math.max(mz, Math.abs(R.camera.rotation.z));
+    }
+    return { mx, my, mz };
+  };
+  const full = peak(1);
+  ok('V3.5 a contact jolts the view', full.mx > 0.005, `${deg(full.mx).toFixed(3)} deg`);
+  ok('V3.6 on all three axes', full.my > 0 && full.mz > 0);
+  note(`contact at shake 1: pitch ${deg(full.mx).toFixed(2)}deg, yaw ${deg(full.my).toFixed(2)}deg, roll ${deg(full.mz).toFixed(2)}deg`);
+  const half = peak(0.5);
+  near('V3.7 the slider is a linear multiplier', full.mx / half.mx, 2, 0.02);
+  note(`the same jolt at shake 0.5: pitch ${deg(half.mx).toFixed(2)}deg`);
+
+  /* It has to stop. */
+  R.applySettings({ camera: { shake: 1, headBob: 0, motionBlur: 0, filmGrain: 0, distortion: 0 } });
+  R._jolts.length = 0;
+  p.stress = 0;
+  R.game.bus.emit('CONTACT', { count: 1, id: p.id }, T);
+  pose(T + 3000);
+  eq('V3.8 and it rings out completely rather than forever', R.camera.rotation.x, p.pitch);
+  eq('V3.9 the jolt is dropped once it is below a hundredth of a degree', R._jolts.length, 0);
+
+  /* Somebody else taking a hit is not your camera. */
+  R._jolts.length = 0;
+  R.game.bus.emit('CONTACT', { count: 1, id: p.id + '-not-me' }, T);
+  eq('V3.10 a teammate’s contact does not shake your view', R._jolts.length, 0);
+
+  /* The heavy door, by distance. */
+  const doorId = Array.from(R.doorMeshes.keys())[0];
+  const dm = R.doorMeshes.get(doorId);
+  const ampAt = (m) => {
+    R._jolts.length = 0;
+    const sx = p.x, sz = p.z;
+    p.x = dm.mesh.position.x + m; p.z = dm.mesh.position.z;
+    R.game.bus.emit('DOOR_CHANGED', { id: doorId, open: true }, T);
+    const a = R._jolts.length ? R._jolts[0].amp : 0;
+    p.x = sx; p.z = sz;
+    return a;
+  };
+  const near1 = ampAt(1), far1 = ampAt(14);
+  ok('V3.11 a door felt through the floor, harder up close', near1 > far1 * 5, `${near1} vs ${far1}`);
+  note(`door thud amplitude: ${deg(near1).toFixed(3)}deg at 1m, ${deg(far1).toFixed(3)}deg at 14m`);
+  R._jolts.length = 0;
+  emit();
+
+  /* ── 4. head bob ───────────────────────────────────────────────────── */
+  const walk = (mult, steps, speed) => {
+    R.applySettings({ camera: { shake: 0, headBob: mult, motionBlur: 0, filmGrain: 0, distortion: 0 } });
+    R._bobPhase = 0;
+    p.vx = speed; p.vz = 0;
+    let lo = Infinity, hi = -Infinity, roll = 0;
+    for (let i = 1; i <= steps; i++) {
+      pose(T + i * 16);
+      lo = Math.min(lo, R.camera.position.y - p.eyeHeight());
+      hi = Math.max(hi, R.camera.position.y - p.eyeHeight());
+      roll = Math.max(roll, Math.abs(R.camera.rotation.z));
+    }
+    return { lo, hi, roll, span: hi - lo };
+  };
+
+  const wOff = walk(0, 90, CONFIG.player.walkSpeed);
+  eq('V4.1 head bob 0 is no bob at all, not less bob', wOff.span, 0);
+  eq('V4.2 and no roll with it', wOff.roll, 0);
+
+  const wFull = walk(1, 90, CONFIG.player.walkSpeed);
+  ok('V4.3 walking bobs the eye', wFull.span > 0.02, `${(wFull.span * 100).toFixed(2)} cm`);
+  note(`walk at ${CONFIG.player.walkSpeed} m/s: ${(wFull.span * 1000).toFixed(1)} mm peak-to-peak, roll ${deg(wFull.roll).toFixed(2)} deg`);
+  const wHalf = walk(0.5, 90, CONFIG.player.walkSpeed);
+  near('V4.4 the slider is a linear multiplier', wFull.span / wHalf.span, 2, 0.02);
+
+  const wCrouch = walk(1, 90, CONFIG.player.crouchSpeed);
+  ok('V4.5 a crouch-walk bobs less than a walk, with nothing knowing what crouching is',
+    wCrouch.span < wFull.span * 0.6, `${(wCrouch.span * 1000).toFixed(1)} mm vs ${(wFull.span * 1000).toFixed(1)} mm`);
+  const wSprint = walk(1, 90, CONFIG.player.sprintSpeed);
+  ok('V4.6 and a sprint bobs more', wSprint.span > wFull.span, `${(wSprint.span * 1000).toFixed(1)} mm`);
+  note(`crouch ${(wCrouch.span * 1000).toFixed(1)} mm · walk ${(wFull.span * 1000).toFixed(1)} mm · sprint ${(wSprint.span * 1000).toFixed(1)} mm`);
+
+  /* Standing still, at full bob, for a long time. */
+  R.applySettings({ camera: { shake: 0, headBob: 1, motionBlur: 0, filmGrain: 0, distortion: 0 } });
+  p.vx = 0; p.vz = 0;
+  const phaseBefore = R._bobPhase;
+  let still = 0;
+  for (let i = 1; i <= 40; i++) { pose(T + 100000 + i * 33); still = Math.max(still, Math.abs(R.camera.position.y - p.eyeHeight())); }
+  eq('V4.7 standing still does not bob, however long you stand', still, 0);
+  eq('V4.8 the phase is a distance integral, so it does not advance either', R._bobPhase, phaseBefore);
+  emit();
+
+  /* ── 5. the lens: allocation ───────────────────────────────────────── */
+  R.applySettings({ camera: { shake: 0, headBob: 0, motionBlur: 0, filmGrain: 0, distortion: 0 } });
+  pose(T);
+  eq('V5.1 all three at zero: no offscreen target at all', R._rtScene, null);
+  eq('V5.2 and no accumulator', R._rtAccum, null);
+
+  R.applySettings({ camera: { shake: 0, headBob: 0, motionBlur: 0, filmGrain: 1, distortion: 0 } });
+  pose(T);
+  ok('V5.3 grain alone allocates the target', !!R._rtScene);
+  eq('V5.4 but not the accumulator', R._rtAccum, null);
+
+  R.applySettings({ camera: { shake: 0, headBob: 0, motionBlur: 1, filmGrain: 0, distortion: 0 } });
+  pose(T);
+  ok('V5.5 motion blur allocates the accumulator', !!R._rtAccum);
+  R.applySettings({ camera: { shake: 0, headBob: 0, motionBlur: 0, filmGrain: 1, distortion: 0 } });
+  pose(T);
+  eq('V5.6 and turning it off frees it again', R._rtAccum, null);
+
+  const dpr = R.renderer.getPixelRatio();
+  eq('V5.7 the target is the drawing buffer, not the css frame',
+    `${R._rtScene.width}x${R._rtScene.height}`,
+    `${Math.round(R.viewW * dpr)}x${Math.round(R.viewH * dpr)}`);
+  note(`viewport ${R.viewW}x${R.viewH} css · dpr ${dpr} · target ${R._rtScene.width}x${R._rtScene.height}`
+    + ` · webgl2 ${R.renderer.capabilities.isWebGL2}`);
+  emit();
+
+  /* ── 6. the lens: measured pixels ──────────────────────────────────── */
+  /* Light the room so there is something in the corners to warp. A dark frame would
+   * make every one of these tests pass by being uniformly black. */
+  const amb = R.scene.children.find((o) => o.isAmbientLight);
+  const fogD = R.scene.fog.density;
+  if (amb) amb.intensity = 3.2;
+  R.scene.fog.density = 0.004;
+  for (const c of g.site.circuits.keys()) g.site.setCircuit(c, true);
+  /* Imager OFF for the lens measurements: it is drawn after the lens now, so a patch
+   * taken on the instrument would be measuring the one part of the frame the lens does
+   * not touch. It comes back on for 6.17 below, which is exactly that property. */
+  g.imagerOn = false;
+  p.vx = 0; p.vz = 0;
+
+  const gl = R.renderer.getContext();
+  const W = gl.drawingBufferWidth, H = gl.drawingBufferHeight;
+  const S = 24;
+  const patch = (fx, fy) => {
+    const buf = new Uint8Array(S * S * 4);
+    gl.readPixels(Math.round(W * fx - S / 2), Math.round(H * fy - S / 2), S, S, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+    return buf;
+  };
+  const diff = (a, b) => { let s = 0; for (let i = 0; i < a.length; i++) if (i % 4 !== 3) s += Math.abs(a[i] - b[i]); return s / (a.length * 0.75); };
+  const spread = (a) => { let lo = 255, hi = 0; for (let i = 0; i < a.length; i++) if (i % 4 !== 3) { lo = Math.min(lo, a[i]); hi = Math.max(hi, a[i]); } return hi - lo; };
+  /* One synchronous shot: render, then read before anything can composite it away. */
+  const shot = (cam, t, at) => { R.applySettings({ camera: cam }); g.clock.simTimeMs = t; R.render(); return patch(at[0], at[1]); };
+
+  const CENTRE = [0.5, 0.5];
+  const flat = { shake: 0, headBob: 0, motionBlur: 0, filmGrain: 0, distortion: 0 };
+
+  /* A warp is only measurable where the picture is not flat, and a dark corner of a
+   * cold store is very flat indeed. So sweep the frame and report the strongest
+   * response rather than betting the assertion on one patch. */
+  const RING = [];
+  for (let i = 0; i < 16; i++) {
+    const a = (i / 16) * Math.PI * 2;
+    RING.push([0.5 + Math.cos(a) * 0.38, 0.5 + Math.sin(a) * 0.38]);
+  }
+  const sweep = (camA, camB) => {
+    let mx = 0, at = null;
+    for (const q of RING) {
+      const dv = diff(shot(camA, T, q), shot(camB, T, q));
+      if (dv > mx) { mx = dv; at = q; }
+    }
+    return { mx, at };
+  };
+  let mxSpread = 0;
+  for (const q of RING) mxSpread = Math.max(mxSpread, spread(shot(flat, T, q)));
+  ok('V6.1 the test frame has something in it to measure', mxSpread > 10,
+    `strongest patch spans ${mxSpread} levels`);
+
+  /* Distortion. The frame moves off-axis; the crosshair does not. */
+  const dOn = sweep({ ...flat, distortion: 0 }, { ...flat, distortion: 1 });
+  const k0 = shot({ ...flat, distortion: 0 }, T, CENTRE);
+  const k1 = shot({ ...flat, distortion: 1 }, T, CENTRE);
+  ok('V6.2 distortion warps the frame away from the axis', dOn.mx > 2, `${dOn.mx.toFixed(2)} levels`);
+  eq('V6.3 and leaves the exact centre untouched — a lens cannot move an aim point', diff(k0, k1), 0);
+  note(`distortion 1: up to ${dOn.mx.toFixed(2)} levels at r=0.38, exactly ${diff(k0, k1).toFixed(2)} at the crosshair`);
+  const dHalf = sweep({ ...flat, distortion: 0 }, { ...flat, distortion: 0.5 });
+  ok('V6.4 half the setting warps less', dHalf.mx < dOn.mx, `${dHalf.mx.toFixed(2)} vs ${dOn.mx.toFixed(2)}`);
+
+  /* Grain. Real, deterministic, and gone at zero. */
+  const gA = shot({ ...flat, filmGrain: 0 }, T, CENTRE);
+  const gB = shot({ ...flat, filmGrain: 1 }, T, CENTRE);
+  const gC = shot({ ...flat, filmGrain: 1 }, T, CENTRE);
+  const gD = shot({ ...flat, filmGrain: 1 }, T + 700, CENTRE);
+  ok('V6.5 grain 1 is visible against grain 0', diff(gA, gB) > 0.5, `${diff(gA, gB).toFixed(2)} levels`);
+  eq('V6.6 and it is a function of sim time, so a replay grains identically', diff(gB, gC), 0);
+  ok('V6.7 but it crawls as sim time advances', diff(gB, gD) > 0.5, `${diff(gB, gD).toFixed(2)} levels`);
+  const gHalf = shot({ ...flat, filmGrain: 0.5 }, T, CENTRE);
+  note(`grain amplitude: ${diff(gA, gB).toFixed(2)} levels at 1.0, ${diff(gA, gHalf).toFixed(2)} at 0.5 (of 255)`);
+  ok('V6.8 half the setting is about half the grain', Math.abs(diff(gA, gB) / diff(gA, gHalf) - 2) < 0.25,
+    `ratio ${(diff(gA, gB) / diff(gA, gHalf)).toFixed(2)}`);
+
+  /* Motion blur. Turn the head and watch the frame catch up. */
+  const settle = (cam, yaw, n) => { for (let i = 0; i < n; i++) { p.yaw = yaw; shot(cam, T + i * 16, CENTRE); } };
+  const blurCam = { ...flat, motionBlur: 1 };
+  const yaw0 = p.yaw;
+  settle(blurCam, yaw0, 24);
+  const settledA = patch(0.5, 0.5);
+  settle(blurCam, yaw0 + 0.9, 24);
+  const settledB = patch(0.5, 0.5);
+  ok('V6.9 turning the head changes the frame at all', diff(settledA, settledB) > 2, `${diff(settledA, settledB).toFixed(2)}`);
+
+  settle(blurCam, yaw0, 24);
+  p.yaw = yaw0 + 0.9;
+  const first = shot(blurCam, T, CENTRE);
+  const second = shot(blurCam, T + 16, CENTRE);
+  const third = shot(blurCam, T + 32, CENTRE);
+  const e1 = diff(first, settledB), e2 = diff(second, settledB), e3 = diff(third, settledB);
+  ok('V6.10 the first frame after a hard turn has not arrived yet', e1 > 1, `${e1.toFixed(2)} levels from settled`);
+  ok('V6.11 and it converges', e2 < e1 && e3 < e2, `${e1.toFixed(2)} -> ${e2.toFixed(2)} -> ${e3.toFixed(2)}`);
+  note(`motion blur 1: ${e1.toFixed(1)} -> ${e2.toFixed(1)} -> ${e3.toFixed(1)} levels from the settled frame`);
+
+  const sharpCam = { ...flat, motionBlur: 0, filmGrain: 0, distortion: 1 };
+  settle(sharpCam, yaw0, 3);
+  p.yaw = yaw0 + 0.9;
+  const sharp1 = shot(sharpCam, T, CENTRE);
+  settle(sharpCam, yaw0 + 0.9, 3);
+  const sharpSettled = patch(0.5, 0.5);
+  eq('V6.12 motion blur 0 arrives on the frame it is asked to, with no trail',
+    diff(sharp1, sharpSettled), 0);
+
+  /* Turning motion blur on must not blink the screen out: a freshly allocated
+   * accumulator is black, and fading up from it reads as a crash. */
+  settle({ ...flat }, yaw0, 2);
+  eq('V6.13 the accumulator really was released first', R._rtAccum, null);
+  const firstBlur = shot({ ...flat, motionBlur: 1 }, T, CENTRE);
+  settle({ ...flat, motionBlur: 1 }, yaw0, 20);
+  const settledBlur = patch(0.5, 0.5);
+  eq('V6.14 the first frame after switching blur on is already the picture, not a fade from black',
+    diff(firstBlur, settledBlur), 0);
+
+  /* And the whole chain off is the same picture as before any of this existed. */
+  settle({ ...flat }, yaw0, 2);
+  const off1 = patch(0.5, 0.5);
+  settle({ ...flat }, yaw0, 2);
+  const off2 = patch(0.5, 0.5);
+  eq('V6.15 with every post value at 0 the frame is stable and target-free', diff(off1, off2), 0);
+  eq('V6.16 and no target is held', R._rtScene, null);
+
+  /* The instrument is drawn after the lens, so nothing the lens does reaches it. */
+  g.imagerOn = true;
+  const ir = R.imagerRect();
+  const inst = () => {
+    const buf = new Uint8Array(S * S * 4);
+    gl.readPixels(Math.round((ir.x + ir.w * 0.5 - S / 2) * dpr), Math.round((ir.y + ir.h * 0.5 - S / 2) * dpr),
+      S, S, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+    return buf;
+  };
+  const room = () => {
+    const buf = new Uint8Array(S * S * 4);
+    gl.readPixels(Math.round(W * 0.12), Math.round(H * 0.5), S, S, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+    return buf;
+  };
+  R.applySettings({ camera: { ...flat } }); R.render();
+  const instPlain = inst(), roomPlain = room();
+  R.applySettings({ camera: { ...flat, filmGrain: 1, distortion: 1 } }); R.render();
+  const instLens = inst(), roomLens = room();
+  ok('V6.17 the instrument screen has something on it', spread(instPlain) > 10, `${spread(instPlain)} levels`);
+  eq('V6.18 grain and warp do not reach the imager — the rule channel keeps its pixels',
+    diff(instPlain, instLens), 0);
+  ok('V6.19 while the room around it does get both', diff(roomPlain, roomLens) > 1,
+    `${diff(roomPlain, roomLens).toFixed(2)} levels`);
+
+  if (amb) amb.intensity = 0.40;
+  R.scene.fog.density = fogD;
+  g.imagerOn = false;
+  p.yaw = yaw0;
+  R.applySettings(cd.settings.effective);
+  emit();
+}
 (async () => {
   try {
     sectionA();
@@ -2306,6 +2664,7 @@ async function sectionU() {
     await sectionU();
     await sectionK();
     await sectionL();
+    await sectionV();
     emit();
   } catch (e) {
     lines.push(`FAIL  suite threw: ${e && e.stack ? e.stack : e}`);
