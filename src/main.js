@@ -141,6 +141,14 @@ async function boot() {
     audio.captions.maxLines = settings.get('captions.maxLines');
     audio.captions.holdMs = settings.get('captions.holdMs');
     input.setHoldModes(settings.holdModes());
+    /* §19.1's timing assist into the rules. Solo and hosting, it is the whole session;
+     * as a client it is declared on join and the host applies it to this operative only,
+     * so the assist travels with the person who needs it (see Player.assistTiming). */
+    game.setAssists(settings.effective.assists, net.role === ROLE.CLIENT ? game.localId : null);
+    /* The renderer grew applySettings after the settings screen shipped, so the six camera
+     * sliders spent a while doing nothing at all. Guarded because an old cached module is
+     * a stale renderer, not a broken game — the sliders come back on the next load. */
+    if (renderer.applySettings) renderer.applySettings(settings.effective);
   };
   const settingsPanel = new SettingsPanel(document.body, settings, {
     input,

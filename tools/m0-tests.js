@@ -849,6 +849,31 @@ async function sectionK() {
   ok('K9 index.html loads three.js from the vendored copy', /assets\/lib\/r128\/three\.min\.js/.test(html));
   ok('K10 and peerjs from the vendored copy', /assets\/lib\/peerjs-1\.5\.4\/peerjs\.min\.js/.test(html));
   ok('K11 and neither from a CDN', !/https?:\/\/[^"']*(three|peerjs)/.test(html));
+
+  /* ⚠ EVERY CONFIG LEAF MUST BE READ BY SOMETHING.
+   *
+   * `contactRadiusM`, `contactCooldownMs` and `reacquireGraceMs` sat in config.js with
+   * confident comments explaining what they controlled, and nothing anywhere read any of
+   * them — they were engine rules in the Unity build and are content here. A number in a
+   * config file is a promise that changing it changes the game, and three of them were
+   * lying. You could have spent an afternoon tuning contact range with no effect at all,
+   * and no test in the suite would have said a word.
+   *
+   * Leaf names only, which is enough: CONFIG is read as `CONFIG.anomaly.batteryDrainRadiusM`
+   * and a name unique enough to be a config key is unique enough to grep for. */
+  const configLeaves = [];
+  const walk = (o, path) => {
+    for (const [k, v] of Object.entries(o)) {
+      if (v && typeof v === 'object' && !Array.isArray(v)) walk(v, `${path}.${k}`);
+      else configLeaves.push({ key: k, path: `${path}.${k}` });
+    }
+  };
+  walk(CONFIG, 'CONFIG');
+  const consumers = files.filter((f) => f !== 'src/config.js').map((f) => src.get(f)).join('\n');
+  const unread = configLeaves.filter((l) => !new RegExp(`\\b${l.key}\\b`).test(consumers));
+  note(`${configLeaves.length} CONFIG leaves, ${unread.length} unread`);
+  eq(`K12 no CONFIG value is read by nothing${unread.length ? ` (${unread.map((l) => l.path).join(', ')})` : ''}`,
+    unread.length, 0);
   emit();
 }
 
@@ -1766,6 +1791,126 @@ async function sectionR() {
     ops.find((o) => o.id === 'op-ashlar-gallery').clearanceRequired > 0);
 }
 
+
+/* ══ S. the assists are real, and they only widen windows ═══════════════════════
+ *
+ * The settings screen offered eleven controls and four of them were connected to
+ * anything. Six camera sliders and the timing assist moved and the game did not — which
+ * is the §18.1 failure the mission board was also committing, in the one screen where it
+ * matters most: a player who needs an assist tries it, sees no change, and concludes the
+ * game cannot be made playable for them.
+ *
+ * What this section is really guarding is the OTHER half of §19.1. An assist that widens
+ * the window is an accessibility feature; an assist that moves the rule is a difficulty
+ * slider wearing its clothes, and §7.4 asks for confidence rather than an easier answer.
+ * So every rule-side number is asserted IDENTICAL at 1.0 and at 2.0.
+ */
+async function sectionS(content) {
+  lines.push('--- S. difficulty assists: wider windows, identical rules ---');
+
+  const mk = (timing) => {
+    const g = new Game(content, { seed: 'assist' });
+    g.commitLoadout(RECOMMENDED_MANIFEST);
+    g.setAssists({ procedureTiming: timing });
+    return g;
+  };
+  const base = mk(1), wide = mk(2);
+
+  eq('S1 the assist reaches the simulation at all', wide.anomaly.assistTiming, 2);
+  eq('S2 and every operative on the roster', wide.player.assistTiming, 2);
+  eq('S3 it is clamped to the 1.0-2.0 band the settings model publishes',
+    mk(9).anomaly.assistTiming, 2);
+  eq('S4 and a missing or damaged value is 1.0, not zero — zero would be instant death',
+    mk(undefined).player.assistTiming, 1);
+
+  /* ── the window ─────────────────────────────────────────────────────────────
+   * Down and alone. How long until they are lost, measured rather than derived. */
+  const bleedOut = (g) => {
+    const p = g.player;
+    p.downed = true; p.alive = true; p.downedMs = 0;
+    let ms = 0;
+    while (p.alive && ms < 600000) { p.stepDowned(50, CONFIG.player.bleedOutMs); ms += 50; }
+    return ms;
+  };
+  const b1 = bleedOut(base), b2 = bleedOut(wide);
+  note(`bleed-out alone: ${(b1 / 1000).toFixed(0)}s at 1.0, ${(b2 / 1000).toFixed(0)}s at 2.0`);
+  eq('S5 ninety seconds down, unassisted (GDD 9.5)', Math.round(b1 / 1000), 90);
+  eq('S6 and a hundred and eighty with the assist at maximum', Math.round(b2 / 1000), 180);
+
+  /* Per-operative, not per-session. A client who needs the assist keeps it in somebody
+   * else's game, and nobody else's clock changes. */
+  const squad = mk(1);
+  squad.addPlayer('Two'); squad.addPlayer('Three');
+  squad.setAssists({ procedureTiming: 2 }, 'p2');
+  eq('S7 an assist can be scoped to one operative', squad.players[1].assistTiming, 2);
+  eq('S8 without touching the rest of the squad', squad.players[2].assistTiming, 1);
+  eq('S9 or the anomaly, which is the host\'s to set', squad.anomaly.assistTiming, 1);
+
+  /* ── the rule ───────────────────────────────────────────────────────────────
+   * Everything below must read the same at both extremes. If any of these ever diverge,
+   * the assist has stopped being an assist. */
+  const cap = content.anomaly.capabilities.find((c) => c.verb === 'contact');
+  const reach = (g, d) => {
+    const a = g.anomaly;
+    a.reset(); a.state = 'drawn';
+    a.x = 0; a.z = 0;
+    const p = g.player; p.x = d; p.z = 0;
+    g.heat.setEmitters([]); g.heat.setSinks([a.asSink()]);
+    return a.step(16, 0, { sources: [], operatives: [p], pressureStage: 0, observation: null })
+      .contacts.length > 0;
+  };
+  eq('S10 contact reach is the content\'s, and the assist does not extend it',
+    reach(mk(1), cap.rangeMetres - 0.05), reach(mk(2), cap.rangeMetres - 0.05));
+  eq('S11 nor shorten it', reach(mk(1), cap.rangeMetres + 0.5), reach(mk(2), cap.rangeMetres + 0.5));
+  eq('S12 the gradient threshold is untouched',
+    mk(1).heat.thresholdC !== undefined ? mk(1).heat.thresholdC : CONFIG.heat.gradientThresholdC,
+    mk(2).heat.thresholdC !== undefined ? mk(2).heat.thresholdC : CONFIG.heat.gradientThresholdC);
+  eq('S13 and so is the thirty seconds of custody',
+    CONFIG.anomaly.custodyVerifySeconds, 30);
+
+  /* What a contact DOES is the rule; how often it may happen is the window. */
+  const contactsIn = (g, ms) => {
+    const a = g.anomaly;
+    a.reset(); a.state = 'drawn'; a.x = 0; a.z = 0;
+    const p = g.player; p.x = 0.4; p.z = 0; p.alive = true; p.downed = false;
+    g.heat.setEmitters([]); g.heat.setSinks([a.asSink()]);
+    let n = 0, applied = null;
+    const at = [];
+    for (let t = 0; t < ms; t += 16) {
+      const r = a.step(16, t, { sources: [], operatives: [p], pressureStage: 0, observation: null });
+      for (const c of r.contacts) { n++; applied = c.applies; at.push(t); }
+    }
+    /* The GAP is the claim, not the count. A count over a fixed window discretises at the
+     * boundary — 12s of a 3s cooldown is five contacts, not four, because the first one
+     * fires on the step it comes into reach. Asserting a doubled count would be asserting
+     * the arithmetic of the window I happened to pick. */
+    const gaps = at.slice(1).map((t, i) => t - at[i]);
+    return { n, applied, gap: gaps.length ? Math.min(...gaps) : null };
+  };
+  const c1 = contactsIn(mk(1), 12000), c2 = contactsIn(mk(2), 12000);
+  note(`at 1.2m: ${c1.n} contacts ${c1.gap}ms apart at 1.0, ${c2.n} contacts ${c2.gap}ms apart at 2.0 (content cooldown ${cap.cooldownMs}ms)`);
+  ok('S14 the assist genuinely spaces the contacts out', c2.n < c1.n);
+  /* Within one 16ms step of the content's figure: the cooldown is checked on a step
+   * boundary, so 3000ms of cooldown is first satisfied at t=3008. Asserting 3000 exactly
+   * would be asserting that the simulation is continuous, which it is not. */
+  ok(`S15 unassisted, the gap is the content's cooldown (${c1.gap}ms vs ${cap.cooldownMs}ms)`,
+    Math.abs(c1.gap - cap.cooldownMs) <= 16);
+  ok(`S16 and at 2.0 it is twice that, not a fudge (${c2.gap}ms vs ${cap.cooldownMs * 2}ms)`,
+    Math.abs(c2.gap - cap.cooldownMs * 2) <= 16);
+  eq('S17 while each contact still applies precisely what the content says it does',
+    JSON.stringify(c1.applied), JSON.stringify(c2.applied));
+
+  /* ── the settings model agrees with the simulation ──────────────────────────
+   * The band the panel offers and the band the rules accept are the same band, asserted
+   * against the model rather than against a number typed twice. */
+  const s = new Settings();
+  s.set('assists.procedureTiming', 2);
+  eq('S18 the panel and the simulation share one band', s.effective.assists.procedureTiming, 2);
+  s.set('assists.procedureTiming', 5);
+  ok('S19 and the panel refuses what the simulation would have clamped',
+    s.effective.assists.procedureTiming <= 2);
+  emit();
+}
 (async () => {
   try {
     sectionA();
@@ -1785,6 +1930,7 @@ async function sectionR() {
     sectionP();
     await sectionQ(content);
     await sectionR();
+    await sectionS(content);
     await sectionK();
     await sectionL();
     emit();

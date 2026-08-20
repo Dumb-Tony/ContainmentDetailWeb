@@ -45,6 +45,7 @@
       "batteryMinutes": 5.5,
       "heatOutputCelsius": 60,
       "heatFalloffMetres": 2.2,
+      "lightRadiusMetres": 6.5,
       "summary": "Light, and heat as a side effect. Its 40C contour is the cheapest fence post you have."
     },
     {

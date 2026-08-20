@@ -29,6 +29,21 @@ export class Player {
     this.remote = false;
     /** False while the operator is disconnected but the slot is still theirs (GDD §11.5). */
     this.connected = true;
+    /**
+     * §19.1's `procedureTiming`, PER OPERATIVE, applied to their own bleed-out clock.
+     *
+     * ⚠ Deliberately not one session-wide value. The host simulates everybody's clock, so
+     * the obvious implementation is the host's setting for the whole squad — and that
+     * would mean a player who needs the assist loses it the moment they join a friend's
+     * game, which is exactly the situation §19 exists to prevent. So a client DECLARES its
+     * timing assist on join and the host APPLIES it to that operative only: authority is
+     * unchanged (§20.3 — the host still decides who lives), and the accessibility setting
+     * travels with the person who needs it.
+     *
+     * A client can therefore declare 2.0 and be harder to lose. That is a co-op game with
+     * five seats and a room code; the trade is not close.
+     */
+    this.assistTiming = 1;
     this.reset();
   }
 
@@ -142,7 +157,7 @@ export class Player {
     if (!this.downed || !this.alive) return null;
     const held = this.draggedBy || this.conditions.exposure.stabilised;
     this.downedMs += held ? stepMs * 0.25 : stepMs;
-    if (this.downedMs >= bleedOutMs) { this.alive = false; return 'lost'; }
+    if (this.downedMs >= bleedOutMs * this.assistTiming) { this.alive = false; return 'lost'; }
     return null;
   }
 

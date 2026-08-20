@@ -248,6 +248,30 @@ export class Game {
 
   commandFor(playerId) { return this.commands.get(playerId) || EMPTY_COMMAND; }
 
+  /**
+   * GDD §19.1 difficulty assists, from the settings screen into the simulation.
+   *
+   * ⚠ `src/sim` cannot import `src/ui`, so the settings object never reaches the rules —
+   * a caller pushes the one number in. That is not a workaround, it is the reason the
+   * whole campaign can be driven headless: the simulation has no opinion about where 1.4
+   * came from. Section K fails the build if this direction is ever reversed.
+   *
+   * `playerId` scopes the timing assist to one operative's own bleed-out clock. Omit it
+   * and it applies to the local squad and to the anomaly's contact spacing — the solo
+   * case, where "the host" and "the player who set it" are the same person.
+   */
+  setAssists(assists, playerId = null) {
+    const t = Math.max(1, Math.min(2, Number(assists && assists.procedureTiming) || 1));
+    if (playerId) {
+      const p = this.players.find((q) => q.id === playerId);
+      if (p) p.assistTiming = t;
+      return t;
+    }
+    for (const p of this.players) p.assistTiming = t;
+    this.anomaly.assistTiming = t;
+    return t;
+  }
+
   /** Back-compatible single-player hook: main.js and the suite drive operative one. */
   setAxis(axis) {
     const c = this.commands.get('p1') || { ...EMPTY_COMMAND };
@@ -854,12 +878,24 @@ export class Game {
 
   /* ── odds and ends ───────────────────────────────────────────────────────── */
 
+  /**
+   * How lit this spot is, 0–1: the mains, plus every floodlight anyone has set down.
+   *
+   * ⚠ THE RADIUS BELONGS TO THE ITEM. It was hard-coded here as 6.5 while CONFIG carried a
+   * `stress.lightReliefRadiusM: 4.5` that nothing read — two different numbers for one
+   * radius, and the one you would have found by searching the config was the wrong one.
+   * It sits in items.json now, beside the heat output and the falloff, because a lamp's
+   * reach is a property of the lamp. A second light source is a content file, not an
+   * `itemId ===` test, and this loop no longer names the floodlight at all.
+   */
   lightAt(x, z) {
     let l = this.site.mainsLightAt(x, z);
     for (const d of this.deployables.list) {
-      if (d.itemId !== 'floodlight-tripod' || !d.active) continue;
+      if (!d.active) continue;
+      const r = d.item && d.item.lightRadiusMetres;
+      if (!r) continue;
       const dd = dist(x, z, d.x, d.z);
-      l = Math.max(l, Math.max(0, 1 - (dd / 6.5) ** 2));
+      l = Math.max(l, Math.max(0, 1 - (dd / r) ** 2));
     }
     return Math.min(1, l);
   }

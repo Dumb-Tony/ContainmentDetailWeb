@@ -84,15 +84,18 @@ export const CONFIG = Object.freeze({
   anomaly: {
     /* Speeds come from the content file's states; this is the pressure multiplier band. */
     pressureSpeedGain: 0.16,      // +16% per pressure stage above Latent
-    contactRadiusM: 1.2,
-    contactCooldownMs: 3000,
     batteryDrainRadiusM: 5,
     batteryDrainMultiplier: 4,
+    /* ⚠ `contactRadiusM`, `contactCooldownMs` and `reacquireGraceMs` used to live here and
+     * were read by nothing. They came over from the Unity build, where contact WAS an
+     * engine rule; here every one of them is content — a capability names its own
+     * `rangeMetres` and `cooldownMs`, and the anomaly re-tests its fence every step rather
+     * than running a grace timer. Three constants sitting in the config quietly describing
+     * a game that is not this one, and any of them could have been "tuned" for an
+     * afternoon with no effect whatsoever. Section K now fails the build on an unread
+     * CONFIG leaf, which is the only reason this cannot happen again. */
     /* How long the case must hold before custody is verified (content: 30s). */
     custodyVerifySeconds: 30,
-    /* Retreat pace once banked and being sealed — it does not move, but the fence is
-     * re-tested every step and this is how fast it resumes if the fence drops. */
-    reacquireGraceMs: 3000,
     /* How long a wall-follower may make no headway before it tries the other way round.
      * Long enough that it is not indecisive, short enough that a squad does not stand
      * about waiting for a lure that is already working. */
@@ -112,12 +115,12 @@ export const CONFIG = Object.freeze({
   },
 
   power: {
-    /* Batteries are minutes of runtime at nominal draw, not opaque percentages. */
-    packMinutes: 9,
-    floodlightMinutes: 5.5,
-    heaterMinutes: 4,
-    imagerMinutes: 14,
-    sensorMinutes: 20,
+    /* ⚠ The five `*Minutes` constants that used to live here were a SECOND set of battery
+     * lives, read by nothing, next to the real ones in content/equipment/items.json. Not
+     * merely dead — divergent: items.json ships eight batteries including a 16, a 12 and a
+     * 22 that this block had never heard of, so anyone who found these first would have
+     * been reading a runtime the game does not have. Batteries are minutes of runtime at
+     * nominal draw and the item that owns the battery states them. */
     /* A power pack in range feeds emitters instead of their own cells draining. */
     packFeedRadiusM: 5.0,
   },
@@ -131,8 +134,9 @@ export const CONFIG = Object.freeze({
     proximityRadiusM: 8,
     injuryPerMinute: 9,
     reliefPerMinute: -13,
-    /* Suppressed inside a deployed floodlight's glow — restoring light is the first relief. */
-    lightReliefRadiusM: 4.5,
+    /* ⚠ `lightReliefRadiusM: 4.5` was here, unread, while game.js used a hard-coded 6.5 for
+     * the same glow. It is items.json's `lightRadiusMetres` now — a lamp's reach belongs to
+     * the lamp, and one number cannot disagree with itself. */
   },
 
   render: {
@@ -157,10 +161,11 @@ export const CONFIG = Object.freeze({
     snapshotHz: 12,
     snapErrorM: 1.2,
     blend: 0.25,
-    /* §8.2 "fair under latency": no anomaly rule may be decided on an exact frame. The
-     * content file carries a `latencyToleranceMs` per trigger for the same reason; this
-     * is the budget the transport is allowed to spend against it. */
-    assumedRttMs: 120,
+    /* ⚠ `assumedRttMs: 120` sat here, unread, under a comment about §8.2 "fair under
+     * latency". The principle is real and the constant was not doing it: every trigger in
+     * the content file carries its own `latencyToleranceMs`, which is what actually keeps
+     * a rule from being decided on an exact frame. A transport-wide RTT budget would have
+     * been a second, coarser answer to a question the content already answers per rule. */
   },
 });
 

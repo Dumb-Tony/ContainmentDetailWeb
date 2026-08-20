@@ -54,6 +54,20 @@ export class Anomaly {
     /* Triggers indexed by id so the rules can be quoted back at the player verbatim. */
     this.trigger = new Map(def.triggers.map((t) => [t.id, t]));
     this.stateDef = new Map(def.states.map((s) => [s.id, s]));
+
+    /**
+     * GDD §19.1's `procedureTiming` assist, 1.0–2.0, set from outside by Game.setAssists.
+     * It stretches the gap between one contact and the next: at 2.0 the thing reaches you
+     * exactly as often and hurts exactly as much, and you get twice as long between hits
+     * to do something about it.
+     *
+     * ⚠ IT MUST ONLY EVER WIDEN A WINDOW, NEVER SOFTEN A RULE. Its reach, what a contact
+     * applies, the 40°C gradient and the thirty seconds of custody are all untouched by it
+     * — §7.4 asks for confidence rather than checklist completion, and an assist that
+     * moved the rule would be answering the question instead of giving the player time to
+     * answer it. The suite asserts the rule side is identical at 1.0 and 2.0.
+     */
+    this.assistTiming = 1;
     this.reset();
   }
 
@@ -390,8 +404,13 @@ export class Anomaly {
     /* Capabilities, dispatched on the verb the content names. */
     for (const cap of this.def.capabilities) {
       if (!(cap.availableInStates || []).includes(this.state)) continue;
-      const last = this.lastUsed.get(cap.id) || -1e9;
-      if (simTimeMs - last < (cap.cooldownMs || 0)) continue;
+      /* ⚠ `.get(id) || -1e9` here, and a capability that fired at sim-time 0 got a free
+       * second use on the very next step: `0 || -1e9` is -1e9, so the record of it having
+       * fired reads as never-fired. Invisible in play, because contact at exactly t=0 means
+       * standing on the thing at the instant the clock starts — and immediately visible to
+       * a test that does precisely that. `.has` asks the question the code means. */
+      const last = this.lastUsed.has(cap.id) ? this.lastUsed.get(cap.id) : -1e9;
+      if (simTimeMs - last < (cap.cooldownMs || 0) * this.assistTiming) continue;
 
       if (cap.verb === 'contact') {
         const op = ctx.operatives.find((o) => dist(this.x, this.z, o.x, o.z) <= cap.rangeMetres);
