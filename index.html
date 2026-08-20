@@ -74,6 +74,11 @@
   .cd-bezel-label{position:absolute;left:0;right:0;bottom:-21px;display:flex;justify-content:space-between;
     font-family:var(--mono);font-size:10.5px;color:var(--dim);letter-spacing:.03em}
 
+  /* §18.2 navigation aid — off unless an accessibility setting turns it on. */
+  .cd-navaid{position:absolute;right:18px;bottom:120px;width:180px;height:180px;
+    background:rgba(8,12,16,.55);border:1px solid rgba(120,150,175,.25);border-radius:3px}
+  .cd-navaid.compass{height:56px;bottom:auto;top:14px;right:50%;transform:translateX(50%);width:240px;
+    background:rgba(8,12,16,.4);border:0}
   .cd-squad{position:absolute;right:18px;top:78px;display:none;flex-direction:column;gap:4px;align-items:flex-end}
   .cd-squad .mate{display:grid;grid-template-columns:auto auto;gap:2px 10px;justify-items:end;
     padding:4px 10px;border-radius:4px;background:rgba(10,14,19,.72);border-right:3px solid var(--green);min-width:170px}

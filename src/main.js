@@ -149,6 +149,7 @@ async function boot() {
      * sliders spent a while doing nothing at all. Guarded because an old cached module is
      * a stale renderer, not a broken game — the sliders come back on the next load. */
     if (renderer.applySettings) renderer.applySettings(settings.effective);
+    hud.setNavigationAid(settings.effective.assists.navigationAids);
   };
   const settingsPanel = new SettingsPanel(document.body, settings, {
     input,

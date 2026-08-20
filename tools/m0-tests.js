@@ -29,6 +29,7 @@ import { NetSession, loopbackPair, ROLE } from '../src/net/net.js';
 import { MSG, ACT, PROTOCOL_VERSION, MAX_SQUAD, encodeSnapshot, applySnapshot } from '../src/net/protocol.js';
 import { mixFor, Audio, BUSES, CAPTIONS, missingCaptions, formatCaption } from '../src/audio/audio.js';
 import { Settings, PALETTES, SHAPES } from '../src/ui/settings.js';
+import { Hud } from '../src/ui/hud.js';
 import { Progression, loadSite, DEPLOYMENT_COST, DEPARTMENT_IDS } from '../src/sim/progression.js';
 import { Input, DEFAULT_BINDINGS, isReservedCode } from '../src/core/input.js';
 import { segmentHitsRect, moveWithWalls, dist, circleHitsRect } from '../src/sim/geometry.js';
@@ -1911,6 +1912,125 @@ async function sectionS(content) {
     s.effective.assists.procedureTiming <= 2);
   emit();
 }
+
+/* ══ T. the navigation aid shows the building, never the incident ══════════════
+ *
+ * GDD §18.2 allows this and allows it only here: "no permanent minimap in standard mode
+ * ... accessibility settings can add navigation aids." The risk is not that the aid
+ * exists, it is what it draws. An aid that marks the anomaly hands back the §7.4 question
+ * — finding the thing IS the game, and the imager is how you find it — under cover of
+ * being an accessibility feature.
+ *
+ * So this section reads the pixels. It runs a frame with the anomaly at a known spot,
+ * and asserts nothing is drawn there.
+ */
+async function sectionT(content) {
+  lines.push('--- T. the navigation aid draws the floor, not the thing on it ---');
+
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  const g = new Game(content, { seed: 'nav' });
+  g.commitLoadout(RECOMMENDED_MANIFEST);
+  const hud = new Hud(host, g, null);
+
+  eq('T1 the aid is off by default, as §18.2 requires', hud.navMode, 'off');
+  eq('T2 an unknown mode is off, not a crash', hud.setNavigationAid('sonar'), 'off');
+  eq('T3 the compass can be turned on', hud.setNavigationAid('compass'), 'compass');
+  eq('T4 and sizes its backing store to its own box', `${hud.navAid.width}x${hud.navAid.height}`, '240x56');
+  eq('T5 the minimap likewise', hud.setNavigationAid('minimap') && `${hud.navAid.width}x${hud.navAid.height}`, '180x180');
+
+  /* Put the anomaly somewhere unambiguous, well away from any wall, and look for it. */
+  const b = g.site.bounds;
+  const a = g.anomaly;
+  a.x = (b.minX + b.maxX) / 2 + 3.5; a.z = (b.minZ + b.maxZ) / 2 + 3.5;
+  g.player.x = b.minX + 2; g.player.z = b.minZ + 2;
+  hud.setNavigationAid('minimap');
+  hud._drawNavAid();
+
+  const W = hud.navAid.width, H = hud.navAid.height;
+  const s = Math.min(W / (b.maxX - b.minX), H / (b.maxZ - b.minZ)) * 0.92;
+  const ox = W / 2 - ((b.minX + b.maxX) / 2) * s;
+  const oy = H / 2 + ((b.minZ + b.maxZ) / 2) * s;
+  const ctx = hud.navAid.getContext('2d');
+  /* A 9x9 window over where the anomaly is. Anything drawn for it would land here. */
+  const ax = Math.round(ox + a.x * s), az = Math.round(oy - a.z * s);
+  const px = ctx.getImageData(ax - 4, az - 4, 9, 9).data;
+  let lit = 0;
+  for (let i = 3; i < px.length; i += 4) if (px[i] > 8) lit++;
+  note(`minimap at the anomaly's position (${ax},${az}): ${lit} of 81 pixels drawn`);
+  eq('T6 nothing at all is drawn where the anomaly is standing', lit, 0);
+
+  /* And prove the canvas is not simply blank — the extraction IS drawn, in the same pass. */
+  const ex = g.site.extraction;
+  const exd = ctx.getImageData(Math.round(ox + ex.x * s) - 4, Math.round(oy - ex.z * s) - 4, 9, 9).data;
+  let exLit = 0;
+  for (let i = 3; i < exd.length; i += 4) if (exd[i] > 8) exLit++;
+  ok(`T7 while the extraction point is (${exLit} of 81 pixels), so the test can see`, exLit > 0);
+
+  /* Squad mates are the building's other people and DO appear — that is §11 information a
+   * player already has by radio, not the answer to the search. */
+  const mate = g.addPlayer('Two');
+  mate.x = (b.minX + b.maxX) / 2 - 3.5; mate.z = (b.minZ + b.maxZ) / 2 - 3.5;
+  hud._drawNavAid();
+  const md = ctx.getImageData(Math.round(ox + mate.x * s) - 4, Math.round(oy - mate.z * s) - 4, 9, 9).data;
+  let mLit = 0;
+  for (let i = 3; i < md.length; i += 4) if (md[i] > 8) mLit++;
+  ok('T8 a teammate is drawn — where your squad is was never the question', mLit > 0);
+
+  /* Still nothing at the anomaly, now that something else has been drawn. */
+  const px2 = ctx.getImageData(ax - 4, az - 4, 9, 9).data;
+  let lit2 = 0;
+  for (let i = 3; i < px2.length; i += 4) if (px2[i] > 8) lit2++;
+  eq('T9 and still nothing where the anomaly is', lit2, 0);
+
+  /* The compass points at the stairs, and points the right way — forward is
+   * (-sin yaw, -cos yaw) and a compass built on the other convention reads plausibly
+   * while sending a lost operative in exactly the wrong direction. */
+  hud.setNavigationAid('compass');
+  const p = g.player;
+  /* Six metres on the −z side of the stairs, facing +z — the same posture section O uses
+   * to make an operative look AT something, so the convention is stated once and reused
+   * rather than re-derived here and got backwards. */
+  p.x = ex.x; p.z = ex.z - 6;
+  p.yaw = Math.PI;
+  hud._drawNavAid();
+  const cW = hud.navAid.width, cH = hud.navAid.height;
+  const strip = hud.navAid.getContext('2d').getImageData(0, 0, cW, cH).data;
+  /* ⚠ Count only BELOW the horizon line. The line itself spans the full width and the
+   * cardinal letters sit above it, so a naive full-column count says the edges are busier
+   * than the centre no matter where the marker is — the first version of this assertion
+   * failed for that reason and was measuring the ruler, not the needle. Everything drawn
+   * below the line is the extraction marker and its label, and nothing else. */
+  const belowAlpha = (x0, x1) => {
+    let n = 0;
+    for (let x = x0; x < x1; x++) {
+      for (let y = Math.floor(cH / 2) + 4; y < cH; y++) if (strip[(y * cW + x) * 4 + 3] > 8) n++;
+    }
+    return n;
+  };
+  const middle = belowAlpha(Math.round(cW * 0.4), Math.round(cW * 0.6));
+  const edges = belowAlpha(0, Math.round(cW * 0.12)) + belowAlpha(Math.round(cW * 0.88), cW);
+  note(`compass, stairs dead ahead: ${middle} marker px centre, ${edges} at the edges`);
+  ok('T10 the marker is drawn ahead of the operative, not behind them', middle > edges);
+
+  /* Turn round. The marker must leave the centre — a compass that points the same way
+   * whichever way you face is the failure mode that reads as working. */
+  p.yaw = 0;
+  hud._drawNavAid();
+  const back = hud.navAid.getContext('2d').getImageData(0, 0, cW, cH).data;
+  const backMiddle = (() => {
+    let n = 0;
+    for (let x = Math.round(cW * 0.4); x < Math.round(cW * 0.6); x++) {
+      for (let y = Math.floor(cH / 2) + 4; y < cH; y++) if (back[(y * cW + x) * 4 + 3] > 8) n++;
+    }
+    return n;
+  })();
+  note(`same spot, facing away: ${backMiddle} marker px centre`);
+  ok('T11 and it leaves the centre when the operative turns round', backMiddle < middle);
+  emit();
+
+  host.remove();
+}
 (async () => {
   try {
     sectionA();
@@ -1931,6 +2051,7 @@ async function sectionS(content) {
     await sectionQ(content);
     await sectionR();
     await sectionS(content);
+    await sectionT(content);
     await sectionK();
     await sectionL();
     emit();
