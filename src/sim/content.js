@@ -362,6 +362,6 @@ export async function loadContent({
 }
 
 /** Every incident the build ships, for the mission board. Content, not code. */
-export const INCIDENTS = Object.freeze(['cold-storage-draught', 'cold-storage-figure', 'ashlar-gallery-draught', 'cold-storage-tally', 'blackthorn-caller', 'cold-storage-passenger', 'ashlar-flat-lodger']);
+export const INCIDENTS = Object.freeze(['cold-storage-draught', 'cold-storage-figure', 'ashlar-gallery-draught', 'cold-storage-tally', 'blackthorn-caller', 'cold-storage-passenger', 'ashlar-flat-lodger', 'harrowbank-ballast', 'cold-storage-toll']);
 
 export { ContentError };

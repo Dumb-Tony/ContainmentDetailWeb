@@ -1,0 +1,76 @@
+{
+  "id": "harrowbank-ballast",
+  "contentRevision": "0.1.0",
+  "displayName": "The stone that came back",
+  "anomaly": "harrowbank-ballast",
+  "map": "harrowbank-switchyard",
+  "difficulty": "field",
+
+  "_note": "THE FOURTH ENVIRONMENT FAMILY AND THE SEVENTH PROCEDURE FAMILY, in one package. The build had indoors-industrial, indoors-residential and outdoors-natural; this is outdoors-BUILT, and the difference is not decoration. Blackthorn's argument is that a forest looks like it is made of walls and is not — 10.1% of its built length stops a draught. The cold store's argument is the opposite: the building's own structure is the fence and four shelving runs are the exception. A switching compound is neither. MEASURED on the shipped geometry: 226.4m of cast concrete and 379.6m of palisade, chain-link, lattice and steel cladding — 37.4% of the built length stops a mass and 100% of it stops a person, and the concrete is not distributed. It is six pens, and every one of them opens the same way.\n\nSO THIS SITE OFFERS MORE READY-MADE CONTAINMENT THAN ANY MAP IN THE BUILD AND THE INCIDENT NEEDS NONE OF IT. That is §15.2 argued from the other end: the cold store's three incidents share a floor whose geometry is the answer every time, and here is a floor whose geometry is a very good answer to a question nobody asked tonight. A squad that spends its first four minutes deciding which bay to use has spent four minutes.\n\nWHAT THE COMPOUND IS ACTUALLY FOR HERE IS DISTANCE AND DARK. 18,827 standable cells over 32 metres, 34.6% of them with any light on arrival, and a decoy is only a decoy if it is far enough from the case to be worth setting up. The two circuits are worth throwing for exactly one reason and it is not the doors: both on takes the lit ground from 34.6% to 98.9%, and every stone on this yard is a fist-sized grey object lying in grey chippings.",
+
+  "anomalySpawn": [2.4, 12.6],
+  "_spawnNote": "The north verge, 27.5m from the vehicle and 3.4m clear of anything. Two of its five stones are within a metre and a half of it, so their sinks superpose and the imager reads them from the back road as one obvious cold patch — the squad's first success is free, exactly as the tally's office cluster is. The other three are alone, and a lone stone is a smudge you have to be within 3.07m of.",
+
+  "_variationNote": "GDD §14.4. The axis that matters most here is the ORIGIN, because on this map the origin decides whether the thing starts penned or in the open: [12.6, 13.0] puts it inside the oil bund, which reads 3 escape rays bare, and [-12.4, 6.4] puts it inside bay 1, which reads 3. A squad that walks in on one of those seeds and does not notice will strip the yard with the problem already solved and never know; a squad that walks in on [2.4, 12.6] or [-6.6, 12.4] has it loose in the north half from the first minute. Same rules, same stones, and a genuinely different night.\n\n⚠ `door-gate` IS NOT ON THE ROUTE LIST. It starts shut and dead — it is on the yard circuit and the incomer is open — and jamming it costs nothing, because the compound fence is 3.4m short at its east end and always has been. Listing it would be an axis that varies nothing a squad could observe, which is exactly the defect §14.4's own note in variation.js was written against.\n\n⚠ AND `circuit-yard` IS NOT ON THE FAULT LIST. It is the only supply to the relay room's own lighting and to two thirds of the yard, and this is an incident whose entire search phase is finding grey stones on grey stone in the dark. Faulting it does not make the operation harder in an interesting way; it makes the same operation take twice as long with nothing to learn from. The bay circuit is the one that may fail: it lights the north half, where the thing usually is.",
+  "variation": {
+    "origins": [[2.4, 12.6], [-6.6, 12.4], [12.6, 13.0], [-12.4, 6.4]],
+    "routes": ["door-relay", "door-scrap"],
+    "routesShutMax": 1,
+    "faults": ["circuit-bays"],
+    "faultsMax": 1,
+    "droppable": ["ganger-statement", "linesman-statement", "dead-waymarkers", "dragged-boot"],
+    "dropMax": 1,
+    "civilians": [
+      { "id": "ganger-statement", "positions": [[0.0, -13.6], [-3.4, -12.2]], "states": ["present", "shaken"] },
+      { "id": "skip-crew-statement", "positions": [[3.8, -13.6], [6.4, -12.2]], "states": ["present", "shaken"] },
+      { "id": "linesman-statement", "positions": [[7.8, -13.4], [11.0, -13.6]], "states": ["present", "shaken"] }
+    ],
+    "behaviour": { "speedFactor": [0.92, 1.08] },
+    "falseLeads": ["earth-mat-record"],
+    "weather": ["still", "cold", "wet", "wind"],
+    "times": ["night", "dawn", "day"]
+  },
+
+  "briefing": {
+    "headline": "Gang withdrawn, Harrowbank switching compound",
+    "report": "A three-man gang lifting the earth mat out of a decommissioned 33kV compound stopped after two days. They report that stone they barrowed out to the skip was back in the yard by the afternoon, twice, and one of them was taken to hospital with a crush injury nobody can account for. The compound has been shut and dark for nine days.",
+    "known": [
+      { "text": "All three of the gang are at the gate and will give statements. One of them will not come back through it.", "confidence": "probable" },
+      { "text": "The incomer is open. Both yard circuits are dead until somebody throws them, and the breakers are in two different places.", "confidence": "probable" },
+      { "text": "The compound fence is 3.4m short at its east end. The vehicle gate is on the yard circuit and is shut.", "confidence": "confirmed" },
+      { "text": "Nothing has been seen. The gang describe stone moving and a man being hurt, and nobody claims to have looked at anything.", "confidence": "disputed" }
+    ]
+  },
+
+  "instanceSites": [
+    { "id": "s1", "anomalous": true, "at": [2.0, 11.4], "label": "Stone", "mundaneLabel": "Stone" },
+    { "id": "s2", "anomalous": true, "at": [2.8, 11.8], "label": "Stone", "mundaneLabel": "Stone" },
+    { "id": "s3", "anomalous": true, "at": [6.2, 6.4], "label": "Stone", "mundaneLabel": "Stone" },
+    { "id": "s4", "anomalous": true, "at": [-14.6, -1.6], "label": "Stone", "mundaneLabel": "Stone" },
+    { "id": "s5", "anomalous": true, "at": [-8.0, 10.2], "label": "Stone", "mundaneLabel": "Stone" },
+
+    { "id": "m1", "anomalous": false, "at": [7.0, -4.0], "label": "Stone", "mundaneLabel": "Stone" },
+    { "id": "m2", "anomalous": false, "at": [-3.0, -8.0], "label": "Stone", "mundaneLabel": "Stone" },
+    { "id": "m3", "anomalous": false, "at": [-11.4, 6.0], "label": "Stone", "mundaneLabel": "Stone" },
+    { "id": "m4", "anomalous": false, "at": [13.0, 2.0], "label": "Stone", "mundaneLabel": "Stone" }
+  ],
+  "_sitesNote": "Nine candidates, five of them the set, and `label` and `mundaneLabel` are the same word on every row for the reason the tally's are: the prompt reads 'Take the stone' for one nobody has instrumented and 'Take the stone — reads cold' for one the imager has confirmed, and the only difference between those two sentences is something the squad did. There are four decoys rather than six because the arithmetic is not the game here — the count is worth nothing and the thing sitting down is the only report that matters. What the four buy is the one mistake this incident cannot afford: a mundane stone in the case stops `instances-accounted` dead, the cure is to turn the case out, and turning the case out is what puts the thing back on its feet.\n\nThey are placed to spread the operation over the whole compound rather than to be hard to find. Two together at the north end so superposition gives the squad a free first reading; one in bay 4, one at the west margin, one on the back road. The four mundane ones are in the south half, where a squad arriving in the dark will meet them first and where being wrong is cheapest to undo.",
+
+  "evidenceSources": [
+    { "evidenceId": "ganger-statement", "at": [0.0, -13.6], "label": "The ganger, at the gate", "prompt": "Take a statement", "requiresEquipment": [] },
+    { "evidenceId": "skip-crew-statement", "at": [3.8, -13.6], "label": "The skip driver, at the gate", "prompt": "Take a statement", "requiresEquipment": [] },
+    { "evidenceId": "linesman-statement", "at": [7.8, -13.4], "label": "The third of the gang, by the vehicles", "prompt": "Take a statement", "requiresEquipment": [] },
+    { "evidenceId": "quarry-delivery", "at": [-10.6, -7.0], "label": "Delivery dockets on the relay room bench", "prompt": "Read the dockets", "requiresEquipment": [] },
+    { "evidenceId": "earth-mat-record", "at": [-15.0, -6.4], "label": "Decommissioning file, relay room", "prompt": "Read the file", "requiresEquipment": [] },
+    { "evidenceId": "second-callout", "at": [2.4, -8.4], "label": "Contractor's day sheet at the marshalling kiosk", "prompt": "Read the day sheet", "requiresEquipment": [] },
+    { "evidenceId": "weighbridge-ticket", "at": [12.4, -7.6], "label": "Weighbridge tickets on the skip", "prompt": "Compare the tickets", "requiresEquipment": [] },
+    { "evidenceId": "site-heater", "at": [-4.0, -3.0], "label": "A site heater run dry in the middle of the yard", "prompt": "Examine the heater", "requiresEquipment": [] },
+    { "evidenceId": "dead-waymarkers", "at": [-12.0, -3.4], "label": "Solar route markers along the yard road", "prompt": "Check the cells", "requiresEquipment": [] },
+    { "evidenceId": "bay-scour", "at": [-6.2, 7.4], "label": "A band of ground dust in bay 2", "prompt": "Follow the band", "requiresEquipment": [] },
+    { "evidenceId": "dragged-boot", "at": [5.0, -0.2], "label": "A rigger boot lying in the dust", "prompt": "Examine the boot", "requiresEquipment": [] },
+    { "evidenceId": "ambulance-sheet", "at": [9.8, -1.8], "label": "Ambulance handover sheet, taped to the gantry leg", "prompt": "Read the sheet", "requiresEquipment": [] },
+    { "evidenceId": "lifted-chippings", "at": [-1.0, 13.4], "label": "Chippings stood on end in a ring", "prompt": "Examine the ring", "requiresEquipment": [] }
+  ],
+
+  "_sourcesNote": "Thirteen placed sources and two earned. Positions were swept for standability at the 0.34m operative radius and for distance to every other interactable — the three statements sit on the access road so the whole investigation can start before anybody crosses the fence line, and the two documents that carry the false leads are both in the relay room, which is the one place on this compound that looks like an office and is therefore where a squad will go first."
+}

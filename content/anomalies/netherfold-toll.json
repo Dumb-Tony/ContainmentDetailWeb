@@ -1,0 +1,508 @@
+{
+  "id": "netherfold-toll",
+  "contentRevision": "0.1.0",
+  "displayName": "The toll",
+  "licensingRecordId": null,
+  "_licensingNote": "Original, not an SCP. GDD §25 makes an attribution record a prerequisite for implementing SCP-derived content and §25.7's ShareAlike questions are unsettled. Nothing here is derived from anyone's work.",
+
+  "incidentPremise": "A night attendant on level 2 was found sitting on the floor beside a drainage gully at the end of a shift with cold burns to both hands and no memory of the previous twenty minutes. He was not trapped and nothing was holding him. He states that he crouched down to look at something, that it was not unpleasant, and that he did not think of getting up. The man who found him pulled him back three feet and says the whole thing stopped the moment he was clear of it. Both of them went back the following night and stood at the gully in turns, deliberately, because the second man wanted to see it — and after about twenty minutes it stopped, and stayed stopped until somebody stepped in again.",
+
+  "_designNote": "AN EIGHTH PROCEDURE FAMILY: containment PAID FOR, in the operatives' own bodies, on a clock — and then taken back at the last moment.\n\nEvery family in this build so far spends equipment, position or attention. The draught spends cargo and floor space; the figure and the lodger spend cones of view; the tally spends time and care; the caller spends the squad's own noise; the passenger spends sequence; the ballast spends minutes of burning kit. This one has no currency but WARMTH, and the squad only has three sources of it: their own bodies, whatever they brought with a heating element in it, and the transit case. Two of those three have cells in them and this thing empties a cell inside its reach at twelve times rate. The third does not.\n\nSO THE RULE IS ONE SENTENCE AND EVERYTHING FOLLOWS FROM IT: something warm has to stay inside two metres of it, without a gap, for eighteen seconds. It is not a fence, it is not a sightline, it is not an account — it is a fee. And nothing in the vocabulary says whose warmth it is, which is exactly the design: an operative can pay it, or a portable heater can pay it, and a heater rated four minutes lasts twenty-three seconds in that two metres. MEASURED, by standing one in the ring and running it flat: 23.0s of a 240s cell against an eighteen-second fee. One heater is one attempt and five seconds.\n\nTHE LAST MOVE IS TAKING THE PAYMENT BACK, AND IT IS THREE SECONDS. `wants-more` is the same sense, the same two metres, and a three-second sustain: once it is paid, anything warm still standing in its reach starts it over. So the operative who has just stood there for eighteen seconds being hurt has to get OUT of the reach before they can do anything else, and the case cannot be waiting inside the reach either. The seal radius is 2.6m and the reach is 2.0m. That 0.6m band is the whole procedure, and it is the same shape of number as the passenger's 0.4m safety band and the lodger's 3.7m of standing room: a rule you can pace out.\n\nAND IT MAKES THE FLOOR HARD TO LEAVE. `rimes-the-floor` puts down a hazard exactly two metres across — the reach, drawn — while it is taking. That is the lodger's trick used for the opposite purpose. The lodger's ring is a WARNING, painted where you must not stand; this one is painted where you MUST stand, and its job is to make the three seconds cost something. 0.28 of the acceleration and 0.18 of the friction, and an operative who spent the eighteen seconds deciding what to do next has already spent the three.\n\nWHAT IT COSTS SOLO, EXACTLY. Contact reaches the same two metres on a 9.5s cooldown and applies minor exposure. Eighteen seconds of standing in it is therefore precisely TWO contacts — at zero and at nine and a half — which is exposure at serious and one short of the floor. The third would land at nineteen seconds and the fee is paid at eighteen. DRIVEN SOLO: two contacts, exposure 2 of 3, the fee landing 18.1s after the operative crossed 2.0m against a third contact due at 19.0 — nine tenths of a second of margin, and it is the reason one operative can run this and cannot run it twice.\n\nNOTHING IS BLOCKED AND `blockedBy` IS AUTHORED EMPTY RATHER THAN OMITTED. It has never been recorded anywhere but in a gully and every state has speedMps 0. An empty list is not the same statement as no list: `isFenced` returns fenced:false unconditionally for an anomaly stopped by nothing, so the HUD's escape count reads twenty-four of twenty-four all night and never once tells a squad they have penned something. Omitting the key would have defaulted to walls-and-gradients and let the readout claim a containment nobody built.",
+
+  "presence": {
+    "hunts": "none",
+    "blockedBy": [],
+    "_huntsNote": "It does not go anywhere, and the fee has to be brought to it. That is the first thing this shares with the lodger and the last: both of them are worked at their own address. What is different is that the lodger's address has to be found without pointing anything at it, and this one announces itself — sixteen degrees under a cold store is the loudest thing on any imager anybody will ever bring down here.",
+    "field": {
+      "kind": "sink",
+      "quantity": "heat",
+      "magnitude": 16,
+      "falloffMetres": 1.8,
+      "_note": "Sixteen degrees under the floor at the gully and about three under at four metres, which puts the edge of the readable cold at roughly the edge of the four-and-a-half-metre wake radius. It is deliberately the strongest signature in the build: this is not an anomaly you have to find, it is one you have to decide to pay, and hiding it would have made the incident a search when the incident is a decision. The one thing the depth does buy is a rate — the fall-off from four degrees under to sixteen over four metres is steep enough that an operative walking in on the imager can see the reach coming."
+    }
+  },
+
+  "perception": {
+    "channels": ["thermal", "physical-trace", "witness"],
+    "recordingInterference": "None, and a camera left pointed at it records a drain. That is worth saying because it is the one instrument that cannot help here at all: nothing in this file reads observation, so a deployed camera neither holds it nor provokes it, and a squad that has run the aisle B handover will deploy one out of habit and get a video of somebody standing still. What a recording IS good for is the timing — the fee and the three seconds are both wall-clock facts, and a camera running on the gully gives a squad a way to time them without anybody having to count while being hurt.",
+    "accessibilityAlternatives": [
+      "Both figures the procedure turns on arrive as sentences in the squad feed rather than as sounds: 'It stops taking. The floor stops spreading.' when the fee is paid, and 'It starts again, from nothing.' when somebody has stayed too long. Neither is carried by a tone and neither depends on which ear it came from.",
+      "The condition strip names and counts the cost as it lands ('Exposure ▮▮'), so 'that operative has paid enough' is a reading task at a glance rather than a judgement about how somebody sounds.",
+      "The rime is a SHAPE with a hard edge two metres across, and the floor inside it is a different surface underfoot, so its boundary is legible by outline and by footfall rather than by fine colour discrimination — which matters because that boundary is the line an operative has to cross in three seconds.",
+      "On the imager it sits at the extreme sub-ambient end of the ramp and renders near black against a floor drawn in bright teal, so it is a brightness difference before it is a colour one."
+    ]
+  },
+
+  "states": [
+    {
+      "id": "dry",
+      "kind": "latent",
+      "speedMps": 0,
+      "displayName": "Dry",
+      "description": "Nothing warm has been near it for a while. It is a floor gully with a grating over it and a stain around the grating, and the stain is dry when the rest of the floor is not.",
+      "presentation": {
+        "visualTell": "Nothing to the eye but a gully. On thermal, a hole in the floor sixteen degrees under the room, holding its shape and its edge",
+        "audioCue": "None. The chiller return and nothing else",
+        "environmentalTell": "A ring of old rime around the grating, hard-edged, two metres across, that has been there long enough to have dust on it"
+      }
+    },
+    {
+      "id": "taking",
+      "kind": "active",
+      "speedMps": 0,
+      "displayName": "Taking",
+      "description": "Something warm is inside two metres and it is taking. It reaches for whatever is there on a nine-and-a-half-second cycle, it empties any cell in the same two metres twelve times faster than rated, and it puts new rime down out to the edge of its own reach.",
+      "presentation": {
+        "visualTell": "Fresh rime spreading from the grating outward in a growing circle with a clean hard edge, and stopping at two metres",
+        "audioCue": "The floor ticks as it freezes, unevenly, and the ticking works outward",
+        "environmentalTell": "Breath fogs at knee height and not at head height. Every cell inside the ring drops a step every few seconds"
+      }
+    },
+    {
+      "id": "paid",
+      "kind": "vulnerable",
+      "speedMps": 0,
+      "displayName": "Paid",
+      "description": "It has had eighteen unbroken seconds of something warm inside its reach and it has stopped. It takes nothing, it drains nothing, and it puts nothing else down. It will stay like this as long as its reach is empty, and it starts over three seconds after it is not.",
+      "presentation": {
+        "visualTell": "The rime stops growing. What is down stays down, and the edge of it stops being a moving line",
+        "audioCue": "The ticking stops between one second and the next",
+        "environmentalTell": "Cells inside the ring go back to their rated draw within a step, which on a case indicator is the difference between a step every few seconds and a step every few minutes"
+      }
+    },
+    {
+      "id": "cased",
+      "kind": "contained",
+      "speedMps": 0,
+      "displayName": "Cased",
+      "description": "Lifted out of the gully and sealed, with the case heater cycling. Custody is the closed lid and the heater; the case is warm and the case is inside its reach, and that appears to be acceptable to it once the lid is over.",
+      "presentation": {
+        "visualTell": "Latches over, case indicator steady, and the gully behind it an ordinary gully",
+        "audioCue": "Heater cycling, roughly every twenty seconds",
+        "environmentalTell": "The rime ring stays exactly where it is. It was there before the operation and it will be there after it"
+      }
+    }
+  ],
+
+  "triggers": [
+    {
+      "id": "noticed",
+      "from": "dry",
+      "to": "taking",
+      "when": { "sense": "heat-within", "radiusMetres": 4.5, "sustainSeconds": 2.5 },
+      "condition": "anything warm within 4.5m of the gully for two and a half seconds",
+      "telegraph": "The floor around the grating ticks once, and then keeps ticking.",
+      "pressureDelta": 1,
+      "latencyToleranceMs": 900,
+      "_note": "FOUR AND A HALF METRES RATHER THAN TWO, so that walking past is what wakes it and standing in it is what pays it. The two figures being different is the first thing a squad learns and the only thing that stops the whole operation being one number."
+    },
+    {
+      "id": "paid-up",
+      "from": "taking",
+      "to": "paid",
+      "when": { "sense": "heat-within", "radiusMetres": 2.0, "sustainSeconds": 18 },
+      "condition": "something warm has stayed inside 2m of it, without a break, for eighteen seconds",
+      "telegraph": "The rime stops spreading. The edge of it stops being a moving line.",
+      "pressureDelta": -2,
+      "latencyToleranceMs": 900,
+      "_note": "THE FEE, AND THE SUSTAIN IS THE WHOLE OF IT. It is not a threshold and it is not a state anybody maintains around the thing — it is eighteen continuous seconds, and a gap of one step puts the count back to zero. That is what makes a HANDOVER possible and necessary: the sense does not care which warm thing it is, so a second operative who steps in before the first steps out keeps the clock running, and one who steps in a moment late has bought nothing at all. §8.2 is paid here rather than on the other side of the pair — eighteen seconds cannot be lost to a dropped packet, and the tolerance is twice the worst modelled wire."
+    },
+    {
+      "id": "wants-more",
+      "from": "paid",
+      "to": "taking",
+      "when": { "sense": "heat-within", "radiusMetres": 2.0, "sustainSeconds": 3.0 },
+      "condition": "anything warm is still inside 2m of it three seconds after it stopped",
+      "telegraph": "It starts again, from nothing. The rime edge begins to move.",
+      "pressureDelta": 2,
+      "latencyToleranceMs": 900,
+      "_note": "THE SAME SENSE AND THE SAME TWO METRES, WHICH IS WHY IT IS FAIR. There is no second rule to learn: the thing that paid the fee is the thing that cancels it, and the only difference is which side of the line it is on when the eighteen seconds land. The asymmetry is in the sustains — eighteen to buy, three to lose — and it runs the opposite way to the caller's and the lodger's, where waking is instant and the restraint is slow. Here the restraint is expensive and the loss is slow enough to walk out of. Three seconds is deliberately long enough to cross two metres of rime at 0.28 acceleration and short enough that it cannot be done while reading a prompt."
+    },
+    {
+      "id": "sealed",
+      "from": "paid",
+      "to": "cased",
+      "when": { "sense": "enclosed-by", "itemId": "reinforced-transit-case", "radiusMetres": 2.6 },
+      "condition": "the transit case is closed around it while its reach is empty",
+      "telegraph": "The latches go over. Nobody is standing in the ring when they do.",
+      "pressureDelta": -4,
+      "latencyToleranceMs": 2500,
+      "_note": "2.6m AND NOT 1.5m, AND IT IS THE ONE NUMBER IN THIS FILE THAT IS NOT A RULE ABOUT THE ANOMALY. Every other seal in the build is 1.5m because every other anomaly can be approached. This one cannot: 1.5m is inside a reach that restarts the fee, so a case placed at the shipped radius would be a warm thing standing in the ring and the operation would cycle forever with a three-second window every twenty-one seconds. The band between 2.0 and 2.6 is the only ground a case can stand on, and `Game.contextAction` reads the trigger's own radius rather than a constant, so the prompt appears exactly where the rule allows it."
+    }
+  ],
+
+  "capabilities": [
+    {
+      "id": "takes-the-toll",
+      "verb": "contact",
+      "availableInStates": ["taking"],
+      "effect": "It takes heat out of whatever is inside two metres, in a way that reads afterwards as a cold burn. Survivable twice; the third one on the same operative puts them down.",
+      "rangeMetres": 2.0,
+      "cooldownMs": 9500,
+      "compounding": true,
+      "applies": [
+        { "condition": "exposure", "severity": "minor" }
+      ],
+      "counterableBy": ["let-the-heater-pay", "stand-off"],
+      "_note": "MINOR RATHER THAN SERIOUS, AND THE COOLDOWN IS THE FEE DIVIDED. Eighteen seconds at 9.5s is two contacts, which is exposure at 2 of 3. A serious severity would have been three-of-three on the second and made the solo grade a casualty every time; a shorter cooldown would have done the same. The numbers exist to make one operative able to pay the fee once, at real cost, and unable to pay it twice — which is the sentence the difficulty profiles are written from.\n\nIt is available ONLY while it is taking, so the moment the fee lands the danger stops. That is not mercy either: it is what makes the three seconds a decision instead of a panic, because an operative standing in a paid ring is safe and is also the reason it will not stay paid."
+    },
+    {
+      "id": "empties-cells",
+      "verb": "drain-power",
+      "availableInStates": ["taking"],
+      "effect": "Anything with a cell in it inside two metres runs down about twelve times faster than rated. A four-minute heater is twenty-three seconds on the clock. A twelve-minute transit case is sixty.",
+      "rangeMetres": 2.0,
+      "cooldownMs": 0,
+      "multiplier": 12,
+      "counterableBy": ["power-pack", "stand-off"],
+      "_note": "⚠ THE FIRST SHIPPED CONTENT TO AUTHOR `multiplier`. `DeployableSet.stepPower` has read it off the drain capability since the capability became content, and every anomaly in the build has silently taken the engine's default of four. Four would not do here: at four a portable heater lasts sixty seconds in the ring and pays the eighteen-second fee three times over, which deletes the entire question of who stands in it. At twelve it lasts twenty-three seconds of wall clock — 240s of cell at twelve times rate is 20s of draining, and it is only draining while the thing is taking, so the three seconds it spends paid each cycle come back — and twenty-three against eighteen is one attempt with five seconds in hand. MEASURED, not divided.\n\nTHE RADIUS IS THE REACH, EXACTLY, AND THAT IS THE POINT. Whatever pays the fee is inside the drain by definition, so there is no geometry that dodges it — no standoff, no annulus, no clever placement. The only payer with nothing to drain is a person. A power pack outside the two metres will feed a heater inside them and takes the multiplied draw in its place, which turns nine minutes of pack into forty-five seconds of fee: two more attempts, and no immunity.\n\nAvailable only while it is taking, so custody is never at risk. A sealed case standing in the ring keeps its cells, which is the whole reason the thirty seconds of verification can be spent standing still."
+    },
+    {
+      "id": "rimes-the-floor",
+      "verb": "surface-hazard",
+      "availableInStates": ["taking"],
+      "effect": "Freezes the floor out to the edge of its own reach and leaves it frozen. The ring is 4.0m across, which is the two metres it can reach, drawn.",
+      "rangeMetres": 4.0,
+      "cooldownMs": 4000,
+      "counterableBy": ["stand-off"],
+      "_note": "THE LODGER'S TRICK, PUT TO THE OPPOSITE USE, and it is worth being explicit about the repetition rather than pretending it is new. In Flat 5 the glaze is a WARNING — the reach painted on the floor so that a squad who paces the bright ring has been told the answer in metres, and the ground inside it is ground nobody should be on. Here the ring is painted around the one place somebody has to stand, and its job is not to inform but to CHARGE: the three seconds that separate a paid anomaly from one that has started over are three seconds spent crossing two metres of it at 0.28 of normal acceleration.\n\nBoth are 1:1 with the reach that made them, and both persist after the operation. The difference is which side of the line the work happens on."
+    }
+  ],
+
+  "constraints": [
+    {
+      "id": "the-fee",
+      "effect": "blocks",
+      "statement": "It cannot be cased until something warm has stayed inside two metres of it, unbroken, for eighteen seconds. It does not care what the warm thing is and it does not care who is watching.",
+      "requiredEquipment": []
+    },
+    {
+      "id": "stand-off",
+      "effect": "weakens",
+      "statement": "Everything it does stops at two metres and the case has to be within 2.6m to close. There is 0.6m of standing room for the vessel, and an operative can be 2.2m from the case on top of that.",
+      "requiredEquipment": ["reinforced-transit-case"]
+    },
+    {
+      "id": "a-cell-cannot-outlast-it",
+      "effect": "weakens",
+      "statement": "Anything with a battery in it inside the same two metres empties about twelve times faster than rated. A portable heater will pay the fee once and will not pay it twice.",
+      "requiredEquipment": ["portable-heater"]
+    },
+    {
+      "id": "it-reads-cold",
+      "effect": "reveals",
+      "statement": "Sixteen degrees under a cold store, holding its shape and its edge. An imager finds it from across the floor and tells you which state it is in, because a paid one stops spreading.",
+      "requiredEquipment": ["thermal-imager"]
+    }
+  ],
+
+  "_evidenceNote": "§27.2 wants two paths per required rule, and the awkward part here is that three of the five rules are about DURATION. A duration cannot be left as a mark on a floor, so every path to one of them is either somebody who timed it or a record that happens to contain two timestamps.\n\n`the-fee` carries three because it is the rule the whole operation is, and the three are deliberately different kinds of record: a man who counted, a door log that counted for him without meaning to, and a set of boot marks that says how long somebody stood still. `wants-more` is the pair that is hardest to find honestly — it is a rule about the three seconds AFTER the interesting thing has happened — so one path is a witness who did it deliberately and the other is two imager frames ninety seconds apart.\n\nTwo entries are EARNED. `thermal-pit` needs the imager held on it, which is the reading that separates a taking one from a paid one and cannot be picked up off the floor. `cell-drain` is the squad's own telemetry with two powered things standing in the ring. Neither is the only path to its rule.\n\nThe two false leads are the two the cold store has already taught. The chiller return is the anchor the draught's own file offers and it is on this floor, cold, and real. The drainage survey is better than that: the gullies on level 2 genuinely do run to a sealed interceptor that was capped in the eighties, and a squad that finds it has found a true fact that explains nothing.",
+
+  "evidenceRules": [
+    {
+      "id": "nightwatch-statement",
+      "type": "testimonial",
+      "dimension": "constraint",
+      "rawObservation": "The night attendant. He states that he crouched at the gully to look at something, that it was not unpleasant, and that he did not think of getting up. He cannot say how long he was there. Asked what stopped it, he says he does not know, because the other man had already pulled him back by then.",
+      "reliability": "probable",
+      "revealsRule": "the-fee",
+      "requiredEquipment": [],
+      "channel": "witness",
+      "isFalseLead": false
+    },
+    {
+      "id": "door-log",
+      "type": "documentary",
+      "dimension": "constraint",
+      "rawObservation": "The floor's access log for the night of the incident. The attendant badges through the freight door at 02:14 and the second man badges through at 02:37. Between those two entries there is one more line, at 02:32, and it is the same badge going the wrong way through the office door — which cannot be done from the floor side without somebody holding it.",
+      "reliability": "probable",
+      "revealsRule": "the-fee",
+      "requiredEquipment": [],
+      "channel": "document",
+      "isFalseLead": false
+    },
+    {
+      "id": "boot-marks",
+      "type": "environmental",
+      "dimension": "constraint",
+      "rawObservation": "Two boot prints in the rime beside the gully, side by side, sharp-edged and melted into the ice rather than pressed into it — a pair of feet that did not move at all while the floor froze around them. The ice has built up against the outside of both soles to about four millimetres.",
+      "reliability": "confirmed",
+      "revealsRule": "the-fee",
+      "requiredEquipment": [],
+      "channel": "visual",
+      "isFalseLead": false
+    },
+    {
+      "id": "second-man-statement",
+      "type": "testimonial",
+      "dimension": "behaviour",
+      "rawObservation": "The man who pulled him out. He states that the two of them went back the following night and took turns standing at the gully on purpose, and that after about twenty minutes of it 'it packed in'. Asked how they knew, he says the floor stopped creeping. Asked what happened next, he says he stepped back in to look and it started again 'about as long as it takes to think about it'.",
+      "reliability": "probable",
+      "revealsRule": "wants-more",
+      "requiredEquipment": [],
+      "channel": "witness",
+      "isFalseLead": false
+    },
+    {
+      "id": "two-readings",
+      "type": "instrumental",
+      "dimension": "behaviour",
+      "rawObservation": "Two thermal frames of the same gully ninety seconds apart, taken from the same mark. In the first the cold edge is 1.6m from the grating; in the second it is 2.0m and has stopped, and there is nothing in either frame that is warm and nothing between them that moved.",
+      "reliability": "confirmed",
+      "revealsRule": "wants-more",
+      "requiredEquipment": ["thermal-imager"],
+      "channel": "instrument",
+      "isFalseLead": false
+    },
+    {
+      "id": "flat-lamp",
+      "type": "environmental",
+      "dimension": "capability",
+      "rawObservation": "A battery inspection lamp lying on the floor a metre from the gully, switched on, cells flat. An identical lamp from the same charging rack, left on the bay wall the same night, is still at three quarters.",
+      "reliability": "confirmed",
+      "revealsRule": "a-cell-cannot-outlast-it",
+      "requiredEquipment": [],
+      "channel": "visual",
+      "isFalseLead": false
+    },
+    {
+      "id": "cell-drain",
+      "type": "instrumental",
+      "dimension": "capability",
+      "rawObservation": "Two separate battery-powered items standing inside two metres of the gully shed charge about twelve times faster than their rated draw. Moved a stride further out, both return to their normal rate within a step.",
+      "reliability": "probable",
+      "revealsRule": "a-cell-cannot-outlast-it",
+      "requiredEquipment": [],
+      "earnedBy": { "observation": "powered-kit-draining", "withinMetres": 2.0, "count": 2 },
+      "channel": "instrument",
+      "isFalseLead": false
+    },
+    {
+      "id": "rime-ring",
+      "type": "environmental",
+      "dimension": "capability",
+      "rawObservation": "A ring of rime around a floor gully, 4.0m across, with a hard edge rather than a fade, and dust settled on it. There are three more like it on this floor at three other gullies, all the same size, and none of them is fresh.",
+      "reliability": "confirmed",
+      "revealsRule": "rimes-the-floor",
+      "requiredEquipment": [],
+      "channel": "visual",
+      "isFalseLead": false
+    },
+    {
+      "id": "accident-book",
+      "type": "documentary",
+      "dimension": "capability",
+      "rawObservation": "The site accident book. Nine entries in four years for slips on level 2 and seven of the nine give a location within a few feet of a gully. Two of the seven are the same man twice, three weeks apart, and both of his are recorded as 'floor wet'.",
+      "reliability": "probable",
+      "revealsRule": "rimes-the-floor",
+      "requiredEquipment": [],
+      "channel": "document",
+      "isFalseLead": false
+    },
+    {
+      "id": "gully-survey",
+      "type": "documentary",
+      "dimension": "form",
+      "rawObservation": "The floor's drainage survey. Four gullies on level 2, all on the same run, all the same fitting. Somebody has gone through it in pencil and put a small cross against one of the four, and the survey is dated eleven years before the attendant was born.",
+      "reliability": "disputed",
+      "revealsRule": "it-reads-cold",
+      "requiredEquipment": [],
+      "channel": "document",
+      "isFalseLead": false
+    },
+    {
+      "id": "thermal-pit",
+      "type": "instrumental",
+      "dimension": "form",
+      "rawObservation": "The gully, held on the imager. A hole in the floor sixteen degrees under the room, keeping a hard edge and a constant shape for as long as it is on the screen. The three other gullies on the same run read the floor.",
+      "reliability": "confirmed",
+      "revealsRule": "it-reads-cold",
+      "requiredEquipment": ["thermal-imager"],
+      "earnedBy": { "observation": "instrument-held-on-it", "item": "thermal-imager", "withinMetres": 6, "holdSeconds": 3 },
+      "channel": "instrument",
+      "isFalseLead": false
+    },
+    {
+      "id": "chiller-return",
+      "type": "environmental",
+      "dimension": "anchor",
+      "rawObservation": "The chiller return runs under this part of the floor and the slab above it reads four degrees under the rest of level 2 for its whole length, including under two of the gullies and not under the other two.",
+      "reliability": "unreliable",
+      "revealsRule": "",
+      "requiredEquipment": [],
+      "channel": "sensory",
+      "isFalseLead": true
+    },
+    {
+      "id": "drain-survey",
+      "type": "documentary",
+      "dimension": "anchor",
+      "rawObservation": "A capping certificate for the interceptor these gullies run to. It was sealed in 1983 after a spillage and has not been opened since; the certificate names two men and one of them is the night attendant's grandfather.",
+      "reliability": "disputed",
+      "revealsRule": "",
+      "requiredEquipment": [],
+      "channel": "document",
+      "isFalseLead": true
+    }
+  ],
+
+  "_claimsNote": "Five required rules, five true claims, and each carries every one of its own entries.\n\n`it-reads-cold` is the pair with no second confirmed source that a squad can walk to — a disputed survey and a reading they have to earn with an instrument — so its claim also names the rime ring, which is the one thing on the floor that says the four gullies are not the same as each other.\n\n`wants-more` is the claim that costs a squad the operation without ever warning them, and it earns its own line for that: a probable witness and a confirmed pair of frames, and the sentence that matters in both of them is about what happened AFTER it stopped.\n\nThe two false claims are the two the cold store has already taught its regulars. The chiller return is the draught's own anchor, on the draught's own floor, and it is genuinely cold under two of the four gullies. The interceptor is better, because everything in it is true.",
+
+  "claims": [
+    {
+      "id": "claim-the-fee",
+      "dimension": "constraint",
+      "text": "It has to be paid: something warm inside two metres, without a break, for eighteen seconds. Only then will a case close on it.",
+      "truth": true,
+      "supportedBy": ["boot-marks", "nightwatch-statement", "door-log"]
+    },
+    {
+      "id": "claim-step-out-or-it-starts-again",
+      "dimension": "behaviour",
+      "text": "Three seconds after it stops, anything warm still inside the two metres starts it over from nothing.",
+      "truth": true,
+      "supportedBy": ["two-readings", "second-man-statement"]
+    },
+    {
+      "id": "claim-a-cell-cannot-outlast-it",
+      "dimension": "capability",
+      "text": "A battery inside the ring empties about twelve times faster than rated. A heater will pay the fee once.",
+      "truth": true,
+      "supportedBy": ["flat-lamp", "cell-drain"]
+    },
+    {
+      "id": "claim-the-ring-is-its-reach",
+      "dimension": "capability",
+      "text": "The rime ring is exactly the ground it can reach, and it is the ground you have to stand on.",
+      "truth": true,
+      "supportedBy": ["rime-ring", "accident-book"]
+    },
+    {
+      "id": "claim-it-reads-cold",
+      "dimension": "form",
+      "text": "One of the four gullies on this floor reads sixteen degrees under the room and the other three read the floor.",
+      "truth": true,
+      "supportedBy": ["thermal-pit", "gully-survey", "rime-ring"]
+    },
+    {
+      "id": "claim-the-chiller-return",
+      "dimension": "anchor",
+      "text": "The chiller return is the anchor. The cold is under the slab and the gully is only where it comes up.",
+      "truth": false,
+      "supportedBy": ["chiller-return"]
+    },
+    {
+      "id": "claim-the-interceptor",
+      "dimension": "anchor",
+      "text": "It came up out of the interceptor that was capped in 1983, and the family name on the certificate is why it took him.",
+      "truth": false,
+      "supportedBy": ["drain-survey"]
+    }
+  ],
+
+  "containment": {
+    "goal": "The toll lifted out of the gully and sealed inside a transit case, verified by a stable case interior for thirty seconds. Custody is the closed lid. The fee has to be paid before the lid will close and the ring has to be empty at the moment it does — those are two different requirements and they are three seconds apart.",
+
+    "procedures": [
+      {
+        "id": "pay-it-yourself",
+        "grade": "minimum",
+        "displayName": "One operative, the case, and eighteen seconds",
+        "requiredEquipment": ["reinforced-transit-case", "trauma-kit"],
+        "verbs": ["stand", "bear", "step-back", "seal"],
+        "concurrentRoles": 1,
+        "statement": "Set the case down between 2.0 and 2.6m from the gully. Walk in, stand inside two metres and do not move for eighteen seconds. When it stops, get out of the ring, then shut the lid.",
+        "abortConditions": [
+          "A third contact on the operative paying the fee",
+          "Anything warm is still inside two metres three seconds after it stops"
+        ],
+        "_note": "It works, it costs three volumes, and the arithmetic is exact: eighteen seconds at a 9.5s cooldown is two contacts and exposure at 2 of 3, with the third landing at nineteen seconds against a fee paid at 18.1. Nine tenths of a second in hand, driven end to end in 63.1s of sim time from the briefing card to verified custody. The trauma kit is on the minimum list rather than the safe one for the only time in this build, because this is the only procedure in it whose intended outcome includes an injury."
+      },
+      {
+        "id": "let-the-heater-pay",
+        "grade": "safe",
+        "displayName": "A heater pays the fee, the pack pays for the heater",
+        "requiredEquipment": ["thermal-imager", "reinforced-transit-case", "portable-heater", "power-pack", "trauma-kit"],
+        "verbs": ["read", "offer", "stand-off", "lift", "seal", "verify"],
+        "concurrentRoles": 2,
+        "statement": "Read the gully on the imager and mark the two-metre edge. Set the heater down inside it and the pack down outside it, within five metres of the heater. Everybody stands off. When it stops, lift the heater out of the ring before the three seconds are up, and seal from the case.",
+        "abortConditions": [
+          "The heater is still in the ring three seconds after it stops",
+          "The pack is inside two metres, so both cells are being spent at twelve times rate",
+          "The case is inside two metres, so the vessel is paying the fee and losing its own heater"
+        ],
+        "_note": "THE HEATER IS A COIN AND YOU GET ONE. Four minutes rated, twelve times rate inside the ring, and 23.0s on the clock against an eighteen-second fee — measured by standing one in it and running it flat. A pack outside the two metres takes the multiplied draw in the heater's place and turns nine minutes into another forty-five seconds — two more attempts, and no immunity, because the pack pays at the same twelve.\n\nThe lift at the end is the whole reason this needs two people: whoever takes the heater out has to be within 2.2m of it, which is inside the ring or on the edge of it, and whoever seals has to be at the case, which is outside. One operative can do both and will spend the three seconds walking rather than deciding."
+      },
+      {
+        "id": "paid-and-sampled",
+        "grade": "research",
+        "displayName": "Timed handover, camera on the ring, sample the rime",
+        "requiredEquipment": ["thermal-imager", "reinforced-transit-case", "portable-heater", "power-pack", "remote-camera", "sample-kit", "trauma-kit"],
+        "verbs": ["read", "offer", "relieve", "stand-off", "lift", "seal", "verify", "witness"],
+        "concurrentRoles": 3,
+        "statement": "Camera on the ring so the eighteen seconds are timed by something that is not counting under pressure. Pay the fee in relays — the relief steps in before the payer steps out, and neither of them is ever the only warm thing in the ring. Lift a rime sample from the hard edge of the old ring, not the new one, before the case goes down.",
+        "abortConditions": [
+          "The ring is empty at any point before the fee is paid, so the eighteen seconds restart",
+          "Two operatives are in the ring when the fee lands, so neither of them can leave alone",
+          "The rime sample is compromised before the lid is over",
+          "Any condition from the safe procedure"
+        ],
+        "_note": "⚠ THE HANDOVER IS WHERE THIS GOES WRONG AND IT IS WHY THE GRADE IS RESEARCH. Relieving somebody looks like the obvious way to spend less exposure per operative, and it is — but the fee does not care how many warm things are in the ring, only that there is at least one, so a relay that overlaps at the moment the fee lands leaves TWO people inside two metres with three seconds to get both of them out. The procedure is not 'take turns'. It is 'take turns and be alone at the end', which needs somebody outside the ring whose whole job is to call it."
+      }
+    ],
+
+    "thresholds": [
+      { "id": "the-fee", "statement": "Eighteen continuous seconds of something warm inside two metres. A gap of one step is a restart.", "value": 18 },
+      { "id": "step-out", "statement": "Three seconds. That is how long a paid one stays paid with somebody still standing in it.", "value": 3 },
+      { "id": "standing-room", "statement": "The reach is 2.0m and the case closes at 2.6m. Six hundred millimetres.", "value": 0.6 }
+    ],
+
+    "integrityConditions": [
+      {
+        "id": "case-heater",
+        "measure": "temperature",
+        "failureSignal": "The heater cycle audibly lengthens, then stops, and the case gets appreciably colder to the hand.",
+        "recoveryWindowMs": 20000
+      },
+      {
+        "id": "case-power",
+        "measure": "power",
+        "failureSignal": "The case indicator drops a step every few seconds rather than every few minutes, which means the case is inside two metres of a gully that is still taking.",
+        "recoveryWindowMs": 5000,
+        "_note": "Five seconds, and it is short because the multiplier is twelve. A transit case is twelve minutes rated and sixty seconds in the ring, so a case that has been left in there through one fee has spent a fifth of its life; the recovery window is not how long before the case is flat, it is how long before the loss stops being cheap."
+      },
+      {
+        "id": "ring-empty",
+        "measure": "proximity",
+        "failureSignal": "'It starts again, from nothing.' — the `wants-more` telegraph, in the squad feed, and the rime edge moving again. The fee has to be paid in full a second time; there is no partial credit.",
+        "recoveryWindowMs": 3000,
+        "_note": "The only integrity condition in this build whose healthy value is an EMPTY radius. The lodger's `no-coverage` is its nearest relative — the one whose healthy value is zero viewers — and the difference is that coverage can be dropped by looking away and this can only be dropped by walking, across two metres of the hazard the thing put down while it was being paid."
+      }
+    ]
+  },
+
+  "difficultyProfiles": [
+    {
+      "preset": "orientation",
+      "squadSize": { "min": 1, "max": 4 },
+      "timingScale": 1.6,
+      "evidenceAvailability": "generous",
+      "automationAllowed": ["automated-observation-unit"]
+    },
+    {
+      "preset": "field",
+      "squadSize": { "min": 1, "max": 5 },
+      "timingScale": 1,
+      "evidenceAvailability": "standard",
+      "automationAllowed": []
+    },
+    {
+      "preset": "severe",
+      "squadSize": { "min": 2, "max": 5 },
+      "timingScale": 0.8,
+      "evidenceAvailability": "sparse",
+      "automationAllowed": []
+    }
+  ],
+  "_profilesNote": "Field opens at one because `pay-it-yourself` is arithmetically survivable solo and the arithmetic is authored rather than hoped for: two contacts, exposure at 2 of 3, third contact due nine tenths of a second after the fee lands. What one operative cannot do is pay it twice, so a solo run that fumbles the three seconds is a solo run that finishes on a trauma kit and a walk back to the stair.\n\n⚠ `timingScale` IS DECLARATIVE AND NOTHING IN src/ READS IT. That is true of every anomaly in the build and it is stated here rather than implied, because on this one the temptation to believe otherwise is strong: the fee, the three seconds and the two contacts are all clocks, and a field called `timingScale` sitting next to them reads like the knob that moves them. It is not. What actually moves is §19.1's `procedureTiming` assist, which `Game.setAssists` puts into `Anomaly.assistTiming` and which multiplies capability cooldowns and nothing else — so at 2.0 the contact cycle goes from 9.5s to 19s, which is ONE contact inside an eighteen-second fee instead of two, while the fee itself, the three seconds and the twelve times rate are untouched. That is exactly the shape §19.1 asks of an assist: it widens the window and never answers the question. Severe starts at two operatives because of the evidence trail rather than the clock — a sparse seed can lift `boot-marks` and one of the `rimes-the-floor` pair, and somebody has to be reading the accident book while somebody else is on the floor."
+}

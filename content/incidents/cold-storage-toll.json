@@ -1,0 +1,58 @@
+{
+  "id": "cold-storage-toll",
+  "contentRevision": "0.1.0",
+  "displayName": "The gully",
+  "anomaly": "netherfold-toll",
+  "map": "cold-storage-l2",
+  "difficulty": "field",
+
+  "_note": "THE FIFTH OPERATION ON THIS FLOOR, and the argument for a fifth is the same as the argument for the third and the fourth, one turn further on. §15.2 wants the building constant and the incident variable; four incidents in, the cold store has taught a squad four different correct answers and this is the first one where NONE of them is even relevant. The draught taught the aisles: 4.2m, two staggered tripods each. The figure taught the camera on the lane mouth. The tally taught the imager and the arithmetic. The passenger taught the vessel-first order. Here the aisles do not matter, a camera does nothing at all, the imager finds the thing in four seconds and then has no further job, and there is no order to get right — there is a fee, and somebody has to stand there and pay it.\n\nWHAT THE FLOOR ACTUALLY CONTRIBUTES IS THE COLD AND THE DARK. It is a cold store at 6C with both circuits down, so an operative is the warmest thing on the level by thirty-one degrees and there is no ambient warmth anywhere to pay a fee with. On the reserve or in a flat there is at least the argument that something else might have wandered into the reach; here there is nothing, and 'something warm has to stand in it' is a sentence with exactly one reading.\n\nAND THE GULLIES ARE THE FLOOR'S OWN JOKE. There are four of them on the same run, all the same fitting, all with an old rime ring round them, and one of them is occupied tonight. A squad that has learned to trust the imager on this floor will find the right one in seconds. A squad that has learned to trust the MARKS will walk to whichever ring they saw first, which is the one nearest the stair.",
+
+  "anomalySpawn": [-4.2, -8.0],
+  "_spawnNote": "A gully in the middle of the loading bay, and it is in the roomiest space on the floor for a measured reason rather than a scenic one. This anomaly's tightest constraint is a RING of standing room: the case has to be between 2.0m and 2.6m out and standable, and the operative sealing has to be within 2.2m of the case and more than 2.0m from the gully. MEASURED against the shipped geometry: 4.0m to the south perimeter, 2.8m to the freight-door wall and 3.8m to the office, so the whole 0.6m band is open on every bearing and the seal has somewhere to be taken from that is not a wall.\n\n⚠ THE FREIGHT LOBBY WAS THE FIRST CHOICE AND IT DOES NOT FIT, which is worth writing down because it looks like it does. The lobby is 3.8m by 2.6m; a case at 2.4m east of its centre stands where an operative then cannot get behind it, the north approach is on the far side of a wall with a powered door in it, and the south approach is inside the office. Driven, the bot could pay the fee and then had nowhere legal to stand to seal. A 0.6m band is a small target on a small floor.",
+
+  "_variationNote": "GDD §14.4, and the axis this incident wants is the ORIGIN, which is exactly the axis the tally had to refuse.\n\nThe tally's `_variationNote` refuses to move its origin because three of its six sources are the objects' own marks: move the set and the marks are lies. This incident does not have that problem and it is not luck, it is how the marks were written. `rime-ring` says there are four rings on this floor and none of them is fresh. `gully-survey` says there are four gullies on the same run and somebody once put a pencil cross against one of them. Both are statements about the FLOOR rather than about tonight, and both are true whichever gully is occupied — so the origin can move between all four and every mark on the level stays honest. The one thing that tells a squad which gully is live is an instrument, and that is the whole design.\n\n⚠ `door-office` IS NOT ON THE ROUTE LIST, for the reason the tally states: the storage breaker is inside the office and jamming its only door strands the circuit permanently. `door-freight-cold` is safe because the wall it sits in has a 2.0m gap at x = 4 to 6 that has never had a door in it, so the freight door is a shortcut and never the only way north. `circuit-office` is not on the fault list for the same reason. `circuit-storage` is: killing it for good leaves the aisles dark all night, which on this incident costs a search and never a rule.",
+  "variation": {
+    "origins": [[-4.2, -8.0], [-10.6, 2.0], [1.6, -7.0], [-5.0, 3.2]],
+    "routes": ["door-freight-cold"],
+    "routesShutMax": 1,
+    "faults": ["circuit-storage"],
+    "faultsMax": 1,
+    "droppable": ["boot-marks", "accident-book", "flat-lamp", "door-log"],
+    "dropMax": 1,
+    "civilians": [
+      { "id": "nightwatch-statement", "positions": [[11.2, -6.6], [8.0, -11.0]], "states": ["present", "shaken"] },
+      { "id": "second-man-statement", "positions": [[0.4, -11.0], [6.0, -10.4]], "states": ["present", "shaken"] }
+    ],
+    "falseLeads": ["chiller-return"],
+    "weather": ["still", "cold", "wet", "wind"],
+    "times": ["night", "dawn", "day"]
+  },
+
+  "briefing": {
+    "headline": "Attendant hospitalised, cold storage level 2",
+    "report": "A night attendant was found sitting on the floor of level 2 with cold burns to both hands and no account of the previous twenty minutes. He was not trapped. The man who found him states that he pulled him three feet and it stopped, that the two of them then went back the following night and stood at the same spot in turns on purpose, and that after about twenty minutes of it 'it packed in'. Regional has the floor sealed and both of them on site.",
+    "known": [
+      { "text": "Both men are on the floor and will give statements. Neither of them is hurt beyond the burns.", "confidence": "probable" },
+      { "text": "Both circuits are down. The office breaker is on the bay wall and the storage breaker is inside the office.", "confidence": "confirmed" },
+      { "text": "There are four floor gullies on level 2, all on the same run. The site does not know which one is meant.", "confidence": "probable" },
+      { "text": "Nothing has been seen moving on this floor and nothing is reported missing from it.", "confidence": "disputed" }
+    ]
+  },
+
+  "evidenceSources": [
+    { "evidenceId": "nightwatch-statement", "at": [11.2, -6.6], "label": "The night attendant, at the east dock", "prompt": "Take a statement", "requiresEquipment": [] },
+    { "evidenceId": "second-man-statement", "at": [0.4, -11.0], "label": "The man who pulled him out", "prompt": "Take a statement", "requiresEquipment": [] },
+    { "evidenceId": "door-log", "at": [-11.2, -11.2], "label": "Access log on the office desk", "prompt": "Read the log", "requiresEquipment": [] },
+    { "evidenceId": "boot-marks", "at": [-5.6, -8.8], "label": "Two boot prints frozen into the floor", "prompt": "Examine the prints", "requiresEquipment": [] },
+    { "evidenceId": "two-readings", "at": [-3.0, -6.2], "label": "Two thermal frames left on the bay terminal", "prompt": "Compare the frames", "requiresEquipment": ["thermal-imager"] },
+    { "evidenceId": "rime-ring", "at": [-9.0, -7.0], "label": "An old rime ring around a gully", "prompt": "Examine the ring", "requiresEquipment": [] },
+    { "evidenceId": "accident-book", "at": [3.0, -9.2], "label": "Site accident book at the muster board", "prompt": "Read the book", "requiresEquipment": [] },
+    { "evidenceId": "flat-lamp", "at": [-10.6, -0.6], "label": "An inspection lamp with flat cells", "prompt": "Check the cells", "requiresEquipment": [] },
+    { "evidenceId": "gully-survey", "at": [-10.4, -4.0], "label": "Drainage survey pinned in the freight lobby", "prompt": "Read the survey", "requiresEquipment": [] },
+    { "evidenceId": "chiller-return", "at": [-10.2, 6.0], "label": "Cold slab over the chiller return", "prompt": "Note the cold", "requiresEquipment": [] },
+    { "evidenceId": "drain-survey", "at": [10.8, -2.0], "label": "Interceptor capping certificate, east run", "prompt": "Read the certificate", "requiresEquipment": [] }
+  ],
+
+  "_sourcesNote": "Eleven placed sources and two earned, and the placement rule was distance from every other interactable rather than fiction: the nearest pair on this floor is `accident-book` and `second-man-statement` at 3.16m, which is comfortably outside the 2.2m reach that decides which context verb an operative is offered. `boot-marks` is the deliberate exception — 1.71m from the authored origin, inside the ring it is describing — so a squad that walks up to read the prints has walked into the reach and started paying without deciding to. That is the incident introducing itself, and it is the only source on this floor placed to do that.\n\n`rime-ring` is on a DIFFERENT gully, 4.9m away in the freight lobby, and that is the point of it: the ring is an old mark on one of four identical fittings and it is not a locator. The two statements are on the south half so the whole investigation can be done before anybody goes near a gully, and the two false leads are as far apart as this floor allows — one at the top of the west run and one in the east run, so nobody finds both without walking the floor twice."
+}

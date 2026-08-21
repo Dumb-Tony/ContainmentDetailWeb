@@ -1,0 +1,595 @@
+{
+  "id": "harrowbank-ballast",
+  "contentRevision": "0.1.0",
+  "displayName": "The ballast",
+  "licensingRecordId": null,
+  "_licensingNote": "Original, not an SCP. GDD §25 makes an attribution record a prerequisite for implementing SCP-derived content and §25.7's ShareAlike questions are unsettled. Nothing here is derived from anyone's work.",
+
+  "incidentPremise": "A three-man gang were lifting the earth mat out of a decommissioned switching compound and stopped after two days. They say the yard chippings kept coming back: stone they had barrowed out to the skip in the morning was under the gantry again by the afternoon, and one of them was hurt badly enough to be taken off site. He was not hit by anything and nothing fell on him. The skip was emptied on the second afternoon and the shift after that was the worst one they had. Nobody has been through the gate since; the incomer is open and the yard has been dark for nine days.",
+
+  "_designNote": "A SEVENTH PROCEDURE FAMILY: containment by DEPRIVATION, performed while the thing is coming for you.\n\nThe six shipped families divide cleanly into things you ACQUIRE and hold — a gradient, a cone of attention, an account, a silence — and things you PUT DOWN at the right moment — the passenger's vessel, the lodger's eyes. Every one of them is about the squad's own state. This one is about the SITE's: the thing is holding onto a set of objects that are lying about the yard, and until those objects are somewhere else it cannot be lifted at all. The work is not building anything and not stopping anything. It is stripping the floor.\n\nIT IS NOT THE TALLY WITH A HUNTER BOLTED ON, and the difference is what the arithmetic is FOR. `ninety-one-tally` is an accounting problem in which nothing hunts you: the count is unknown, it is written on a sheet in an office, and a squad that seals at the wrong number establishes custody of a subset and finds out at the debrief. Here the count is worth nothing and the sheet does not exist. You know you have them all because THE THING SITS DOWN. The feedback is the anomaly, not the paperwork, and it arrives in the field rather than at the debrief — which is the whole reason the arithmetic can be trivial and the operation still hard. What is hard is doing it at all while a two-metre-a-second cold mass walks to whichever of you is warmest.\n\nSO THE CASE IS THREE THINGS AT ONCE, AND THAT IS THE INCIDENT. It is the ledger you deposit into. It is the vessel you seal with. And at 39C it is the warmest thing on a dark yard, so it is also the LURE — which means every trip back to log a stone is a trip toward where the thing is going. A squad that puts the case somewhere convenient has put it where the danger will be, and a squad that puts it somewhere safe has made the walk twice as long. There is no arrangement that is both.\n\nTHE ONE OPERATOR NOTHING HAS EVER NAMED. `instances-loose` has been implemented in src/sim/senses.js since the tally shipped and no content file names it. It is the way BACK, and this is the anomaly that needs one: `instances-accounted` requires a CLEAN case, so one mundane stone logged stops the arithmetic dead, and the only way to clear it is to turn the case out — which puts every stone back on the yard and stands the thing up again. Contamination on the tally costs a walk. Contamination here releases it.\n\nHEAT IS NOT A WALL HERE AND THAT IS THE §15.2 TRAP. `presence.blockedBy` is `[\"insulation\"]` — concrete, deployed panels and closed doors, and nothing else. So the first family's whole answer is inert, and worse than inert: because `chooseTarget` only rejects a target behind a gradient when the anomaly is stopped by gradients, a floodlight left burning is not a fence post, it is the hottest object on the compound and therefore the thing's destination. On the cold store a tripod is a wall. Here it is bait, and a squad that walks in with the draught's loadout has built a beacon and stood behind it.\n\nWHICH MAKES THE DECOY THE REAL SKILL, AND IT IS A CLOCK RATHER THAN A WALL. `chooseTarget` is peakC-dominant, so a running heater at 78C outranks a person at 37C from anywhere on the compound: while something is burning, it goes there. But it does not stay — it sits on what it came for for about twenty-five seconds and then chooses again — and `bleeds-cells` empties whatever is within 4.5m of it at four times rate, so the thing it is sitting on is the thing it is emptying. The decoy therefore prices the operation in minutes rather than in metres, and the loadout wager (§10.7) is a straight question: how many minutes of burning kit does it take to strip a yard you have not seen?\n\nAND THE CASE IS A DECOY WHETHER YOU MEANT IT OR NOT, at 39C, which is the trap under the trap. A squad that brings no heater has still brought a lure, and it is the one object they have to keep going back to. What saves them is that the danger is on the APPROACH: `takes-weight` is available only while it is drawn, and `arrives` ends that state a second after it gets to what it wanted. Three contacts put an operative down and a five-stone recovery is five trips to the case, so a version of this file in which it kept reaching after it arrived would be a version one operative could not finish — and the field profile's minimum squad size of one is an authored claim that has to be true.",
+
+  "presence": {
+    "hunts": "heat",
+    "blockedBy": ["insulation"],
+    "_blockedNote": "⚠ THE 40C GRADIENT DOES NOT STOP IT, and saying so costs the squad their first instinct. It is a mass with weight in it rather than a temperature, and it goes through a heat contour exactly as it goes through chain-link. Cast concrete stops it, a deployed barrier panel stops it, a closed door stops it. On the switchyard that is the bay walls, the bund, the relay building and nothing else — 37.4% of the built length of that compound and none of the fence.",
+    "field": {
+      "kind": "sink",
+      "quantity": "heat",
+      "magnitude": 9,
+      "falloffMetres": 2.2,
+      "_note": "Nine degrees under the yard at its centre and about two under at four metres. Deliberately weak: at these numbers it moves a floodlight's 40C contour by centimetres and could not open a fence even if a fence were relevant to it. It is a sink for the same reason the tally's objects are — so the imager the squad already owns is the instrument that finds it in the dark — and for one more: the stones it is holding are sinks too, so a stone lying next to the mass reads far colder than the same stone alone. The search gradient is superposition and nothing in the engine decides it."
+    }
+  },
+
+  "perception": {
+    "channels": ["thermal", "physical-trace", "visible"],
+    "recordingInterference": "None. It records like anything else and a camera left on the yard holds it exactly as an operative does, which matters here only because coverage is worth nothing to this incident: no rule in this file reads observation in either direction, so a remote camera buys situational awareness and never custody. That is worth stating because it is the third face of the same item in three buildings — custody on the cold store's aisle B, poison in Flat 5, and here just a pair of eyes that does not get tired.",
+    "accessibilityAlternatives": [
+      "The case's count is a written number in the notice feed on every deposit ('The case answers.' / 'The case takes it.'), and the rule that matters is a state change with a telegraph sentence rather than a sound: 'It puts its weight down' arrives as text in the squad feed on the step it fires.",
+      "A stone the imager has confirmed renames its own interaction prompt — 'Take the stone' becomes 'Take the stone — reads cold' — so the difference between a candidate and a member of the set is words rather than a shade of blue.",
+      "Its approach is legible without hearing it: it grinds the chippings under itself while it is drawn, so the ground it has crossed is a visibly different surface with a hard edge, and the trail points the way it came.",
+      "The three states a squad has to tell apart differ in POSITION rather than in colour or tone — bedded is a cold patch that has not moved between two readings, drawn is a cold patch that has, and light is a cold patch with no ground disturbance growing round it."
+    ]
+  },
+
+  "states": [
+    {
+      "id": "bedded",
+      "kind": "latent",
+      "speedMps": 0,
+      "displayName": "Bedded",
+      "description": "Down on the yard with its ballast round it, doing nothing at all. It has been in the north half of this compound for nine days and the chippings above it are dry when everything else on the site has rain in it.",
+      "presentation": {
+        "visualTell": "Nothing to the eye. On thermal a mass about a metre across, nine degrees under the yard, with a scatter of much smaller cold points around it out to fifteen metres",
+        "audioCue": "None. The compound sounds like an empty compound",
+        "environmentalTell": "A patch of chippings that is dry through, and a ring of them stood on end around it that no boot did"
+      }
+    },
+    {
+      "id": "lifting",
+      "kind": "active",
+      "speedMps": 0.8,
+      "displayName": "Lifting",
+      "description": "Something warm has been inside eleven metres for four seconds and it has taken its weight up. It moves at less than a walk and not always toward anything. It is pulling charge out of everything near it and it has not decided on anybody yet.",
+      "presentation": {
+        "visualTell": "The cold patch is in a different place each time you look back at it, and the chippings between the two places are turned over",
+        "audioCue": "Chippings shifting somewhere out in the dark, in short runs of two or three seconds",
+        "environmentalTell": "Every cell on the yard starts losing charge four times faster than rated — the case indicator, a torch on the ground, a heater you have just set down"
+      }
+    },
+    {
+      "id": "drawing",
+      "kind": "hunting",
+      "speedMps": 2.2,
+      "displayName": "Drawn",
+      "description": "It has picked the hottest thing on the compound and it is going to it in a straight line at a little over two metres a second, which is slower than a walk and faster than a walk with something in your hands. It grinds the ground under itself the whole way.",
+      "presentation": {
+        "visualTell": "It crosses open yard on a line that does not wander, and the chippings behind it are ground to grey dust in a band about two and a half metres wide",
+        "audioCue": "A continuous grinding under it, at walking pace, that does not stop when it does",
+        "environmentalTell": "The dust band ends where it is standing, so the trail says both where it came from and where it is now"
+      }
+    },
+    {
+      "id": "holding",
+      "kind": "active",
+      "speedMps": 0,
+      "displayName": "Holding",
+      "description": "It has got to whatever it was going for and it is sitting on it. It does not reach for anybody in this state and it does not move; it puts its weight on the thing it came for and empties it. It gets up again after about half a minute, and goes to whatever is hottest then.",
+      "presentation": {
+        "visualTell": "The cold patch is stationary and the ground dust stops growing, with the thing it came for underneath it",
+        "audioCue": "The grinding stops. Something under it creaks, at intervals, and does not stop",
+        "environmentalTell": "Whatever it is sitting on runs down at four times rate and comes out of it crushed — a heater cowl flattened, a lamp body oval"
+      }
+    },
+    {
+      "id": "light",
+      "kind": "vulnerable",
+      "speedMps": 0,
+      "displayName": "Light",
+      "description": "Every stone it had taken up is in the case and the case is clean. It has nothing to put its weight on and it does not move. It is not harmless and it is not asleep: it will stand up again the moment anything it owns is back on the yard.",
+      "presentation": {
+        "visualTell": "The cold patch stops where it is and stays there between readings, and no new ground disturbance grows around it",
+        "audioCue": "The grinding stops between one second and the next",
+        "environmentalTell": "Cells stop draining. A case indicator that had been dropping a step every few seconds goes back to dropping one every few minutes"
+      }
+    },
+    {
+      "id": "cased",
+      "kind": "contained",
+      "speedMps": 0,
+      "displayName": "Cased",
+      "description": "Sealed in the transit case with its own ballast, which is the only arrangement anybody has found that holds it. The stones travel with it and they are not to be separated from it at the store.",
+      "presentation": {
+        "visualTell": "Latches over, case indicator steady, and the case appreciably heavier than the case",
+        "audioCue": "Stone shifting inside the lid when it is picked up, and nothing else",
+        "environmentalTell": "The yard comes back up to air temperature over about two minutes"
+      }
+    }
+  ],
+
+  "triggers": [
+    {
+      "id": "disturbed",
+      "from": "bedded",
+      "to": "lifting",
+      "when": { "sense": "heat-within", "radiusMetres": 11, "sustainSeconds": 4 },
+      "condition": "any warm body or powered emitter within 11m for longer than 4s",
+      "telegraph": "Chippings shift somewhere out in the dark, in a short run, and stop.",
+      "pressureDelta": 1,
+      "latencyToleranceMs": 1200,
+      "_note": "ELEVEN METRES ON A THIRTY-TWO METRE COMPOUND covers about a tenth of the standable ground, which is what buys the investigation phase. The draught wakes at twelve on a twenty-four metre floor and is therefore awake before anybody has read anything; here a squad can take three statements and walk the fence line before it knows they are on site."
+    },
+    {
+      "id": "settles-on",
+      "from": "lifting",
+      "to": "drawing",
+      "when": { "sense": "strongest-heat-within", "radiusMetres": 7 },
+      "condition": "the hottest thing it can reach is within 7m of it",
+      "telegraph": "The shifting stops being intermittent. Whatever it is doing, it is now doing one thing.",
+      "pressureDelta": 2,
+      "latencyToleranceMs": 900,
+      "_note": "IT HAS TO GET NEAR THE TARGET FIRST, which is what makes a decoy work rather than merely exist. `strongest-heat-within` reads the chosen source, so it inherits nothing about reachability here — this anomaly is stopped by walls rather than by gradients, so a target the other side of a bay wall is still the target and it walks round. What the seven metres price is TIME: it drifts at 0.8 m/s until it is close, so a decoy set down thirty metres away buys most of a minute before it starts running."
+    },
+    {
+      "id": "arrives",
+      "from": "drawing",
+      "to": "holding",
+      "when": { "sense": "strongest-heat-within", "radiusMetres": 1.4, "sustainSeconds": 1.2 },
+      "condition": "it is within 1.4m of the thing it chose, and has been for a second",
+      "telegraph": "The grinding stops. Something under it starts creaking instead.",
+      "pressureDelta": -1,
+      "latencyToleranceMs": 900,
+      "_note": "⚠ THE MOST IMPORTANT TRIGGER IN THE FILE AND IT LOOKS LIKE HOUSEKEEPING. Contact is available in `drawing` and nowhere else, so this is what ENDS the danger: it reaches what it was going for, sits on it, and stops reaching for people. Without it the operation is unplayable and the arithmetic says so — the case at 39C outranks an operative at 37C from anywhere on the compound, so the thing parks on the case, the case is where every stone has to be logged, and a solo operative kneeling there five times takes five contacts. Three puts them down.\n\nWith it, standing at the case costs at most one contact per cycle, because the window in which it is dangerous is the second and a bit between arriving and settling. §8.2 wants a rule to be observable: this one is, and the tell is the sound — the grinding is what it does while it is coming, and the creaking is what it does when it has got there."
+    },
+    {
+      "id": "stirs-again",
+      "from": "holding",
+      "to": "lifting",
+      "when": { "sense": "heat-within", "radiusMetres": 11, "sustainSeconds": 25 },
+      "condition": "twenty-five seconds of anything warm within 11m, after which it puts down whatever it was on and looks again",
+      "telegraph": "The creaking stops. Whatever it was sitting on is finished with.",
+      "pressureDelta": 1,
+      "latencyToleranceMs": 1200,
+      "_note": "THE CYCLE, AND IT IS WHAT MAKES THE DECOY A CLOCK RATHER THAN A LEASH. It does not hold onto one thing; it holds onto it for about half a minute and then chooses again, and if the decoy is still the hottest thing on the compound it chooses the decoy again. So a heater does not keep it away for four minutes because it is a heater — it keeps it away for as long as it is still burning when the twenty-five seconds are up. Sixty seconds inside the drain is two cycles and a bit.\n\nThe eleven metres are the same eleven the wake radius uses rather than a new number, and they mean 'there is still something worth getting up for'. On an empty compound with nothing warm anywhere near it, it stays where it is indefinitely, which is exactly what it did for nine days."
+    },
+    {
+      "id": "lightened",
+      "from": "*",
+      "to": "light",
+      "when": { "sense": "instances-accounted", "requireClean": true },
+      "condition": "every stone it had taken up is logged in the case and there is nothing else in there",
+      "telegraph": "It puts its weight down. The grinding stops between one second and the next.",
+      "pressureDelta": -3,
+      "latencyToleranceMs": 700,
+      "_note": "NO COUNT, ON PURPOSE. `instances-accounted` with no `count` reads the set's own total, so this rule says 'all of them' rather than a number — and the squad is never told the number, because they do not need it. The thing sitting down IS the count. That is the whole distinction from the tally, where the number is on a sheet in an office and sealing at the wrong one is a defeat you discover at the debrief.\n\nFROM ANY STATE, INCLUDING WHILE IT IS RUNNING AT SOMEBODY. Wildcards are evaluated first, so the last stone going into the case takes effect on the step it lands rather than after one more metre of travel, and that metre is the difference between a seal and a contact. `requireClean` is stated rather than defaulted because it is a rule the squad has to learn: one mundane stone in the case and this never fires, with nothing to say so but the thing still walking."
+    },
+    {
+      "id": "re-earthed",
+      "from": "light",
+      "to": "lifting",
+      "when": { "sense": "instances-loose", "count": 1 },
+      "condition": "one of its own stones is loose on the yard again — which on a sealed case means somebody has opened it",
+      "telegraph": "It takes its weight back up. The case is lighter than it was and something outside it is not.",
+      "pressureDelta": 3,
+      "latencyToleranceMs": 900,
+      "_note": "THE WAY BACK, and the reason it exists is the reason senses.js gives for `set-clean`: a state machine authored with only the entering transition is a trap. `instances-loose` counts stones that are anomalous and not deposited, so it can only rise again through `InstanceSet.purge` — turning the case out — and turning the case out is the only cure for a contaminated one. So the punishment for logging the wrong stone is not a walk back, it is the thing standing up in the middle of the yard with everything you had collected lying round its feet.\n\nA count of ONE rather than a fraction of the set, because the rule is about ownership rather than arithmetic: it does not need most of its ballast, it needs some."
+    },
+    {
+      "id": "sealed",
+      "from": "light",
+      "to": "cased",
+      "when": { "sense": "enclosed-by", "itemId": "reinforced-transit-case", "radiusMetres": 1.5 },
+      "condition": "the transit case is closed around it while it has nothing to stand on",
+      "telegraph": "The latches go over on a case that is already most of the way full of stone.",
+      "pressureDelta": -4,
+      "latencyToleranceMs": 2500
+    }
+  ],
+
+  "capabilities": [
+    {
+      "id": "takes-weight",
+      "verb": "contact",
+      "availableInStates": ["drawing"],
+      "effect": "It arrives at what it was going to and puts its weight through whatever is in the way. A crush injury and a cold burn, neither of them serious on its own, and the third one on the same operative puts them down.",
+      "rangeMetres": 1.3,
+      "cooldownMs": 11000,
+      "compounding": true,
+      "applies": [
+        { "condition": "exposure", "severity": "minor" },
+        { "condition": "mobility-injury", "severity": "minor" }
+      ],
+      "counterableBy": ["decoy-heat", "concrete-stops-it"],
+      "_note": "ONLY WHILE IT IS DRAWN, which is the one mercy in the file and it is arithmetic rather than kindness. TWO MINOR CONDITIONS RATHER THAN A SERIOUS ONE, MEASURED: `Player.applyCondition` takes a severity to 3 on the second application of the same grade or worse, so a serious exposure downs an operative on the SECOND contact. Driven solo with that arrangement the bot was on the floor before the second stone and the operation could not be finished at all — which would have made the field profile's `squadSize.min: 1` a false claim in a shipped file. Two minors compound one step at a time, so it is three contacts, and eleven seconds between them rather than six and a half.\n\nIt is dangerous on the way and not at the end: it reaches for people while it is crossing ground toward something, and once it has arrived it sits on what it came for and stops. The reach is 1.3m against a 2.2 m/s approach and a 2.6 m/s walk, so an operative who keeps moving is not caught, and an operative kneeling at the case logging a stone is standing still by definition — which is why `arrives` carries a 1.2s sustain and not a longer one."
+    },
+    {
+      "id": "bleeds-cells",
+      "verb": "drain-power",
+      "availableInStates": ["lifting", "drawing", "holding"],
+      "effect": "Everything with a cell in it inside 4.5m sheds charge about four times faster than rated. What that costs is the decoy, because the decoy is the thing it is sitting on.",
+      "rangeMetres": 4.5,
+      "cooldownMs": 0,
+      "counterableBy": ["power-pack"],
+      "_note": "THE CLOCK, AND THE DECOY WINDS IT. A heater rated four minutes is sixty seconds once the thing is standing over it; a floodlight rated five and a half minutes is eighty-two. That is the whole price list, and it is why the loadout question on this incident is minutes rather than metres. A pack does not dodge the multiplier — `stepPower` charges the pack at the drained rate when it is feeding something inside the radius — it stands in the way of it, so nine minutes of pack is another two and a quarter minutes of decoy and no more.\n\nNo multiplier is authored, so it takes the engine's four. That is deliberate here: the figure is the one a squad already knows from the cold store, and this incident is not the place to teach a new one."
+    },
+    {
+      "id": "grinds-the-yard",
+      "verb": "surface-hazard",
+      "availableInStates": ["drawing"],
+      "effect": "Grinds the yard chippings to dust under itself and leaves the band behind. It is loose underfoot afterwards and stays that way for the rest of the operation.",
+      "rangeMetres": 2.6,
+      "cooldownMs": 9000,
+      "counterableBy": ["decoy-heat"],
+      "_note": "THE TRAIL IS THE INSTRUMENT A SQUAD DID NOT PACK. Laid only while it is drawn, so the band exists exactly where it has been running and nowhere it merely drifted, and it ends at the thing. A squad with no imager can still work out where it is and which way it was going by looking at the ground — and that matters on this incident more than on any other in the build, because the imager's real job here is the stones and there is only one of it.\n\nIt costs what ice costs: 0.28 of the acceleration and 0.18 of the friction, so stopping on it is what goes wrong. The place an operative has to come to a dead halt is beside the case, and the case is where it has been running to."
+    }
+  ],
+
+  "constraints": [
+    {
+      "id": "ballast-holds-it",
+      "effect": "blocks",
+      "statement": "It cannot be cased while it owns anything. Every stone it has taken up has to be in the case and nothing else may be in there — a case with the wrong stone in it counts as full of nothing.",
+      "requiredEquipment": ["reinforced-transit-case"]
+    },
+    {
+      "id": "concrete-stops-it",
+      "effect": "weakens",
+      "statement": "Cast concrete stops it, and so does a deployed barrier panel and a shut door. Chain-link, palisade, steel lattice and forty degrees of anything do not. A bay is a real pen and the fence around the compound is not.",
+      "requiredEquipment": ["portable-barrier"]
+    },
+    {
+      "id": "warmest-thing-wins",
+      "effect": "weakens",
+      "statement": "It goes to the hottest thing on the site, wherever it is, sits on it for about half a minute, and then chooses again. A running heater outranks a floodlight, a floodlight outranks the case, and the case outranks a person — so whatever you leave burning is where it will be, and it is only dangerous on the way.",
+      "requiredEquipment": []
+    },
+    {
+      "id": "stones-read-cold",
+      "effect": "reveals",
+      "statement": "A stone it has taken up reads about four degrees under the yard; one it has not read the yard. Alone that is a smudge you have to be within three metres of; two together are obvious from across the compound.",
+      "requiredEquipment": ["thermal-imager"]
+    }
+  ],
+
+  "_evidenceNote": "§27.2 wants two evidence paths per required rule and the difficulty on this one is that four of the five rules are about a thing nobody has ever seen. Everything here is therefore about STONE, CHARGE or GROUND, and the split inside each pair is what kind of record it is: a document somebody wrote at the time against a mark somebody left without meaning to.\n\n`ballast-holds-it` carries three because it is the rule the whole operation turns on and because the three say different halves of it — the weighbridge ticket says stone left the site, the ring of lifted chippings says stone came back, and the ganger says which of the two he watched happen.\n\nTwo entries are EARNED rather than found, and both of them arrive while the squad is working rather than while it is walking. `held-at-the-bay` needs the thing actually stopped by something, which cannot be picked up off the floor at all; `cell-drain` is the squad's own telemetry with two powered things standing in the radius. Neither is the only path to its rule, so the loadout wager bites without gating a rule behind a purchase.\n\nThe two false leads are the two the yard offers on its own. The earth mat is what the gang were there to lift and it is the obvious anchor; the quarry delivery is a real docket for real stone from a real pit forty miles away, and the stone in it is granite exactly like everything else on the yard.",
+
+  "evidenceRules": [
+    {
+      "id": "weighbridge-ticket",
+      "type": "documentary",
+      "dimension": "constraint",
+      "rawObservation": "Two weighbridge tickets for the same skip, twenty-six hours apart. The first is 4.12 tonnes out. The second, after the skip was emptied and brought back, is 3.86 tonnes out of a yard the gang say they had not worked in the meantime. Nobody has a ticket for anything coming in.",
+      "reliability": "confirmed",
+      "revealsRule": "ballast-holds-it",
+      "requiredEquipment": [],
+      "channel": "document",
+      "isFalseLead": false
+    },
+    {
+      "id": "lifted-chippings",
+      "type": "environmental",
+      "dimension": "form",
+      "rawObservation": "A patch of yard about a metre across where the chippings have been stood on end in a rough ring, edges up, close packed. It is not a boot print and it is not settlement. The ground inside the ring is dry through and the ground outside it has nine days of rain in it.",
+      "reliability": "confirmed",
+      "revealsRule": "ballast-holds-it",
+      "requiredEquipment": [],
+      "channel": "visual",
+      "isFalseLead": false
+    },
+    {
+      "id": "ganger-statement",
+      "type": "testimonial",
+      "dimension": "constraint",
+      "rawObservation": "The ganger. He states that he barrowed the same stone out twice and that the second time he marked it with a paint stick first. Asked whether he found the marked stone, he says he found four of them, and that he had marked six.",
+      "reliability": "probable",
+      "revealsRule": "ballast-holds-it",
+      "requiredEquipment": [],
+      "channel": "witness",
+      "isFalseLead": false
+    },
+    {
+      "id": "skip-crew-statement",
+      "type": "testimonial",
+      "dimension": "behaviour",
+      "rawObservation": "The skip driver. He tipped the skip at the transfer station on the second afternoon and came back empty. He states that the shift after that was 'the worst one they had' and that until he tipped it the yard had been quiet since dinner.",
+      "reliability": "probable",
+      "revealsRule": "re-earthed",
+      "requiredEquipment": [],
+      "channel": "witness",
+      "isFalseLead": false
+    },
+    {
+      "id": "second-callout",
+      "type": "documentary",
+      "dimension": "behaviour",
+      "rawObservation": "The contractor's day sheet for the second day. Two entries against the afternoon in the same hand: 'quiet since 1' and, later and underlined, 'skip went at 3'. The injury is recorded at 3:40.",
+      "reliability": "probable",
+      "revealsRule": "re-earthed",
+      "requiredEquipment": [],
+      "channel": "document",
+      "isFalseLead": false
+    },
+    {
+      "id": "site-heater",
+      "type": "environmental",
+      "dimension": "trigger",
+      "rawObservation": "A diesel site heater in the middle of the yard, run dry, with its cowl crushed flat and the ground for two metres round it ground to grey dust. The mess hut it was supposed to be heating is forty feet away with its door open and is not marked at all.",
+      "reliability": "confirmed",
+      "revealsRule": "warmest-thing-wins",
+      "requiredEquipment": [],
+      "channel": "visual",
+      "isFalseLead": false
+    },
+    {
+      "id": "linesman-statement",
+      "type": "testimonial",
+      "dimension": "trigger",
+      "rawObservation": "The third of the gang. He states that it never came at the man working, it came at 'whatever was hot', and that the two of them worked twenty minutes within a yard of it while the heater was running and it did not look at them once. He will not go back for his tools.",
+      "reliability": "disputed",
+      "revealsRule": "warmest-thing-wins",
+      "requiredEquipment": [],
+      "channel": "witness",
+      "isFalseLead": false
+    },
+    {
+      "id": "bay-scour",
+      "type": "environmental",
+      "dimension": "constraint",
+      "rawObservation": "Inside one of the switch bays, a band of ground dust that runs the length of the back wall and stops dead against the concrete at both ends. It does not resume on the other side of the wall. Outside the same bay the chain-link has dust blown through it in a straight line and no mark on the mesh at all.",
+      "reliability": "confirmed",
+      "revealsRule": "concrete-stops-it",
+      "requiredEquipment": [],
+      "channel": "visual",
+      "isFalseLead": false
+    },
+    {
+      "id": "held-at-the-bay",
+      "type": "instrumental",
+      "dimension": "constraint",
+      "rawObservation": "The mass, held. It runs the inside of whatever is stopping it end to end and back rather than pressing on it, and the ground disturbance follows the wall exactly. It does not cross concrete and it does not try twice in the same place.",
+      "reliability": "confirmed",
+      "revealsRule": "concrete-stops-it",
+      "requiredEquipment": [],
+      "earnedBy": { "observation": "held-at-a-barrier", "withinMetres": 9 },
+      "channel": "instrument",
+      "isFalseLead": false,
+      "_note": "EARNED, because it cannot be otherwise. Nobody can pick up an observation of a thing being stopped; somebody has to stop it and be there. Nine metres is far enough that the observation is available to whoever penned it rather than only to whoever is standing in the pen with it, and closer than the 11m wake radius so it can never be earned by an operative who has not woken it."
+    },
+    {
+      "id": "dead-waymarkers",
+      "type": "environmental",
+      "dimension": "capability",
+      "rawObservation": "Six solar route markers along the yard road. The four nearest the north half are flat, cells and all; the two by the gate are full. All six were installed in the same week and all six are the same model.",
+      "reliability": "confirmed",
+      "revealsRule": "bleeds-cells",
+      "requiredEquipment": [],
+      "channel": "visual",
+      "isFalseLead": false
+    },
+    {
+      "id": "cell-drain",
+      "type": "instrumental",
+      "dimension": "capability",
+      "rawObservation": "Two separate battery-powered items standing within five metres of the mass shed charge about four times faster than their rated draw. Carried out of range, both return to their normal rate within a minute.",
+      "reliability": "probable",
+      "revealsRule": "bleeds-cells",
+      "requiredEquipment": [],
+      "earnedBy": { "observation": "powered-kit-draining", "withinMetres": 4.5, "count": 2 },
+      "channel": "instrument",
+      "isFalseLead": false
+    },
+    {
+      "id": "ambulance-sheet",
+      "type": "documentary",
+      "dimension": "capability",
+      "rawObservation": "Ambulance handover sheet for the man taken off the compound. Crush injury to the left side and a cold burn across the same forearm. The mechanism recorded is 'struck by falling material'. There is nothing on this site above head height that has come down, and the gantry above where he was found is intact.",
+      "reliability": "probable",
+      "revealsRule": "takes-weight",
+      "requiredEquipment": [],
+      "channel": "document",
+      "isFalseLead": false
+    },
+    {
+      "id": "dragged-boot",
+      "type": "environmental",
+      "dimension": "capability",
+      "rawObservation": "A rigger boot lying in the ground dust about a metre and a half off the band, on its side, laces done up. The dust around it is undisturbed except for two drag lines running out of the band and stopping where the boot is.",
+      "reliability": "confirmed",
+      "revealsRule": "takes-weight",
+      "requiredEquipment": [],
+      "channel": "visual",
+      "isFalseLead": false
+    },
+    {
+      "id": "earth-mat-record",
+      "type": "documentary",
+      "dimension": "anchor",
+      "rawObservation": "The decommissioning record for the compound's earth mat. Copper tape and rod, laid in 1961, disconnected from the incomer nine days before the gang started and scheduled for recovery. Two of the four rod pits have been opened and refilled.",
+      "reliability": "disputed",
+      "revealsRule": "",
+      "requiredEquipment": [],
+      "channel": "document",
+      "isFalseLead": true
+    },
+    {
+      "id": "quarry-delivery",
+      "type": "documentary",
+      "dimension": "anchor",
+      "rawObservation": "A delivery docket in the relay room for forty tonnes of 20mm granite chipping, tipped on this compound eleven months ago, from a pit forty miles away that closed the same year. The yard has been surfaced with the same stone since it was built.",
+      "reliability": "unreliable",
+      "revealsRule": "",
+      "requiredEquipment": [],
+      "channel": "document",
+      "isFalseLead": true
+    }
+  ],
+
+  "_claimsNote": "Six required rules, six true claims, each carrying every one of its own entries, and two false ones that are the two stories the yard tells about itself.\n\n`re-earthed` is the pair with no confirmed source in it at all — a skip driver and a day sheet, both probable, which cannot carry a claim past 'probable' however carefully a squad works — so its claim also names the weighbridge tickets. That is not a patch: the two tickets ARE the rule, stated in tonnes. Stone left the site on the first ticket and was back in the yard by the second, and the only event between them is a skip being emptied. The driver says what happened after and the tickets say that it did.\n\n`warmest-thing-wins` is the pair with no second confirmed source in it — a confirmed heater and a disputed linesman — so its claim also names the boot: the man who was hurt was found a metre and a half off the band the thing had ground on its way to something else, which is what says it was going somewhere and he was in the way rather than that it was going for him.\n\nThe false pair is deliberately the two most reasonable readings on the compound. Anybody who has read the decommissioning record will reach for the earth mat, because a mat being lifted is the one thing that has changed here in sixty years. And the quarry docket is real: the stone IS from a closed pit forty miles away, every last tonne of it, which is exactly why it explains nothing.",
+
+  "claims": [
+    {
+      "id": "claim-ballast-holds-it",
+      "dimension": "constraint",
+      "text": "It cannot be lifted while it owns any stone. Every one of them has to be in the case and nothing else may be.",
+      "truth": true,
+      "supportedBy": ["weighbridge-ticket", "lifted-chippings", "ganger-statement"]
+    },
+    {
+      "id": "claim-opening-the-case-frees-it",
+      "dimension": "behaviour",
+      "text": "Put its stone back on the ground and it stands up again. Turning the case out is the same act.",
+      "truth": true,
+      "supportedBy": ["skip-crew-statement", "second-callout", "weighbridge-ticket"]
+    },
+    {
+      "id": "claim-warmest-thing-wins",
+      "dimension": "trigger",
+      "text": "It goes to the hottest thing on the site and not to the nearest person. Whatever you leave burning is where it will be.",
+      "truth": true,
+      "supportedBy": ["site-heater", "linesman-statement", "dragged-boot"]
+    },
+    {
+      "id": "claim-concrete-stops-it",
+      "dimension": "constraint",
+      "text": "Cast concrete and a deployed panel stop it. Chain-link, lattice and a heat contour do not.",
+      "truth": true,
+      "supportedBy": ["bay-scour", "held-at-the-bay"]
+    },
+    {
+      "id": "claim-it-bleeds-cells",
+      "dimension": "capability",
+      "text": "Anything with a cell in it near the mass runs down about four times faster than rated, the decoy included.",
+      "truth": true,
+      "supportedBy": ["dead-waymarkers", "cell-drain"]
+    },
+    {
+      "id": "claim-it-puts-its-weight-through-you",
+      "dimension": "capability",
+      "text": "It reaches a bit over a metre and it does not strike — it arrives, and puts its weight through whatever is there.",
+      "truth": true,
+      "supportedBy": ["ambulance-sheet", "dragged-boot"]
+    },
+    {
+      "id": "claim-the-earth-mat",
+      "dimension": "anchor",
+      "text": "Lifting the earth mat is what started it. Put the mat back and it settles.",
+      "truth": false,
+      "supportedBy": ["earth-mat-record"]
+    },
+    {
+      "id": "claim-the-quarry-stone",
+      "dimension": "anchor",
+      "text": "It came in with the stone. The pit it came from closed the same year and the yard has been wrong since.",
+      "truth": false,
+      "supportedBy": ["quarry-delivery"]
+    }
+  ],
+
+  "containment": {
+    "goal": "The mass sealed in a transit case together with every stone it had taken up, verified by a stable case interior for thirty seconds. Custody is the closed lid AND the contents: a sealed case with one of its stones left on the yard is a box with something awake beside it, and opening the case at any point after the seal releases both.",
+
+    "procedures": [
+      {
+        "id": "bare-strip",
+        "grade": "minimum",
+        "displayName": "One operative, the case, and no instrument",
+        "requiredEquipment": ["reinforced-transit-case"],
+        "verbs": ["sweep", "strip", "stow", "close"],
+        "concurrentRoles": 1,
+        "statement": "Set the case down where the ground disturbance is thickest, walk the yard, take every stone you find to it, and shut the lid when it stops moving.",
+        "abortConditions": [
+          "A second contact on the operative doing the stripping",
+          "The case heater goes flat before the last stone is in"
+        ],
+        "_note": "It works and it costs two volumes, and it is a trap of the same shape as the tally's `sweep-and-lift`: without the imager the only way to tell a stone it owns from a stone off the yard is to put it in the case and watch whether the number moves, and the number not moving is a contaminated case. One wrong guess and the whole operation restarts with the thing standing up. Fast when the yard happens to be legible and a very long night when it is not.\n\nDRIVEN SOLO, with the case and one instrument and nothing else deployed: 116.1s of sim time from the briefing card to verified custody. Fourteen point seven of that is the walk round the east end of the fence, the five stones are logged at 25.9s, 37.7s, 46.5s, 66.1s and 83.9s, it goes light at 84.5s having finished 0.02m from the case, and the whole recovery costs ONE contact. That is the honest shape of the minimum grade: it is not dangerous, it is long, and the danger is entirely in guessing wrong about which stones it owns."
+      },
+      {
+        "id": "decoy-and-strip",
+        "grade": "safe",
+        "displayName": "Heater at the far end, imager on the stones, strip the yard",
+        "requiredEquipment": ["thermal-imager", "reinforced-transit-case", "portable-heater", "trauma-kit"],
+        "verbs": ["sweep", "decoy", "strip", "stow", "close", "verify"],
+        "concurrentRoles": 2,
+        "statement": "Put the heater down as far from the case as the compound allows and light it. Sweep with the imager and confirm each stone reads cold before it is lifted. Work outward from the case while the thing is committed to the heater, and be ready to be somewhere else when the heater dies.",
+        "abortConditions": [
+          "The decoy is out and nothing else is burning",
+          "The case is contaminated, because the cure releases it",
+          "A second contact on any operative"
+        ],
+        "_note": "THE DECOY IS PRICED IN MINUTES AND THE STRIP IS PRICED IN METRES, and the wager is whether they meet. A heater is four minutes rated and sixty seconds once the thing is standing over it, so the honest reading of this procedure is: one heater buys one minute of a yard where nothing is hunting you, and the yard is thirty-two metres across.\n\n⚠ THREE OF THESE FOUR ITEMS ARE `general` BULK AND THERE ARE TWO GENERAL SLOTS (§9.2). One operative cannot carry the imager, the case and the heater, which is why this is `concurrentRoles: 2` and why the minimum grade is a real grade rather than a formality.\n\nDRIVEN with a floodlight instead of a heater, which is the long-slot version of the same idea and does not compete for a general slot: set down 12.9m from the case, it took the mass for the whole recovery and the mass finished sitting ON it, 13.0m from the case, having burned 78s of a 330s cell. That distance is the whole value of the decoy — it is also the only arrangement in which a squad can ever reach the purge verb, because the seal outranks everything when the case is inside the seal radius of a held mass."
+      },
+      {
+        "id": "penned-and-stripped",
+        "grade": "research",
+        "displayName": "Pen it in a bay, feed the decoy off a pack, sample the ground",
+        "requiredEquipment": ["thermal-imager", "reinforced-transit-case", "portable-heater", "power-pack", "portable-barrier", "sample-kit", "trauma-kit"],
+        "verbs": ["sweep", "decoy", "pen", "strip", "stow", "close", "verify", "witness"],
+        "concurrentRoles": 3,
+        "statement": "Draw it into a bay with the heater, panel the mouth behind it, and set the pack outside the bay so the decoy runs on the pack's cells rather than its own. Strip the compound while it walks the inside of the wall. Lift a sample of the ground dust before the panel comes down, and take the panel down before the last stone goes in the case.",
+        "abortConditions": [
+          "The panel is still standing when the last stone goes in, so the case cannot be brought within 1.5m of it",
+          "The pack is inside the drain radius, so both cells are being spent at four times rate",
+          "The ground sample is compromised before the lid is over",
+          "Any condition from the safe procedure"
+        ],
+        "_note": "⚠ THIS IS WHERE IT GOES WRONG AND IT IS WHY THE GRADE IS RESEARCH RATHER THAN SAFE. Penning it is genuinely the strongest position on the compound — a bay reads three escape rays bare and none with two panels across the mouth, and a penned mass cannot come for anybody. But the seal needs the case within 1.5m of it, and a pen that stops the mass stops the operative carrying the case just as completely. So the last act of this procedure is dismantling the thing that was keeping everybody safe, in the right order, with a squad that has spent twenty minutes being glad of it. That needs a third pair of hands and somebody whose whole job is the order."
+      }
+    ],
+
+    "thresholds": [
+      { "id": "reach", "statement": "One metre thirty. It does not strike and it does not throw anything; it arrives.", "value": 1.3 },
+      { "id": "drain-radius", "statement": "Four and a half metres, at four times rate, whenever it is awake. The decoy is inside it by definition.", "value": 4.5 },
+      { "id": "wake-radius", "statement": "Eleven metres of warmth for four seconds. On this compound that is about a tenth of the ground.", "value": 11 }
+    ],
+
+    "integrityConditions": [
+      {
+        "id": "case-heater",
+        "measure": "temperature",
+        "failureSignal": "The heater cycle audibly lengthens, then stops, and the case gets appreciably colder to the hand.",
+        "recoveryWindowMs": 20000
+      },
+      {
+        "id": "case-power",
+        "measure": "power",
+        "failureSignal": "The case indicator drops a step every few seconds rather than every few minutes, which means the mass is inside four and a half metres of it and nothing is feeding it.",
+        "recoveryWindowMs": 12000
+      },
+      {
+        "id": "case-contents",
+        "measure": "instance-count",
+        "failureSignal": "A stone goes in and the count does not move. Nothing is announced and nothing changes colour; the number simply stays where it was, and from that moment the thing can never be lightened until the case is turned out.",
+        "recoveryWindowMs": 30000,
+        "_note": "The only integrity condition in this build whose failure is SILENT and whose recovery makes things worse before it makes them better. Thirty seconds is not how long the squad has before something breaks — it is how long the arithmetic stays cheap to redo: turn the case out inside half a minute and the stones are still where you left them, in a ring around the case, and the thing has only just stood up."
+      }
+    ]
+  },
+
+  "difficultyProfiles": [
+    {
+      "preset": "orientation",
+      "squadSize": { "min": 1, "max": 4 },
+      "timingScale": 1.6,
+      "evidenceAvailability": "generous",
+      "automationAllowed": ["automated-observation-unit"]
+    },
+    {
+      "preset": "field",
+      "squadSize": { "min": 1, "max": 5 },
+      "timingScale": 1,
+      "evidenceAvailability": "standard",
+      "automationAllowed": []
+    },
+    {
+      "preset": "severe",
+      "squadSize": { "min": 2, "max": 5 },
+      "timingScale": 0.8,
+      "evidenceAvailability": "sparse",
+      "automationAllowed": []
+    }
+  ],
+  "_profilesNote": "Field opens at one because `bare-strip` genuinely works solo: the case is the only required item, the thing is harmless while it is lifting, and a single operative who never lets it choose them can walk the whole compound. What solo costs is the imager — two general slots cannot hold the case and the imager and anything else — so a lone operative is guessing which stones it owns, and guessing is the one mistake that restarts the operation.\n\nSevere starts at two because a sparse trail can drop one of the three `ballast-holds-it` paths and one of the `warmest-thing-wins` pair, and recovering the second from the linesman alone leaves a disputed source that will not carry a claim past 'disputed'. Somebody has to be reading the day sheets while somebody else is walking the ground.",
+
+  "behaviourModule": null
+}
