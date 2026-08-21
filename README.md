@@ -348,7 +348,7 @@ There is no Node.js here, so the harness is a browser.
 powershell -ExecutionPolicy Bypass -File tools/smoketest.ps1 -Tests tools/m0-tests.js
 ```
 
-**746 assertions, all headless.** Section I is the one that matters: it plays a complete
+**875 assertions, all headless.** Section I is the one that matters: it plays a complete
 solo containment through the same interfaces a keyboard reaches — walks to the vehicle,
 takes kit, throws breakers, opens doors, baits, fences, seals, waits out custody and
 carries the case to the stairs. No teleports and no direct state writes, because testing
@@ -370,6 +370,31 @@ them, a `lightReliefRadiusM: 4.5` next to a hard-coded 6.5 for the same radius, 
 budget under a correct comment about a rule the content already enforces per trigger. A
 number in a config file is a promise that changing it changes the game, and ten of them
 were lying.
+
+That rule has a bigger sibling now, because the same question asked of *content* found far
+more. 199 distinct JSON keys across `content/`, checked against all 25 files in `src/`:
+**seventeen were read by no engine file and asserted by nothing.** Some were documentation
+and fine. The rest were not, and each one was a field that looked like a rule and was a
+comment — a `drain-power` capability that drained batteries whether or not it was authored,
+a `hunts` that was ignored, a `blockedBy` that was overridden, a `thresholdCelsius` the heat
+field never saw, a `cellRequirement` that let a thermal negative be filed in a locker, a
+`concurrentRoles` no procedure was checked against.
+
+Three more of the same shape were the engine knowing one anomaly by name: the custody
+escape, the target chooser and the audio mix all switched on `graybox-draught`'s state ids,
+so five of six anomalies fell through a `default:` and came out silent, unfenced, or in the
+wrong state. Section K greps for those three words now. And three instruments were
+simulated and connected to nothing — the sound field with no readout, the directional
+microphone with no screen, and every anomaly's body on the thermal layer alone, so
+`stillwater-figure` could not be seen by the squad whose whole job is looking at it.
+
+`tools/bench.ps1` is the other half, because the suite asserts *work* — how many occluder
+sweeps, how many samples — and says nothing about milliseconds. It replaces `main.js` so
+nothing competes for the CPU being measured, keeps the real GPU adapter, and runs the whole
+thing twice to print the spread. Measured on all seven incidents with five operatives, the
+most expensive frame is Flat 5 at **4.596 ms of a 16.67 ms frame** — 27.6%, p95 5.883,
+worst 6.531, 3.6× headroom at the median. Every sampled frame fits. That is §23's Milestone
+3 performance gate, as a number rather than a claim.
 
 `tools/shot.ps1 -Setup tools/_shot-fence.js -Out docs/m0-fence.png` poses a scene and
 photographs it. `tools/verify-live.ps1` asks whether GitHub Pages is actually serving the
