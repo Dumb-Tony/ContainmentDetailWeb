@@ -200,6 +200,16 @@ recording a preference, five volume sliders, UI scale, and difficulty assists. `
 GDD §19.2 is the design constraint, not the menu: no required rule may depend on fine
 colour discrimination, stereo hearing, a microphone, small text or flashing imagery.
 
+Applying that constraint to the caller found something bigger than a menu item. The sound
+field is fully simulated — four levels off speed, wall loss, occluders, masking, and an
+instrument built to read it — and *nothing showed it*. Not the HUD, and not the mix either:
+there is no footstep cue, so a player wearing headphones knew exactly as much as one with
+the sound off. On the reserve, where the thing hunts noise and is stopped by silence, the
+game's central quantity was legible only to the anomaly. That is §8.2 before it is §19.2 —
+every rule has to be observable. There is a four-band readout now, and it carries no
+decibel figure and no threshold mark, because the level the caller wakes at is a rule you
+are supposed to learn from evidence rather than read off your own HUD.
+
 Two rules the suite enforces rather than trusting:
 
 **An assist widens a window; it never moves a rule.** `procedureTiming` stretches the gap

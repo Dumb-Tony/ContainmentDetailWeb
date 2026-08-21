@@ -26,7 +26,6 @@
  */
 
 import { CONFIG } from '../config.js';
-import { ANOMALY_STATE } from '../sim/anomaly.js';
 
 /**
  * Pure. Returns target values for the continuous voices, in 0..1 gains and Hz.
@@ -36,20 +35,33 @@ import { ANOMALY_STATE } from '../sim/anomaly.js';
 export function mixFor(s) {
   const near = Math.max(0, 1 - s.distance / 18);
 
-  /* The draught itself. Gain follows proximity; pitch follows state, exactly as authored. */
+  /**
+   * ⚠ THIS SWITCHED ON THE DRAUGHT'S FIVE STATE IDS.
+   *
+   * `latent`, `aware`, `drawn`, `banked`, `contained` are `graybox-draught`'s state names,
+   * not the game's. Every other anomaly calls its states something else — `standing`,
+   * `dispersed`, `casting`, `settled`, `unremarked` — so all five of them fell through the
+   * `default:` and came out with whistle 0 at every distance in every state. FIVE OF SIX
+   * ANOMALIES HAD NO VOICE AT ALL, and the one that did was the one the file was written
+   * against, which is exactly why nobody heard it.
+   *
+   * `senses.js` states the rule this broke: the engine may not know an anomaly by name.
+   * The abstraction already existed — every state declares a `kind` from a closed set, and
+   * the draught's five map onto it one for one — so this reads the KIND and is
+   * bit-identical for the draught while giving the other five a voice for the first time.
+   */
   let whistle = 0, whistleHz = 0, drone = 0.12 + near * 0.2;
-  switch (s.anomalyState) {
-    case ANOMALY_STATE.LATENT: whistle = 0; whistleHz = 0; break;
-    case ANOMALY_STATE.AWARE: whistle = 0.10 * near; whistleHz = 420; break;
-    case ANOMALY_STATE.DRAWN: whistle = 0.24 * near; whistleHz = 720; break;
-    case ANOMALY_STATE.BANKED: whistle = 0.13 * near; whistleHz = 300; break;
-    case ANOMALY_STATE.CONTAINED: whistle = 0; whistleHz = 0; drone = 0.04; break;
+  switch (s.anomalyStateKind) {
+    case 'latent': whistle = 0; whistleHz = 0; break;
+    case 'active': whistle = 0.10 * near; whistleHz = 420; break;
+    case 'hunting': whistle = 0.24 * near; whistleHz = 720; break;
+    case 'vulnerable': whistle = 0.13 * near; whistleHz = 300; break;
+    case 'contained': whistle = 0; whistleHz = 0; drone = 0.04; break;
     default: break;
   }
-  /* Flutter is what "banked" sounds like: the note breaks up rather than dropping out,
-   * so a held anomaly never sounds like a contained one. */
-  const flutterHz = s.anomalyState === ANOMALY_STATE.BANKED ? 7 : 0;
-
+  /* Flutter is what a held anomaly sounds like: the note breaks up rather than dropping
+   * out, so one you are holding never sounds like one you have contained. */
+  const flutterHz = s.anomalyStateKind === 'vulnerable' ? 7 : 0;
   /* The case heater cycles every twenty seconds while custody holds (content, `contained`). */
   const heater = s.custodyHeldMs > 0 ? (Math.floor(s.custodyHeldMs / 20000) !== Math.floor((s.custodyHeldMs - 900) / 20000) ? 0.22 : 0) : 0;
 

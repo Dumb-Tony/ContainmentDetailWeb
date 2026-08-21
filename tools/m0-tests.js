@@ -848,23 +848,52 @@ async function sectionI(content) {
 }
 
 /* ── J. audio as a pure function ─────────────────────────────────────────── */
-function sectionJ() {
+async function sectionJ() {
   lines.push('--- J. the mix is a pure function of the world ---');
   const base = { distance: 4, imagerOn: false, imagerLockMs: 0, custodyHeldMs: 0, stressNorm: 0, pressureStage: 0, activeEmitters: 0 };
-  const aware = mixFor({ ...base, anomalyState: ANOMALY_STATE.AWARE });
-  const drawn = mixFor({ ...base, anomalyState: ANOMALY_STATE.DRAWN });
-  const banked = mixFor({ ...base, anomalyState: ANOMALY_STATE.BANKED });
+  const aware = mixFor({ ...base, anomalyStateKind: 'active' });
+  const drawn = mixFor({ ...base, anomalyStateKind: 'hunting' });
+  const banked = mixFor({ ...base, anomalyStateKind: 'vulnerable' });
   ok('J1 the whistle sharpens when it locks on', drawn.whistleHz > aware.whistleHz);
   ok('J2 and drops when it is held', banked.whistleHz < drawn.whistleHz);
   ok('J3 held sounds like a flutter, not like silence', banked.flutterHz > 0 && banked.whistle > 0);
-  ok('J4 distance is audible', mixFor({ ...base, anomalyState: ANOMALY_STATE.DRAWN, distance: 16 }).whistle < drawn.whistle);
+  ok('J4 distance is audible', mixFor({ ...base, anomalyStateKind: 'hunting', distance: 16 }).whistle < drawn.whistle);
   ok('J5 the imager has a non-visual presence cue',
-    mixFor({ ...base, anomalyState: ANOMALY_STATE.DRAWN, imagerOn: true, imagerLockMs: 2000 }).imagerHz
-    > mixFor({ ...base, anomalyState: ANOMALY_STATE.DRAWN, imagerOn: true, imagerLockMs: 0 }).imagerHz);
-  ok('J6 contained is quiet', mixFor({ ...base, anomalyState: ANOMALY_STATE.CONTAINED }).whistle === 0);
-  const a1 = JSON.stringify(mixFor({ ...base, anomalyState: ANOMALY_STATE.DRAWN }));
-  const a2 = JSON.stringify(mixFor({ ...base, anomalyState: ANOMALY_STATE.DRAWN }));
+    mixFor({ ...base, anomalyStateKind: 'hunting', imagerOn: true, imagerLockMs: 2000 }).imagerHz
+    > mixFor({ ...base, anomalyStateKind: 'hunting', imagerOn: true, imagerLockMs: 0 }).imagerHz);
+  ok('J6 contained is quiet', mixFor({ ...base, anomalyStateKind: 'contained' }).whistle === 0);
+  const a1 = JSON.stringify(mixFor({ ...base, anomalyStateKind: 'hunting' }));
+  const a2 = JSON.stringify(mixFor({ ...base, anomalyStateKind: 'hunting' }));
   eq('J7 pure — the same state gives the same mix', a1, a2);
+
+  /**
+   * ⚠ AND IT KNEW ONE ANOMALY BY NAME. `mixFor` switched on `latent`/`aware`/`drawn`/
+   * `banked`/`contained` — the DRAUGHT's five state ids, not the game's. Every other
+   * anomaly names its states something else, fell through the `default:`, and came out
+   * silent at every distance in every state. Five of six had no voice at all, and the one
+   * that did was the one the file was written against.
+   *
+   * Driven through every shipped anomaly's OWN state ids rather than through five literals,
+   * so a seventh cannot be added silent.
+   */
+  const voiceless = [];
+  const kindsSeen = new Set();
+  for (const id of INCIDENTS) {
+    const pack = await loadContent({ incident: id });
+    for (const st of pack.anomaly.states || []) {
+      kindsSeen.add(st.kind);
+      const m = mixFor({ ...base, anomalyStateKind: st.kind });
+      /* Latent and contained are SUPPOSED to be silent — that is the design, not a gap.
+       * Every other kind has to make a sound at four metres. */
+      if (st.kind === 'latent' || st.kind === 'contained') continue;
+      if (!(m.whistle > 0)) voiceless.push(`${pack.anomaly.id}/${st.id} (${st.kind})`);
+    }
+  }
+  note(`state kinds in shipped content: ${[...kindsSeen].sort().join(', ')}`);
+  eq(`J8 every anomaly has a voice, not just the one the mix was written against${voiceless.length ? ` — ${voiceless.join(', ')}` : ''}`,
+    voiceless.length, 0);
+  ok('J9 and an unknown kind is silence rather than a crash',
+    mixFor({ ...base, anomalyStateKind: 'q7' }).whistle === 0);
   emit();
 }
 

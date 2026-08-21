@@ -390,7 +390,7 @@ async function boot() {
 
     if (audio.ok) {
       audio.apply(mixFor({
-        anomalyState: game.anomaly.state,
+        anomalyStateKind: game.anomaly.stateKind,
         distance: dist(game.player.x, game.player.z, game.anomaly.x, game.anomaly.z),
         imagerOn: game.imagerOn,
         imagerLockMs: game.imagerHoldMs,
