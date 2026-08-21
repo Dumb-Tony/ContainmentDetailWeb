@@ -353,6 +353,20 @@ function knownCaps(game) {
    * the wire field it mirrors as two independent leaks is a soak double-counting one number.
    */
   try { caps['anomaly.transitions'] = CONFIG.anomaly.transitionLogMax; } catch { /* older build */ }
+  /* One id per operative who is currently on the floor and down. Bounded by the roster, and
+   * it took a soak to notice that a LOST operative stays `downed` for ever and so never left
+   * it — small, and the difference between "bounded by the squad" and "bounded by the squad,
+   * eventually" is exactly what this tool is for. */
+  caps['_downLogged'] = Math.max(1, game.players.length);
+  /**
+   * ⚠ A BYTE COUNT OF A NUMBER IS NOT A COUNTER, and the fraction guard cannot save it.
+   * `wire.snap.pr` is `q3(mission.pressure)` — one quantised number, four or five characters
+   * — and it gains a character as pressure climbs from 0 to 100. Half a byte a minute off a
+   * base of five IS more than the 0.5%-a-minute floor, so the guard that catches a player's
+   * coordinates gaining a digit does not catch this one: the base is too small for any
+   * fraction to be meaningful. Bounded by the number of digits in the maximum.
+   */
+  caps['wire.snap.pr'] = String(CONFIG.pressure.max).length + 5;
   caps['gpu.sceneChildren'] = SCENE_FURNITURE + 40;
   caps['wire.snap.an'] = AN_BASE_BYTES + 40 * AN_ICE_BYTES;
   return caps;

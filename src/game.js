@@ -794,7 +794,11 @@ export class Game {
      * standing over the case used to keep hold of it while unconscious.
      */
     for (const p of this.players) {
-      if (!p.downed) { this._downLogged.delete(p.id); continue; }
+      /* ⚠ A LOST OPERATIVE IS STILL `downed`, so the first version of this line kept their id
+       * for the rest of the session — bounded by the roster, and therefore small, but the
+       * soak saw it climbing toward five and was right to. Somebody who is not alive cannot
+       * go down again, so there is nothing left for the id to prevent. */
+      if (!p.downed || !p.alive) { this._downLogged.delete(p.id); continue; }
       if (this._downLogged.has(p.id)) continue;
       this._downLogged.add(p.id);
       this.notice(this.players.length > 1
