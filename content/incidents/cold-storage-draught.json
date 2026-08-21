@@ -19,6 +19,7 @@
     "faultsMax": 1,
     "droppable": ["chart-recorder", "lantern-pair", "spent-cells", "ambulance-transcript", "crew-imager"],
     "dropMax": 2,
+    "behaviour": { "speedFactor": [0.9, 1.12] },
     "falseLeads": ["maintenance-log", "stairwell-draught"],
     "weather": ["still", "cold", "wet", "wind"],
     "times": ["night", "dawn", "day"]

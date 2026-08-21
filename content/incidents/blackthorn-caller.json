@@ -23,6 +23,7 @@
       { "id": "survivor-account", "positions": [[7.0, -16.0], [-9.6, -20.2]], "states": ["present", "shaken"] },
       { "id": "contractor-account", "positions": [[-9.6, -20.2], [7.0, -16.0]], "states": ["present", "shaken"] }
     ],
+    "behaviour": { "speedFactor": [0.92, 1.1] },
     "falseLeads": ["generator-log"],
     "weather": ["still", "cold", "wet", "wind"],
     "times": ["night", "dawn", "day"]

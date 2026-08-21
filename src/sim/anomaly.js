@@ -142,7 +142,18 @@ export class Anomaly {
 
   get speedMps() {
     const s = this.stateDef.get(this.state);
-    return s && s.speedMps ? s.speedMps : 0;
+    const base = s && s.speedMps ? s.speedMps : 0;
+    /**
+     * §14.4's "anomaly behaviour parameters within approved bounds", scaled by the seed.
+     *
+     * ⚠ WITHIN A BAND THE CONTENT DECLARES, and never wider. §8.2 requires a rule to be
+     * consistent and communicable: a seed that could put a speed anywhere would make this a
+     * different anomaly every night, and everything the squad learned about the last one
+     * would be worthless — which is the exact opposite of what §14.4 is for. A tenth either
+     * side is a night that feels quicker; a half is a lie about what the thing is.
+     */
+    const f = this.varied && this.varied.speedFactor;
+    return f ? base * f : base;
   }
 
   /**

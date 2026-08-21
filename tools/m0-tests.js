@@ -4782,6 +4782,35 @@ async function sectionAJ() {
   note(`  40°C contour radius by weather: ${radii.map((x) => `${x.w} ${x.rad.toFixed(3)}m`).join(' · ')}`);
   ok('AJ18 so the weather changes how much fence one floodlight buys',
     new Set(radii.map((x) => x.rad.toFixed(3))).size > 1);
+
+  /* ── behaviour, within the band and never outside it ──────────────────────
+   * §14.4's last axis. ⚠ §8.2 requires a rule to be consistent and communicable, so the
+   * band is the whole safety: a seed that could put a speed anywhere would make this a
+   * different anomaly every night and everything the squad learned about the last one
+   * would be worthless — the exact opposite of what controlled variation is for. */
+  const band = a1.incident.variation.behaviour.speedFactor;
+  const speeds = [];
+  for (let i = 0; i < packs.length; i++) {
+    const g = new Game(packs[i], { seed: SEEDS[i] });
+    g.anomaly.state = 'drawn';
+    speeds.push({ f: packs[i].variation.behaviour.speedFactor, v: g.anomaly.speedMps });
+  }
+  const factors = speeds.map((s) => s.f);
+  const lo = Math.min(...factors), hi = Math.max(...factors);
+  const drawnBase = a1.anomaly.states.find((s) => s.id === 'drawn').speedMps;
+  note(`speed factor over ${SEEDS.length} seeds: ${lo.toFixed(3)}–${hi.toFixed(3)} against the authored band ${band[0]}–${band[1]}`);
+  note(`  which is ${(drawnBase * lo).toFixed(2)}–${(drawnBase * hi).toFixed(2)} m/s drawn, from a base of ${drawnBase}`);
+  ok('AJ19 the seed varies the anomaly speed', hi - lo > 0.05);
+  ok('AJ20 and never outside the band the content declared', lo >= band[0] - 1e-9 && hi <= band[1] + 1e-9,
+    `${lo}..${hi} vs ${band.join('..')}`);
+  ok('AJ21 the factor reaches the actual speed the mover reads',
+    speeds.every((s) => Math.abs(s.v - drawnBase * s.f) < 1e-9));
+  /* An incident that declares no band is exactly its authored speed. */
+  const noBand = await loadContent({ incident: 'cold-storage-figure', seed: 'x' });
+  const gn = new Game(noBand, { seed: 'x' });
+  gn.anomaly.state = 'closing';
+  eq('AJ22 and an incident with no band runs at exactly its authored speed',
+    gn.anomaly.speedMps, noBand.anomaly.states.find((s) => s.id === 'closing').speedMps);
   emit();
 }
 /**
