@@ -1,0 +1,73 @@
+{
+  "_locale": "en-GB",
+  "_note": "EVERY SENTENCE THE GAME SAYS TO A PLAYER. GDD §23 Milestone 5 asks for a localization pass; this is the half of it that is engineering rather than translation.\n\nTHE RULE: a key names a MESSAGE, never a fragment. There is no key here whose value is ' · stabilised' or ' of ' or 'lane' — because a sentence assembled at runtime from pieces is a sentence that cannot be translated. Word order moves, adjectives agree, plurals are not two-valued. Interpolation is allowed and concatenation is not: a message carries {placeholders} and decides for itself where they go.\n\nPLURALS are sibling keys under a `one`/`other` object and are selected by Intl.PluralRules, not by `n === 1 ? a : b`. English has two forms and that is not a law — Polish has three and Arabic six. The naive ternary is written into this codebase in fourteen places and every one of them is a bug in the second language.\n\nWHAT IS NOT HERE: anything an anomaly or an incident says. Content prose lives in content/anomalies and content/incidents and is localised with the package, not with the engine — a briefing is authored writing, not a UI string, and the two have different reviewers.",
+
+  "hud": {
+    "_note": "The head-up display. Everything here is read at a glance while something is walking toward you, so it is short by design and the short forms are the ones that must survive translation.",
+    "pressure": "Incident pressure: {stage}",
+    "clock": "{time} · {phase}",
+    "primary": "Primary",
+    "slotEmpty": "—",
+    "imagerCharge": "{minutes}m",
+    "imagerChargeOn": "{minutes}m · ON",
+    "cond": {
+      "exposure": "Exposure {bars}",
+      "exposureStabilised": "Exposure {bars} · stabilised",
+      "mobility": "Mobility injury {bars}",
+      "mobilityStabilised": "Mobility injury {bars} · stabilised"
+    },
+    "stress": {
+      "unsteady": "Unsteady",
+      "hard": "Breathing hard"
+    },
+    "noise": {
+      "_note": "The four gaits the sound model has. No decibel figure and no threshold mark: the level a sound-hunting anomaly wakes at is a rule the squad learns from evidence (§7.4), and a live readout with the number on it hands that back for free.",
+      "still": "Still",
+      "careful": "Careful",
+      "walking": "Walking",
+      "running": "Running"
+    },
+    "mic": {
+      "title": "DIRECTIONAL MICROPHONE",
+      "none": "Nothing resolves above the room.",
+      "floor": "room {room} dB · handling {handling} dB",
+      "row": "{what} · {bearing}",
+      "level": "{db} dB",
+      "what": { "body": "body", "equipment": "equipment" },
+      "bearing": {
+        "ahead": "ahead",
+        "left": "{degrees}° left",
+        "right": "{degrees}° right"
+      }
+    },
+    "squad": {
+      "ok": "ok",
+      "injured": "injured",
+      "noRadio": "no radio",
+      "lost": "lost",
+      "down": "DOWN {seconds}s",
+      "position": "{metres}m · {room}"
+    },
+    "bezel": {
+      "contour": "{celsius}C contour · white",
+      "held": "HELD · {state}",
+      "lanes": {
+        "one": "{count} lane open · {state}",
+        "other": "{count} lanes open · {state}"
+      },
+      "lanesUnknown": "— lanes open · {state}"
+    },
+    "objective": {
+      "carry": "Carry the case to the stair head.",
+      "carrierHas": "{name} has the case. Cover them to the stairs.",
+      "lift": "Lift the case and get it to the stair head.",
+      "hold": "Hold custody — {held}s of {need}s. Keep the case powered.",
+      "instancesCarrying": "Logged: {count}. Carry it to the case.",
+      "instancesNone": "Logged: 0. Sweep on thermal — they read colder than the floor.",
+      "instances": "Logged: {count}. Seal when the sheet is satisfied.",
+      "held": "It is held. Get the case within {metres}m and seal it.",
+      "procedure": "Execute the committed procedure.",
+      "investigate": "Establish what it is and what stops it. Plan on the tablet (TAB)."
+    }
+  }
+}

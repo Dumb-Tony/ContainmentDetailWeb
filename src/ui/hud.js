@@ -17,6 +17,7 @@ import { GameClock } from '../core/clock.js';
 import { ANOMALY_STATE } from '../sim/anomaly.js';
 import { dist } from '../sim/geometry.js';
 import { operativeNoiseDb } from '../sim/sound.js';
+import { t, plural } from '../core/i18n.js';
 
 const el = (tag, cls, parent) => {
   const n = document.createElement(tag);
@@ -219,7 +220,7 @@ export class Hud {
 
   update() {
     const g = this.game, p = g.viewPlayer, m = g.mission, a = g.anomaly;
-    const t = g.clock.simTimeMs;
+    const now = g.clock.simTimeMs;
 
     /* ── top left: where, when, how bad ── */
     const room = g.site.roomNameAt(p.x, p.z);
@@ -227,8 +228,8 @@ export class Hud {
     const power = Array.from(left.values()).map((c) => `<i class="${c.on ? 'on' : 'off'}"></i>${c.displayName.replace(' circuit', '')}`).join('');
     this._set('tl', this.topLeft, `
       <div class="row big">${room}</div>
-      <div class="row">${GameClock.formatMs(t)} · ${m.phase}</div>
-      <div class="row stage s${m.stage}">Incident pressure: <b>${m.stageName}</b></div>
+      <div class="row">${t('hud.clock', { time: GameClock.formatMs(now), phase: m.phase })}</div>
+      <div class="row stage s${m.stage}">${t('hud.pressure', { stage: `<b>${m.stageName}</b>` })}</div>
       <div class="row power">${power}</div>`);
 
     /* ── top right: the objective, in the order it actually happens ── */
@@ -254,10 +255,10 @@ export class Hud {
       let sub = '';
       if (id === 'thermal-imager') {
         const mins = g.batteryFor('thermal-imager') / 60000;
-        sub = `<em class="${mins < 2 ? 'warn' : ''}">${mins.toFixed(1)}m${on ? ' · ON' : ''}</em>`;
+        sub = `<em class="${mins < 2 ? 'warn' : ''}">${t(on ? 'hud.imagerChargeOn' : 'hud.imagerCharge', { minutes: mins.toFixed(1) })}</em>`;
       }
       return `<div class="slot ${held ? 'held' : ''} ${item ? '' : 'empty'}">
-        <b>${i + 1}</b><span>${item ? item.displayName : '—'}</span>${sub}</div>`;
+        <b>${i + 1}</b><span>${item ? item.displayName : t('hud.slotEmpty')}</span>${sub}</div>`;
     }).join('');
     const hands = p.hands ? `<div class="slot hands held"><b>✋</b><span>${g.itemsById.get(p.hands).displayName}</span></div>` : '';
     this._set('slots', this.slots, slotHtml + hands);
@@ -265,10 +266,19 @@ export class Hud {
     /* ── condition and stress ── */
     const c = p.conditions;
     const cond = [];
-    if (c.exposure.severity) cond.push(`<div class="cond sev${c.exposure.severity}">Exposure ${'▮'.repeat(c.exposure.severity)}${c.exposure.stabilised ? ' · stabilised' : ''}</div>`);
-    if (c.mobility.severity) cond.push(`<div class="cond sev${c.mobility.severity}">Mobility injury ${'▮'.repeat(c.mobility.severity)}${c.mobility.stabilised ? ' · stabilised' : ''}</div>`);
+    /* ⚠ ' · stabilised' WAS A FRAGMENT CONCATENATED ONTO A SENTENCE, and a fragment is the
+     * one thing a message table may not contain: the word order it assumes is English's.
+     * Two whole messages, and the code picks between them. */
+    if (c.exposure.severity) {
+      cond.push(`<div class="cond sev${c.exposure.severity}">${t(c.exposure.stabilised
+        ? 'hud.cond.exposureStabilised' : 'hud.cond.exposure', { bars: '▮'.repeat(c.exposure.severity) })}</div>`);
+    }
+    if (c.mobility.severity) {
+      cond.push(`<div class="cond sev${c.mobility.severity}">${t(c.mobility.stabilised
+        ? 'hud.cond.mobilityStabilised' : 'hud.cond.mobility', { bars: '▮'.repeat(c.mobility.severity) })}</div>`);
+    }
     const st = p.stressNorm;
-    if (st > 0.35) cond.push(`<div class="cond stress">${st > 0.75 ? 'Breathing hard' : 'Unsteady'}</div>`);
+    if (st > 0.35) cond.push(`<div class="cond stress">${t(st > 0.75 ? 'hud.stress.hard' : 'hud.stress.unsteady')}</div>`);
     this._set('cond', this.conditions, cond.join(''));
 
     /**
@@ -295,11 +305,11 @@ export class Hud {
     const band = noiseDb <= q0 + 0.5 ? 1
       : noiseDb <= q1 + 0.5 ? 2
         : noiseDb <= q2 + 0.5 ? 3 : 4;
-    const NOISE_WORD = ['', 'Still', 'Careful', 'Walking', 'Running'];
+    const NOISE_KEY = ['', 'hud.noise.still', 'hud.noise.careful', 'hud.noise.walking', 'hud.noise.running'];
     this.noise.className = `cd-noise n${band}`;
     this._set('noise', this.noise, `
       <span class="bars">${[1, 2, 3, 4].map((i) => `<i class="${i <= band ? 'lit' : ''}"></i>`).join('')}</span>
-      <span>${NOISE_WORD[band]}</span>`);
+      <span>${t(NOISE_KEY[band])}</span>`);
 
     /**
      * ⚠ THE DIRECTIONAL MICROPHONE HAD NO SCREEN. `micReading` modelled the whole
@@ -319,13 +329,16 @@ export class Hud {
     this.mic.className = mic ? 'cd-mic on' : 'cd-mic';
     if (mic) {
       const rows = mic.resolved.slice(0, 3).map((r) => {
-        const deg = Math.round(Math.abs(r.offAxisRad) * 180 / Math.PI);
-        const side = deg <= 4 ? 'ahead' : (r.offAxisRad > 0 ? `${deg}° right` : `${deg}° left`);
-        const what = r.kind === 'operative' ? 'body' : 'equipment';
-        return `<div class="src"><span>${what} · ${side}</span><b>${r.db.toFixed(1)} dB</b></div>`;
+        const degrees = Math.round(Math.abs(r.offAxisRad) * 180 / Math.PI);
+        const bearing = degrees <= 4 ? t('hud.mic.bearing.ahead')
+          : t(r.offAxisRad > 0 ? 'hud.mic.bearing.right' : 'hud.mic.bearing.left', { degrees });
+        const what = t(r.kind === 'operative' ? 'hud.mic.what.body' : 'hud.mic.what.equipment');
+        return `<div class="src"><span>${t('hud.mic.row', { what, bearing })}</span>`
+          + `<b>${t('hud.mic.level', { db: r.db.toFixed(1) })}</b></div>`;
       }).join('');
-      this._set('mic', this.mic, `<div class="head">DIRECTIONAL MICROPHONE</div>${rows
-        || '<div class="none">Nothing resolves above the room.</div>'}<div class="floor">room ${mic.floorDb.toFixed(1)} dB · handling ${mic.selfNoiseDb.toFixed(0)} dB</div>`);
+      this._set('mic', this.mic, `<div class="head">${t('hud.mic.title')}</div>${rows
+        || `<div class="none">${t('hud.mic.none')}</div>`}<div class="floor">${
+        t('hud.mic.floor', { room: mic.floorDb.toFixed(1), handling: mic.selfNoiseDb.toFixed(0) })}</div>`);
     }
 
     /* ── the squad (GDD §18.2 "squad status indicators", §11.2 split information) ──
@@ -336,12 +349,15 @@ export class Hud {
       const rows = g.players.map((q) => {
         const d = dist(p.x, p.z, q.x, q.z);
         const state = !q.alive ? 'lost' : q.downed ? 'down' : !q.connected ? 'off' : q.injured ? 'hurt' : 'ok';
-        const word = !q.alive ? 'lost' : q.downed ? `DOWN ${Math.max(0, Math.ceil((CONFIG.player.bleedOutMs - q.downedMs) / 1000))}s`
-          : !q.connected ? 'no radio' : q.injured ? 'injured' : 'ok';
+        const word = !q.alive ? t('hud.squad.lost')
+          : q.downed ? t('hud.squad.down', { seconds: Math.max(0, Math.ceil((CONFIG.player.bleedOutMs - q.downedMs) / 1000)) })
+            : !q.connected ? t('hud.squad.noRadio') : q.injured ? t('hud.squad.injured') : t('hud.squad.ok');
         return `<div class="mate ${state} ${q === p ? 'self' : ''}">
           <b>${escapeHtml(q.name)}</b>
           <span class="w">${word}</span>
-          <span class="d">${q === p ? '' : `${d.toFixed(0)}m · ${escapeHtml(g.site.roomNameAt(q.x, q.z))}`}</span>
+          <span class="d">${q === p ? '' : t('hud.squad.position', {
+    metres: d.toFixed(0), room: escapeHtml(g.site.roomNameAt(q.x, q.z)),
+  })}</span>
         </div>`;
       }).join('');
       this._set('squad', this.squad, rows);
@@ -366,9 +382,15 @@ export class Hud {
       const held = a.isHeld;
       this.bezel.classList.toggle('held', held);
       this.bezel.classList.toggle('hot', a.stateKind === 'hunting');
-      const lanes = a.escapes === undefined ? '—' : a.escapes;
-      this.bezelLabel.innerHTML = `<span>${CONFIG.heat.gradientThresholdC}C contour · white</span>`
-        + `<span>${held ? 'HELD' : `${lanes} lane${lanes === 1 ? '' : 's'} open`} · ${state}</span>`;
+      /* ⚠ `n === 1 ? '' : 's'` IS NOT A PLURAL RULE, it is English's plural rule written
+       * out. Polish has three forms and Arabic six, and `Intl.PluralRules` already knows
+       * which one this locale wants — so the message table authors the categories and the
+       * code asks for a count. */
+      const right = held ? t('hud.bezel.held', { state })
+        : a.escapes === undefined ? t('hud.bezel.lanesUnknown', { state })
+          : plural('hud.bezel.lanes', a.escapes, { state });
+      this.bezelLabel.innerHTML = `<span>${t('hud.bezel.contour', { celsius: CONFIG.heat.gradientThresholdC })}</span>`
+        + `<span>${right}</span>`;
     } else {
       this.bezel.style.display = 'none';
     }
@@ -381,13 +403,13 @@ export class Hud {
     const me = g.viewPlayer;
     if (g.custody === 'verified') {
       const carrier = g.players.find((q) => q.hands === 'reinforced-transit-case');
-      if (carrier === me) return 'Carry the case to the stair head.';
-      if (carrier) return `${carrier.name} has the case. Cover them to the stairs.`;
-      return 'Lift the case and get it to the stair head.';
+      if (carrier === me) return t('hud.objective.carry');
+      if (carrier) return t('hud.objective.carrierHas', { name: carrier.name });
+      return t('hud.objective.lift');
     }
     if (g.custody === 'sealed') {
       const held = g.anomaly.sealedIn ? g.anomaly.sealedIn.custodyHeldMs / 1000 : 0;
-      return `Hold custody — ${held.toFixed(0)}s of ${CONFIG.anomaly.custodyVerifySeconds}s. Keep the case powered.`;
+      return t('hud.objective.hold', { held: held.toFixed(0), need: CONFIG.anomaly.custodyVerifySeconds });
     }
     /**
      * The distributed set (GDD §26.2). What the HUD is allowed to say here is the whole
@@ -405,18 +427,24 @@ export class Hud {
     if (g.anomaly.isDistributed) {
       const n = g.instances.counted;
       const carrying = g.instances.carriedBy(me.id);
-      if (carrying) return `Logged: ${n}. Carry it to the case.`;
-      if (n === 0) return 'Logged: 0. Sweep on thermal — they read colder than the floor.';
+      if (carrying) return t('hud.objective.instancesCarrying', { count: n });
+      if (n === 0) return t('hud.objective.instancesNone');
       /* ⚠ "The account is closed. Seal it." was here, and it was the game answering the
        * question. Nothing tells you when you are finished: the case reports what it holds,
        * the sheet in the office says how many there should be, and the seal is a decision
        * you make on those two numbers. */
-      return `Logged: ${n}. Seal when the sheet is satisfied.`;
+      return t('hud.objective.instances', { count: n });
     }
 
-    if (g.anomaly.isHeld) return 'It is held. Get the case within 1.5m and seal it.';
-    if (g.mission.procedure) return 'Execute the committed procedure.';
-    return 'Establish what it is and what stops it. Plan on the tablet (TAB).';
+    /* ⚠ 1.5m WAS SPELLED INTO THE SENTENCE and the seal radius is authored on the trigger.
+     * Read it, so a package that seals at a different distance says so. */
+    if (g.anomaly.isHeld) {
+      const seal = (g.anomaly.def.triggers || []).find((x) => x.when && x.when.sense === 'enclosed-by');
+      const metres = seal && seal.when.radiusMetres !== undefined ? seal.when.radiusMetres : 1.5;
+      return t('hud.objective.held', { metres });
+    }
+    if (g.mission.procedure) return t('hud.objective.procedure');
+    return t('hud.objective.investigate');
   }
 }
 
