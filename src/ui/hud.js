@@ -16,6 +16,7 @@ import { CONFIG, SLOTS } from '../config.js';
 import { GameClock } from '../core/clock.js';
 import { ANOMALY_STATE } from '../sim/anomaly.js';
 import { dist } from '../sim/geometry.js';
+import { operativeNoiseDb } from '../sim/sound.js';
 
 const el = (tag, cls, parent) => {
   const n = document.createElement(tag);
@@ -37,6 +38,7 @@ export class Hud {
     this.prompt = el('div', 'cd-prompt', root);
     this.slots = el('div', 'cd-slots', root);
     this.conditions = el('div', 'cd-conditions', root);
+    this.noise = el('div', 'cd-noise', root);
     this.notices = el('div', 'cd-notices', root);
     this.bezel = el('div', 'cd-bezel', root);
     this.bezelLabel = el('div', 'cd-bezel-label', this.bezel);
@@ -267,6 +269,36 @@ export class Hud {
     const st = p.stressNorm;
     if (st > 0.35) cond.push(`<div class="cond stress">${st > 0.75 ? 'Breathing hard' : 'Unsteady'}</div>`);
     this._set('cond', this.conditions, cond.join(''));
+
+    /**
+     * ⚠ HOW MUCH NOISE YOU ARE MAKING HAD NO OUTPUT CHANNEL AT ALL.
+     *
+     * The sound field is fully simulated — four levels off SPEED, wall loss, occluders,
+     * masking, a whole instrument to read it — and `blackthorn-caller` hunts it and is
+     * restrained by silence, so on that floor it is the entire game. Nothing showed it.
+     * Not the HUD, and not the mix either: `audio.js` has no footstep cue, so a player
+     * with headphones on was in exactly the same position as one with the sound off.
+     *
+     * That is §8.2 before it is §19.2. Every rule has to be OBSERVABLE, and the quantity
+     * this one is about was legible only to the anomaly.
+     *
+     * NO NUMBER AND NO THRESHOLD MARK. The figure the caller wakes at is a rule the squad
+     * learns from evidence (§7.4), and printing "46 dB" beside a live readout would hand
+     * back the question the whole investigation phase exists to ask. What this shows is
+     * the thing the player is DOING, which they chose and are entitled to see: still,
+     * crouched, walking, running. The bands come off CONFIG's own four figures rather than
+     * being redrawn here, so a tuning pass moves the readout with the rule.
+     */
+    const noiseDb = operativeNoiseDb(p);
+    const { stillNoiseDb: q0, crouchNoiseDb: q1, walkNoiseDb: q2 } = CONFIG.player;
+    const band = noiseDb <= q0 + 0.5 ? 1
+      : noiseDb <= q1 + 0.5 ? 2
+        : noiseDb <= q2 + 0.5 ? 3 : 4;
+    const NOISE_WORD = ['', 'Still', 'Careful', 'Walking', 'Running'];
+    this.noise.className = `cd-noise n${band}`;
+    this._set('noise', this.noise, `
+      <span class="bars">${[1, 2, 3, 4].map((i) => `<i class="${i <= band ? 'lit' : ''}"></i>`).join('')}</span>
+      <span>${NOISE_WORD[band]}</span>`);
 
     /* ── the squad (GDD §18.2 "squad status indicators", §11.2 split information) ──
      * Solo shows nothing: a roster of one is clutter. The moment there are two, where

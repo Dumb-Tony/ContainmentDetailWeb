@@ -2092,6 +2092,57 @@ async function sectionT(content) {
   g.commitLoadout(RECOMMENDED_MANIFEST);
   const hud = new Hud(host, g, null);
 
+
+  /**
+   * ⚠ HOW LOUD YOU ARE HAD NO OUTPUT CHANNEL. The sound field drives an entire anomaly —
+   * `blackthorn-caller` hunts sound and is restrained by silence — and nothing showed it.
+   * Not the HUD, and not the mix either: there is no footstep cue in `audio.js`, so a
+   * player wearing headphones knew exactly as much as one with the sound off. §8.2 asks
+   * every rule to be observable and this one was legible only to the anomaly.
+   *
+   * Asserted on the WORD and the class, not on pixels: the word is what a screen reader
+   * gets and the class is what the colour-vision presets recolour, and §19.1 says a
+   * readout may not depend on colour alone.
+   */
+  /* Stand the operative in the middle of the cargo cache's room and find a heading that is
+   * actually clear, because a test that pushes an operative into a wall measures the wall.
+   * The readout is a function of SPEED, so it needs real movement to say anything. */
+  g.player.x = g.site.cache.x; g.player.z = g.site.cache.z;
+  const HEADINGS = [{ x: 0, y: 1 }, { x: 0, y: -1 }, { x: 1, y: 0 }, { x: -1, y: 0 }];
+  let heading = null;
+  for (const h of HEADINGS) {
+    g.setCommand('p1', { axis: h, sprint: false, crouch: false });
+    for (let i = 0; i < 10; i++) g.skipMs(16);
+    if (Math.hypot(g.player.vx, g.player.vz) > 0.2) { heading = h; break; }
+    g.player.x = g.site.cache.x; g.player.z = g.site.cache.z;
+  }
+  ok('T0 the operative can walk somewhere from the cache, so the readout has something to read',
+    !!heading, JSON.stringify(heading));
+
+  const bands = [];
+  const drive = (axis, sprint, crouch) => {
+    g.setCommand('p1', { axis, sprint, crouch });
+    for (let i = 0; i < 25; i++) g.skipMs(16);
+    hud.update();
+    const n = host.querySelector('.cd-noise');
+    return { word: n.textContent.trim(), lit: n.querySelectorAll('i.lit').length, cls: n.className };
+  };
+  bands.push(drive({ x: 0, y: 0 }, false, false));
+  bands.push(drive(heading, false, true));
+  bands.push(drive(heading, false, false));
+  bands.push(drive(heading, true, false));
+  note(`noise readout across the four gaits: ${bands.map((b) => `${b.word}/${b.lit}`).join(' → ')}`);
+  eq('T0a the noise readout names the four gaits the sound model actually has',
+    bands.map((b) => b.word).join(','), 'Still,Careful,Walking,Running');
+  eq('T0b and lights one more bar for each, so it does not depend on colour (§19.1)',
+    bands.map((b) => b.lit).join(','), '1,2,3,4');
+  ok('T0c and it comes back down — a readout that only rises is a readout nobody trusts',
+    drive({ x: 0, y: 0 }, false, false).word === 'Still');
+  /* ⚠ AND IT MUST NOT PRINT THE THRESHOLD. The level the caller wakes at is a rule the
+   * squad learns from evidence (§7.4); a live readout with "46 dB" on it hands back the
+   * question the investigation phase exists to ask. */
+  ok('T0d the readout carries no decibel figure, so it does not answer §7.4 for free',
+    !/\d\s*dB/i.test(host.querySelector('.cd-noise').textContent));
   eq('T1 the aid is off by default, as §18.2 requires', hud.navMode, 'off');
   eq('T2 an unknown mode is off, not a crash', hud.setNavigationAid('sonar'), 'off');
   eq('T3 the compass can be turned on', hud.setNavigationAid('compass'), 'compass');
