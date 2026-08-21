@@ -565,6 +565,17 @@ export class Game {
      *    what makes leaving them there a decision rather than an inconvenience. */
     const emitters = this.deployables.heatEmitters();
     for (const p of this.players) if (p.alive) emitters.push({ ...p.heatSource(), active: true });
+    /* An anomaly that declares itself a heat SOURCE goes in the emitter list, and is added
+     * BEFORE the field is set rather than after — `FIELD_KINDS` accepts "source", validated
+     * it, and then `asSink` emitted a chill anyway, so a warm anomaly cooled the room and
+     * the file that said so looked correct. See `Anomaly.asSink`. */
+    const presence = this.anomaly.asSink();
+    if (presence && presence.kind === 'source') {
+      emitters.push({
+        id: 'anomaly', x: presence.x, z: presence.z,
+        peakC: presence.chillC, falloffM: presence.falloffM, active: true,
+      });
+    }
     this.heat.setEmitters(emitters);
     /* ⚠ THE INSTANCES ARE SINKS ON THE SAME FIELD, and that is the whole design of the
      * third procedure family rather than an implementation detail. Each is four degrees of
@@ -572,16 +583,6 @@ export class Game {
      * that finds them — and superposition, which nothing here writes, makes three in a
      * drawer legible from the doorway while one on its own is a smudge you have to stand
      * over. The field that is a WALL in one incident is an INSTRUMENT in another. */
-    /* An anomaly that declares itself a heat SOURCE goes in the emitter list. It validated
-     * and was silently applied as a sink before — see `Anomaly.asSink`. */
-    const presence = this.anomaly.asSink();
-    if (presence && presence.kind === 'source') {
-      emitters.push({
-        id: 'anomaly', x: presence.x, z: presence.z,
-        peakC: presence.chillC, falloffM: presence.falloffM, active: true,
-      });
-      this.heat.setEmitters(emitters);
-    }
     const sink = presence && presence.kind !== 'source' ? presence : null;
     this.heat.setSinks([...(sink ? [sink] : []), ...this.instances.sinks()]);
 
@@ -695,7 +696,17 @@ export class Game {
     for (const d of this.deployables.list) {
       if (d.itemId === 'remote-camera' && d.active) viewers.push(cameraViewer(d));
     }
-    this.observation = observedBy(this.anomaly.x, this.anomaly.z, viewers, this.site.blockingRects());
+    /* ⚠ A DEPLOYED PANEL BLOCKS A SIGHTLINE, and until now it did not. `observedBy` was
+     * given `site.blockingRects()` and nothing else, so a 2.4m insulated panel stood
+     * between an operative and the thing they were watching and the thing stayed watched.
+     * `stillwater-figure`'s `handover-safe` procedure lists `portable-barrier` among its
+     * items; on the old engine that item could not do the job the procedure implies.
+     *
+     * BARRIERS ONLY, not `blockingRects()`. The transit case stops a person walking through
+     * it and is knee-high; a squad crouched behind the case is not hidden, and pretending
+     * otherwise would make the one piece of equipment nobody can leave behind into cover. */
+    const sightBlockers = this.site.blockingRects().concat(this.deployables.barrierRects());
+    this.observation = observedBy(this.anomaly.x, this.anomaly.z, viewers, sightBlockers);
     this.viewers = viewers;
 
     const prevState = this.anomaly.state;

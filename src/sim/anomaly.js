@@ -228,16 +228,32 @@ export class Anomaly {
    * of them reaches the radius. Returns {fenced, escapes, weakestBearing} — `escapes` is
    * how many lanes are still open, which is what the imager operator is really counting.
    */
+  /**
+   * ⚠ THE FENCE TEST HAS TO ASK THE SAME QUESTION THE MOVER ASKS.
+   *
+   * This cast its rays against walls and against the 40°C gradient unconditionally, while
+   * `pathBlocked` right above consults `presence.blockedBy`. So an anomaly declaring
+   * `blockedBy: []` — stopped by nothing, which is a legal thing to author and is exactly
+   * what `coldharbour-passenger` says about itself — read 4 escapes of 24 against walls it
+   * walks straight through, and would report itself FENCED by a ring of tripods it does not
+   * care about. A rule the player could never learn, printed as a fact by the HUD, which is
+   * the one thing §18.1 does not allow.
+   *
+   * An anomaly stopped by nothing can never be fenced, and now says so.
+   */
   isFenced() {
     const R = CONFIG.fence.testRadiusM;
     const n = CONFIG.fence.rayCount;
+    const by = this.blockedBy;
+    const solidStops = by.includes('insulation');
+    const gradientStops = by.includes('gradient');
     let escapes = 0, weakestBearing = null, weakestHeat = Infinity;
 
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2;
       const ex = this.x + Math.cos(a) * R, ez = this.z + Math.sin(a) * R;
-      if (this.solidBlocksPath(this.x, this.z, ex, ez)) continue;
-      if (this.heat.blocksPath(this.x, this.z, ex, ez)) {
+      if (solidStops && this.solidBlocksPath(this.x, this.z, ex, ez)) continue;
+      if (gradientStops && this.heat.blocksPath(this.x, this.z, ex, ez)) {
         const hot = this.heat.hottestOnPath(this.x, this.z, ex, ez).c;
         if (hot < weakestHeat) { weakestHeat = hot; weakestBearing = a; }
         continue;

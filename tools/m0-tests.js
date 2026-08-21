@@ -23,6 +23,7 @@ import { chooseVariation, applyVariation, WEATHER, TIMES } from '../src/sim/vari
 import { Site } from '../src/sim/site.js';
 import { DeployableSet } from '../src/sim/deployables.js';
 import { Anomaly, ANOMALY_STATE } from '../src/sim/anomaly.js';
+import { SENSES, EFFECT_VERBS, FIELD_KINDS, HUNT_KINDS, BLOCK_KINDS } from '../src/sim/senses.js';
 import { EvidenceLedger, CLAIMS } from '../src/sim/evidence.js';
 import { Game, RECOMMENDED_MANIFEST, EMPTY_COMMAND, recommendedManifest, EVENTS } from '../src/game.js';
 import { PHASE } from '../src/sim/mission.js';
@@ -420,6 +421,29 @@ function sectionE(content) {
   heat.setEmitters([{ id: 'd', x: doorC[0], z: doorC[1], peakC: tripod.heatOutputCelsius, falloffM: tripod.heatFalloffMetres, active: true }]);
   const plugged = a.isFenced();
   ok('E5 ONE tripod in the open doorway closes it again', plugged.fenced);
+
+  /* ⚠ AND THE SAME GEOMETRY FENCES NOTHING IF THE CONTENT SAYS NOTHING STOPS IT.
+   * `isFenced` cast its rays against walls and heat unconditionally while `pathBlocked`
+   * consulted `presence.blockedBy`, so `coldharbour-passenger` — which declares
+   * `blockedBy: []` — reported itself fenced by a ring of tripods it walks straight
+   * through. §18.1: the UI may not print that as a fact. */
+  const freeDef = JSON.parse(JSON.stringify(content.anomaly));
+  freeDef.presence = { ...(freeDef.presence || {}), blockedBy: [] };
+  const free = new Anomaly(freeDef, site, heat, deps);
+  free.x = a.x; free.z = a.z;
+  const freeFence = free.isFenced();
+  eq('E6 an anomaly stopped by nothing has every lane open, in the doorway that just closed',
+    freeFence.escapes, CONFIG.fence.rayCount);
+  ok('E7 and therefore can never be fenced, whatever the squad builds', !freeFence.fenced);
+  /* Half of it: walls yes, gradient no — the caller's declaration. */
+  const wallsOnlyDef = JSON.parse(JSON.stringify(content.anomaly));
+  wallsOnlyDef.presence = { ...(wallsOnlyDef.presence || {}), blockedBy: ['insulation'] };
+  const wallsOnly = new Anomaly(wallsOnlyDef, site, heat, deps);
+  wallsOnly.x = a.x; wallsOnly.z = a.z;
+  const wallsFence = wallsOnly.isFenced();
+  ok('E8 and one that walls stop but heat does not is fenced by the room and not by the tripod',
+    wallsFence.escapes > 0 && wallsFence.escapes < CONFIG.fence.rayCount,
+    `${wallsFence.escapes} of ${CONFIG.fence.rayCount}`);
   emit();
 }
 
@@ -1420,6 +1444,35 @@ async function sectionO() {
   cam.x = -10.0; cam.z = -10.0;                    // into the office, walls in the way
   g.skipMs(2500);
   eq('O19 a camera with no sightline holds nothing', a.state, 'closing');
+
+  /* ⚠ AND SO DOES A PANEL THE SQUAD PUT THERE THEMSELVES. `observedBy` was handed
+   * `site.blockingRects()` and nothing else, so a 2.4m insulated panel stood between a
+   * camera and the figure and the figure stayed held — while `handover-safe`, this
+   * anomaly's own procedure, lists `portable-barrier` among its items. */
+  cam.x = a.x; cam.z = a.z - 5; cam.yaw = Math.PI;
+  g.skipMs(300);
+  eq('O19a the camera is holding it again, so the next assertion is not vacuous', a.state, 'held');
+  const panel = g.deployables.place(figure.itemsById.get('portable-barrier'), a.x, a.z - 2.5, 0);
+  g.skipMs(60);
+  ok('O19b a deployed panel between camera and anomaly breaks the sightline',
+    !g.observation.by.includes(cam.uid), JSON.stringify(g.observation.by));
+  const relBefore = a.transitions.length;
+  g.skipMs(2500);
+  /* Asserted on the TRANSITION LOG rather than on the state at the end, because releasing it
+   * makes it move, and a thing that moves comes back out from behind the panel and gets held
+   * again. The flicker is correct and the end state is whichever half of it the clock landed
+   * on; what has to be true is that the panel released it at all. */
+  const released = a.transitions.slice(relBefore).some((t) => t.to === 'closing');
+  ok('O19c and losing coverage to your own barrier releases it exactly as a wall would',
+    released, a.transitions.slice(relBefore).map((t) => `${t.from}->${t.to}/${t.triggerId}`).join() || 'no transitions');
+  /* The case is knee-high and is NOT cover: the one item nobody can leave behind must not
+   * double as a screen. */
+  g.deployables.remove(panel);
+  const caseNotCover = g.deployables.place(figure.itemsById.get('reinforced-transit-case'), a.x, a.z - 2.5, 0);
+  g.skipMs(300);
+  ok('O19d but the transit case is not cover, however squarely it is in the way',
+    g.observation.by.includes(cam.uid), JSON.stringify(g.observation.by));
+  g.deployables.remove(caseNotCover);
 
   /* And the custody move is the same verb with a different meaning: sealed while HELD. */
   cam.x = a.x; cam.z = a.z - 5; cam.yaw = Math.PI;
@@ -5353,6 +5406,88 @@ async function sectionAN(content) {
   note('    a bot would be measuring the bot.');
   emit();
 }
+
+/* ── AO. the closed vocabularies, and whether the engine reads them ───────── */
+/**
+ * §20.6's rule is that a JSON key names a QUANTITY and never an OPERATOR, and the four
+ * flat vocabularies below are the quantities a content file may name.
+ *
+ * ⚠ THE LOADER REFUSES DANGLING REFERENCES AND DOES NOT REFUSE UNIMPLEMENTED ONES, which
+ * is a much worse failure than a typo. `validateAnomaly` checked membership of these lists
+ * and stopped there, so `kind: "source"` loaded clean and was applied as a sink, `hunts`
+ * loaded clean and was ignored, `blockedBy: []` loaded clean and was overridden by the
+ * fence test, and `drain-power` loaded clean and drained batteries whether it was there or
+ * not. Four entries the vocabulary offered, the validator accepted, and the engine did not
+ * have. A designer trusting the list would ship a rule the player can never learn.
+ *
+ * All four are implemented now. This section exists so the fifth one cannot be added
+ * without an implementation: every token is required to appear as a string literal in the
+ * engine, fetched as source text over the same http the harness already serves.
+ */
+async function sectionAO() {
+  lines.push('--- AO. every word the vocabulary offers, the engine has to read ---');
+
+  const FILES = [
+    'src/sim/anomaly.js', 'src/sim/deployables.js', 'src/sim/heat.js',
+    'src/sim/instances.js', 'src/game.js', 'src/sim/senses.js', 'src/sim/content.js',
+  ];
+  const src = new Map();
+  for (const f of FILES) src.set(f, await (await fetch(`/${f}`)).text());
+  /* senses.js is where the words are DECLARED, so a token that appears only there is a
+   * token nothing reads. Every consumer check excludes it. */
+  const consumers = FILES.filter((f) => f !== 'src/sim/senses.js');
+  const readBy = (token) => consumers.filter((f) => src.get(f).includes(`'${token}'`)
+    || src.get(f).includes(`"${token}"`));
+
+  const unread = [];
+  const groups = [
+    ['EFFECT_VERBS', EFFECT_VERBS],
+    ['FIELD_KINDS', FIELD_KINDS],
+    ['HUNT_KINDS', HUNT_KINDS],
+    ['BLOCK_KINDS', BLOCK_KINDS],
+  ];
+  for (const [group, list] of groups) {
+    for (const token of list) {
+      const where = readBy(token);
+      if (!where.length) unread.push(`${group}/${token}`);
+      else note(`  ${group} "${token}" read by ${where.map((f) => f.split('/').pop()).join(', ')}`);
+    }
+  }
+  eq(`AO1 every token in every closed vocabulary is read somewhere in the engine${unread.length ? ` — ${unread.join(', ')}` : ''}`,
+    unread.length, 0);
+
+  /* The senses carry their own operator, so they cannot be unimplemented — but they CAN be
+   * unreachable, and an operator no content file names is a rule with no way to learn it.
+   * Reported, not asserted: an unused sense is a gap in the content, not a bug. */
+  const named = new Set();
+  for (const id of INCIDENTS) {
+    const pack = await loadContent({ incident: id });
+    for (const t of pack.anomaly.triggers) named.add(t.when.sense);
+  }
+  const idle = Object.keys(SENSES).filter((s) => !named.has(s));
+  note(`${named.size} of ${Object.keys(SENSES).length} senses are named by shipped content`);
+  if (idle.length) note(`    named by nothing: ${idle.join(', ')}`);
+  ok('AO2 every sense the engine implements carries a poll or is marked performed',
+    Object.values(SENSES).every((s) => typeof s.poll === 'function' || s.performed === true));
+
+  /* And the other direction: no content file names a token outside the vocabularies. The
+   * loader already refuses this, so the assertion is that the loader is still the thing
+   * standing in the way rather than luck. */
+  const strayVerbs = [];
+  for (const id of INCIDENTS) {
+    const pack = await loadContent({ incident: id });
+    for (const c of pack.anomaly.capabilities || []) {
+      if (!EFFECT_VERBS.includes(c.verb)) strayVerbs.push(`${pack.anomaly.id}/${c.verb}`);
+    }
+    const pres = pack.anomaly.presence || {};
+    if (pres.field && pres.field.kind && !FIELD_KINDS.includes(pres.field.kind)) strayVerbs.push(`${pack.anomaly.id}/field:${pres.field.kind}`);
+    if (pres.hunts && !HUNT_KINDS.includes(pres.hunts)) strayVerbs.push(`${pack.anomaly.id}/hunts:${pres.hunts}`);
+    for (const b of pres.blockedBy || []) if (!BLOCK_KINDS.includes(b)) strayVerbs.push(`${pack.anomaly.id}/blockedBy:${b}`);
+  }
+  eq(`AO3 and no shipped package names a word outside them${strayVerbs.length ? ` — ${strayVerbs.join(', ')}` : ''}`,
+    strayVerbs.length, 0);
+  emit();
+}
 /**
  * ⚠ ONE SECTION THROWING MUST NOT DELETE EVERY SECTION AFTER IT.
  *
@@ -5416,6 +5551,7 @@ async function run(name, fn) {
     await run('AK', () => sectionAK());
     await run('AM', () => sectionAM(content));
     await run('AN', () => sectionAN(content));
+    await run('AO', () => sectionAO());
     await run('K', () => sectionK());
     await run('L', () => sectionL());
     await run('V', () => sectionV());
