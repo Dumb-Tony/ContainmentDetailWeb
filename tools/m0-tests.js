@@ -6117,6 +6117,103 @@ async function sectionAR() {
   emit();
 }
 
+/* ── AS. the instrument that had no screen ───────────────────────────────── */
+/**
+ * ⚠ `micReading` MODELLED THE WHOLE MICROPHONE AND NOTHING OUTSIDE `sound.js` CALLED IT.
+ *
+ * Polar pattern, on-axis gain, off-axis and diffuse rejection, handling noise coming up the
+ * handle, and masking arithmetic done in the microphone's own frame rather than by
+ * filtering the naked-ear answer — all of it complete, all of it unreachable. A squad could
+ * spend a general slot and twelve minutes of cell on an item that did nothing at all, on
+ * the one incident whose every rule is about sound. The imager's opposite number had no
+ * screen, and its authored `batteryMinutes` had never had a millisecond taken off it.
+ */
+async function sectionAS(content) {
+  lines.push('--- AS. the directional microphone reads, costs, and refuses ---');
+
+  const g = new Game(content, { seed: 'mic' });
+  g.commitLoadout(RECOMMENDED_MANIFEST);
+  const p = g.player;
+  p.x = g.site.cache.x; p.z = g.site.cache.z; p.yaw = 0;
+  g.skipMs(60);
+
+  ok('AS1 an operative holding nothing gets no reading', g.micReadingFor('p1') === null);
+
+  g.cache.set('directional-microphone', (g.cache.get('directional-microphone') || 0) + 1);
+  g.takeFromCache('directional-microphone');
+  const slot = SLOTS.findIndex((s) => p.slots.get(s.id) === 'directional-microphone');
+  ok('AS2 the microphone can be taken and held', slot >= 0);
+  g.selectSlot('p1', (slot + 1) % SLOTS.length);
+  g.selectSlot('p1', slot);
+  g.skipMs(60);
+  const empty = g.micReadingFor('p1');
+  ok('AS3 and holding it gives a reading rather than nothing', !!empty, JSON.stringify(empty));
+
+  /* One noisemaker, up the axis, in a direction with no wall in it. A cold store is mostly
+   * walls, and a test that points a directional microphone at one measures the wall. */
+  const heater = content.itemsById.get('portable-heater');
+  let dep1 = null, facing = null;
+  for (const yaw of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) {
+    p.yaw = yaw;
+    const d = g.deployables.place(heater, p.x - Math.sin(yaw) * 6, p.z - Math.cos(yaw) * 6, 0);
+    g.skipMs(200);
+    const r = g.micReadingFor('p1');
+    if (r && r.resolved.length) { dep1 = d; facing = r; break; }
+    g.deployables.remove(d);
+  }
+  ok('AS4 a noisemaker up the axis resolves', !!facing,
+    facing ? JSON.stringify(facing.resolved.map((r) => [r.kind, +r.db.toFixed(1)])) : 'no clear heading from the cache');
+  if (!facing) { emit(); return; }
+  ok('AS5 and it is reported as a BEARING, not a position — degrees off axis and nothing else',
+    facing.loudest && Math.abs(facing.loudest.offAxisRad) < 0.1
+    && facing.loudest.x !== undefined, `${(facing.loudest.offAxisRad * 180 / Math.PI).toFixed(1)}°`);
+
+  /* Turn away. The rejection IS the instrument, and what rejection means is QUIETER — not
+   * necessarily absent. A source six metres up your back at 58 dB can still clear the
+   * masking margin, and asserting silence would be asserting a particular distance rather
+   * than the polar pattern. What has to hold is the drop. */
+  const onAxisDb = facing.loudest.db;
+  p.yaw += Math.PI;
+  g.skipMs(200);
+  const away = g.micReadingFor('p1');
+  const awayDb = away.loudest ? away.loudest.db : -Infinity;
+  ok('AS6 turning your back drops it by the rejection the item authors, not by a little',
+    onAxisDb - awayDb >= 20, `${onAxisDb.toFixed(1)} dB on axis, ${awayDb === -Infinity ? 'gone' : `${awayDb.toFixed(1)} dB`} behind`);
+  p.yaw -= Math.PI;
+  g.skipMs(200);
+
+  /* ⚠ TWO EQUAL SOURCES IN ONE PLACE ARE UNRESOLVABLE, and that is the caller's own lesson
+   * appearing on the instrument rather than being described in a briefing. Each sits at
+   * exactly the other's masking level, so neither clears the margin. */
+  const dep2 = g.deployables.place(heater, dep1.x, dep1.z, 0);
+  g.skipMs(200);
+  const masked = g.micReadingFor('p1');
+  eq('AS7 two identical sources in one place mask each other into nothing (§26.2 auditory)',
+    masked.resolved.length, 0);
+  g.deployables.remove(dep2);
+  g.skipMs(200);
+  ok('AS8 and removing one brings the other back', g.micReadingFor('p1').resolved.length >= 1);
+  note(`one heater at 6m up the axis reads ${g.micReadingFor('p1').loudest.db.toFixed(1)} dB over a ${g.micReadingFor('p1').floorDb.toFixed(1)} dB floor`);
+
+  /* It costs a cell, and the cell is the wager. */
+  const before = g.batteryFor('directional-microphone');
+  g.skipMs(4000);
+  const spent = before - g.batteryFor('directional-microphone');
+  near('AS9 listening spends the cell it authors — four seconds costs four seconds', spent, 4000, 60);
+  g.itemBattery.set('directional-microphone', 0);
+  g.skipMs(60);
+  ok('AS10 and a flat cell is no reading rather than a stale one', g.micReadingFor('p1') === null);
+
+  /* ⚠ AND IT NEVER RESOLVES THE ANOMALY. The sound field's sources are operatives and
+   * deployables; the anomaly is a LISTENER on it and has no entry. An instrument that
+   * pointed at the thing would answer §7.4's question for free. */
+  const ids = new Set(g.sound.sources.map((s) => s.id));
+  ok('AS11 the anomaly is not a source on the field, so the microphone can never point at it',
+    !ids.has('anomaly') && ![...ids].some((i) => String(i).includes('anomaly')), [...ids].join());
+  g.deployables.remove(dep1);
+  emit();
+}
+
 /**
  * ⚠ ONE SECTION THROWING MUST NOT DELETE EVERY SECTION AFTER IT.
  *
@@ -6184,6 +6281,7 @@ async function run(name, fn) {
     await run('AP', () => sectionAP(content));
     await run('AQ', () => sectionAQ());
     await run('AR', () => sectionAR());
+    await run('AS', () => sectionAS(content));
     await run('K', () => sectionK());
     await run('L', () => sectionL());
     await run('V', () => sectionV());

@@ -39,6 +39,7 @@ export class Hud {
     this.slots = el('div', 'cd-slots', root);
     this.conditions = el('div', 'cd-conditions', root);
     this.noise = el('div', 'cd-noise', root);
+    this.mic = el('div', 'cd-mic', root);
     this.notices = el('div', 'cd-notices', root);
     this.bezel = el('div', 'cd-bezel', root);
     this.bezelLabel = el('div', 'cd-bezel-label', this.bezel);
@@ -299,6 +300,33 @@ export class Hud {
     this._set('noise', this.noise, `
       <span class="bars">${[1, 2, 3, 4].map((i) => `<i class="${i <= band ? 'lit' : ''}"></i>`).join('')}</span>
       <span>${NOISE_WORD[band]}</span>`);
+
+    /**
+     * ⚠ THE DIRECTIONAL MICROPHONE HAD NO SCREEN. `micReading` modelled the whole
+     * instrument — polar pattern, on-axis gain, off-axis and diffuse rejection, handling
+     * noise up the handle, masking arithmetic done in the microphone's own frame — and
+     * nothing outside `sound.js` ever called it. A squad could spend a general slot and
+     * twelve minutes of cell on an item that did nothing. The imager's opposite number.
+     *
+     * A BEARING, NOT A POSITION, which is what the item's own summary promises. Degrees off
+     * the axis you are pointing, with a side, and the level in decibels because that is
+     * what an instrument is FOR — the whole reason to carry it is that it tells you more
+     * than your ears. It does not name what a source is beyond its kind, and it never
+     * mentions the anomaly, which is not a sound source and cannot be: what this resolves
+     * is your own squad and your own kit, and finding that out is the caller's lesson.
+     */
+    const mic = g.micReadingFor(p.id);
+    this.mic.className = mic ? 'cd-mic on' : 'cd-mic';
+    if (mic) {
+      const rows = mic.resolved.slice(0, 3).map((r) => {
+        const deg = Math.round(Math.abs(r.offAxisRad) * 180 / Math.PI);
+        const side = deg <= 4 ? 'ahead' : (r.offAxisRad > 0 ? `${deg}° right` : `${deg}° left`);
+        const what = r.kind === 'operative' ? 'body' : 'equipment';
+        return `<div class="src"><span>${what} · ${side}</span><b>${r.db.toFixed(1)} dB</b></div>`;
+      }).join('');
+      this._set('mic', this.mic, `<div class="head">DIRECTIONAL MICROPHONE</div>${rows
+        || '<div class="none">Nothing resolves above the room.</div>'}<div class="floor">room ${mic.floorDb.toFixed(1)} dB · handling ${mic.selfNoiseDb.toFixed(0)} dB</div>`);
+    }
 
     /* ── the squad (GDD §18.2 "squad status indicators", §11.2 split information) ──
      * Solo shows nothing: a roster of one is clutter. The moment there are two, where

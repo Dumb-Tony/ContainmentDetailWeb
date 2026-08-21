@@ -31,7 +31,7 @@ import { Mission, PHASE } from './sim/mission.js';
 import { observedBy, operativeViewer, cameraViewer } from './sim/perception.js';
 import { PingBoard, requestPing } from './sim/comms.js';
 import { InstanceSet } from './sim/instances.js';
-import { SoundField, operativeSource, deployableSource } from './sim/sound.js';
+import { SoundField, operativeSource, deployableSource, operativeMic, micOptionsFromItem, micReading } from './sim/sound.js';
 import { dist } from './sim/geometry.js';
 
 /** A command is what one operative is asking for this step, whoever is asking. */
@@ -664,6 +664,24 @@ export class Game {
       const left = Math.max(0, this.batteryFor('thermal-imager') - stepMs * (near ? CONFIG.anomaly.batteryDrainMultiplier : 1));
       this.itemBattery.set('thermal-imager', left);
       if (left === 0) { this.imagerOnIds.delete(id); this.notice('The imager screen goes dark. Battery flat.'); }
+    }
+
+    /* ⚠ AND THE MICROPHONE SPENDS ITS CELL THE SAME WAY. It authors twelve minutes of
+     * `batteryMinutes` and nothing had ever taken a millisecond off it, because until now
+     * nothing read the instrument at all. Listening is the cost: an operative holding a
+     * live one is spending it whether or not anything is audible, which is the whole
+     * reason it is a wager rather than a free sense. */
+    for (const p of this.players) {
+      if (!p.alive || p.downed || p.heldItemId !== 'directional-microphone') continue;
+      const was = this.batteryFor('directional-microphone');
+      if (was <= 0) continue;
+      const near = this.anomaly.isAwake && dist(p.x, p.z, this.anomaly.x, this.anomaly.z) <= CONFIG.anomaly.batteryDrainRadiusM;
+      const left = Math.max(0, was - stepMs * (near ? CONFIG.anomaly.batteryDrainMultiplier : 1));
+      this.itemBattery.set('directional-microphone', left);
+      if (left === 0) {
+        this.bus.emit(EVENTS.BATTERY_DEAD, { itemId: 'directional-microphone' }, simTimeMs);
+        this.notice('The microphone hisses and stops. Cell flat.');
+      }
     }
 
     /* Expired calls leave the board. ⚠ REQUIRED, not housekeeping: `encode()` sends the
@@ -1321,6 +1339,30 @@ export class Game {
     return best;
   }
   get imagerBatteryMs() { return this.batteryFor('thermal-imager'); }
+
+  /**
+   * What the directional microphone resolves for one operative, or null if they are not
+   * holding a live one.
+   *
+   * ⚠ THE INSTRUMENT WAS COMPLETE AND CONNECTED TO NOTHING. `micReading` in `sim/sound.js`
+   * models the whole thing — polar pattern, on-axis gain, off-axis and diffuse rejection,
+   * handling noise up the handle, and the masking arithmetic done in the microphone's own
+   * frame rather than by filtering the naked-ear answer — and it was called by no file
+   * outside `sound.js`. A squad could spend a general slot and 12 minutes of cell on an
+   * item that did nothing at all. The imager's opposite number had no screen.
+   *
+   * Host-authoritative like everything else a rule might turn on (§20.3), and computed
+   * from the same `this.sound` the anomaly is hunting through, so what the operator reads
+   * and what the caller hears cannot drift apart.
+   */
+  micReadingFor(playerId = 'p1') {
+    const p = this.playerById(playerId);
+    if (!p || !p.alive || p.downed) return null;
+    if (p.heldItemId !== 'directional-microphone') return null;
+    const item = this.itemsById.get('directional-microphone');
+    if (item && item.batteryMinutes && this.batteryFor('directional-microphone') <= 0) return null;
+    return micReading(operativeMic(p, micOptionsFromItem(item || {})), this.sound);
+  }
 
   useHeld(playerId = 'p1') {
     const p = this.playerById(playerId);

@@ -77,6 +77,18 @@
   .cd-noise.n4{border-left-color:var(--red);color:#f0c4be}
   .cd-noise.n4 .bars i.lit{background:var(--red)}
 
+  /* The directional microphone's screen. Mirrors the imager bezel's job on the other
+     field: it says what the instrument resolved and refuses to say anything else. */
+  .cd-mic{position:absolute;left:50%;transform:translateX(-50%);bottom:150px;min-width:250px;
+    padding:6px 11px;border-radius:4px;background:rgba(10,14,19,.84);border:1px solid #38424c;
+    font-family:var(--mono);font-size:11.5px;color:var(--dim);display:none}
+  .cd-mic.on{display:block}
+  .cd-mic .head{color:var(--cyan);font-size:10px;letter-spacing:.06em;margin-bottom:3px}
+  .cd-mic .src{display:flex;justify-content:space-between;gap:12px;padding:1px 0;color:#c8d6e0}
+  .cd-mic .src b{font-weight:600;color:var(--amber)}
+  .cd-mic .none{color:var(--faint);font-style:italic}
+  .cd-mic .floor{margin-top:3px;color:var(--faint);font-size:10px}
+
   .cd-notices{position:absolute;right:18px;bottom:18px;width:390px;display:flex;flex-direction:column;gap:5px;align-items:flex-end}
   .cd-notices .notice{padding:6px 11px;background:rgba(10,14,19,.82);border-left:2px solid var(--cyan);
     border-radius:3px;font-size:12.5px;color:#c8d6e0;text-align:right;animation:fade .3s ease}
