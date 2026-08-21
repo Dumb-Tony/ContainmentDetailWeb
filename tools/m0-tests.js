@@ -4563,8 +4563,8 @@ async function sectionAJ() {
 
   /* An incident that declares no bounds varies in nothing, whatever seed it is given.
    * That is what let this be added without touching the four incidents that predate it. */
-  const plain = await loadContent({ incident: 'cold-storage-figure', seed: 'anything' });
-  const plainB = await loadContent({ incident: 'cold-storage-figure', seed: 'different' });
+  const plain = await loadContent({ incident: 'cold-storage-tally', seed: 'anything' });
+  const plainB = await loadContent({ incident: 'cold-storage-tally', seed: 'different' });
   eq('AJ1 an incident with no variation block is identical under any seed',
     JSON.stringify(plain.map.anomalySpawn) + plain.map.evidenceSources.length,
     JSON.stringify(plainB.map.anomalySpawn) + plainB.map.evidenceSources.length);
@@ -4687,6 +4687,50 @@ async function sectionAJ() {
   note(`${SEEDS.length} seeds swept for structural winnability: ${unwinnable.length} unwinnable`);
   eq(`AJ11 no seed produces an operation that cannot be finished (§14.4)${unwinnable.length ? ` — ${unwinnable.slice(0, 3).join(' · ')}` : ''}`,
     unwinnable.length, 0);
+
+  /* ── and the same sweep across every incident that varies ─────────────────
+   * ⚠ One incident swept is one incident's authoring judged. The promise is about the
+   * build, and each incident's `variation` block is a separate set of decisions about
+   * which routes may be shut and which circuits may fault — the two that most easily
+   * strand a squad. */
+  const broad = [];
+  let swept = 0;
+  for (const id of INCIDENTS) {
+    for (let i = 0; i < 12; i++) {
+      const s = `sweep-${i}`;
+      let p;
+      try {
+        p = await loadContent({ incident: id, seed: s });
+      } catch (e) {
+        broad.push(`${id}@${s}: refused — ${e.message.split('\n')[0]}`);
+        continue;
+      }
+      swept++;
+      if (!p.variation || !p.incident.variation) continue;
+      const g = new Game(p, { seed: s });
+      const site = g.site;
+      if (!standsAt(site, p.map.anomalySpawn[0], p.map.anomalySpawn[1])) {
+        broad.push(`${id}@${s}: origin (${p.map.anomalySpawn.join()}) is inside geometry`);
+      }
+      /* Every rule keeps a path — checked against THIS anomaly's rules, not the draught's. */
+      const placed = new Set(p.map.evidenceSources.map((x) => x.evidenceId));
+      const authored = new Set();
+      const base = await loadContent({ incident: id });
+      for (const x of base.map.evidenceSources) authored.add(x.evidenceId);
+      const left = new Map();
+      for (const e of p.anomaly.evidenceRules) {
+        if (!e.revealsRule) continue;
+        const alive = placed.has(e.id) || !authored.has(e.id);
+        left.set(e.revealsRule, (left.get(e.revealsRule) || 0) + (alive ? 1 : 0));
+      }
+      for (const [rule, n] of left) {
+        if (n === 0) broad.push(`${id}@${s}: rule ${rule} has no discovery path left`);
+      }
+    }
+  }
+  note(`${swept} operations swept across ${INCIDENTS.length} incidents`);
+  eq(`AJ11b and that holds for every incident, not just the one${broad.length ? ` — ${broad.slice(0, 3).join(' · ')}` : ''}`,
+    broad.length, 0);
 
   /* ── the faulted circuit is a discovery, not an announcement ──────────────── */
   const faulted = packs.find((p) => p.variation.faults.length);

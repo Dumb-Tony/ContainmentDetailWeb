@@ -359,6 +359,32 @@ export class Game {
       if (k === 'assistTiming') this.anomaly.assistTiming = val;
       else this.anomaly.varied = { ...(this.anomaly.varied || {}), [k]: val };
     }
+
+    /**
+     * §14.4's secondary hazard package: something already on the floor when you arrive.
+     *
+     * ⚠ IT REUSES THE ANOMALY'S OWN ICE, deliberately, rather than inventing a second kind
+     * of hazard. §24 names "scope expands through anomaly uniqueness" as a critical risk and
+     * prescribes a shared grammar; a variation that could introduce a hazard the anomaly
+     * cannot produce would be the same expansion arriving through a side door. So the seed
+     * can only pre-place a thing the floor could already have — six days of a failed chiller
+     * leaves ice whether or not anybody watched it happen — and the renderer, the movement
+     * code and the evidence rules all already know what to do with it.
+     */
+    const hz = v.hazard;
+    if (hz && Array.isArray(hz.at)) {
+      const n = Math.max(1, Math.min(12, hz.count || 4));
+      for (let i = 0; i < n; i++) {
+        const ang = (i / n) * Math.PI * 2;
+        const r = (hz.spreadM || 2.5) * (0.35 + 0.65 * ((i % 3) / 2));
+        this.anomaly.icePatches.push({
+          x: hz.at[0] + Math.cos(ang) * r,
+          z: hz.at[1] + Math.sin(ang) * r,
+          r: hz.radiusM || 1.2,
+          atMs: 0,
+        });
+      }
+    }
     return this;
   }
 

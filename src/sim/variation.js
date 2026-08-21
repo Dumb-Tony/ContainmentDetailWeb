@@ -163,8 +163,46 @@ export function applyVariation(pack, v) {
   const problems = [];
   const map = { ...pack.map };
 
-  /* 1. Origin. */
-  if (v.origin) map.anomalySpawn = v.origin.slice();
+  /* 1. Origin.
+   *
+   * ⚠ AND IT MUST BE SOMEWHERE A BODY FITS. An origin inside a wall is not a hard-to-reach
+   * anomaly, it is one that is pre-fenced at zero escape rays and cannot be lured, walked
+   * to or sealed — an unwinnable state arriving one seed in four with nothing to say it
+   * had. Author coordinates that look perfectly reasonable on a floor plan and are inside a
+   * pallet stack; one of the four I wrote for the figure incident was, and the seed sweep
+   * is what found it.
+   *
+   * The test is deliberately here rather than in `validateMap`, and cheaply: a rect
+   * containment check against the statics, with the operative's own radius, needs no Site
+   * and runs once at load. */
+  if (v.origin) {
+    const [ox, oz] = v.origin;
+    const R = 0.34;
+    const stuck = (map.statics || []).some((r) =>
+      ox > r[0] - R && ox < r[2] + R && oz > r[1] - R && oz < r[3] + R);
+    if (stuck) {
+      problems.push(`variation "${v.seed}" starts the incident at [${ox}, ${oz}], which is inside the geometry — it could not be reached, lured or sealed (§14.4: randomization must not generate unwinnable states)`);
+    }
+    map.anomalySpawn = v.origin.slice();
+  }
+
+  /* 4. Civilians. A witness IS an evidence source on this floor, so moving one moves where
+   * the squad has to go to hear it, and a witness who will not talk removes a path.
+   *
+   * ⚠ WHICH IS WHY IT GOES THROUGH THE SAME PER-RULE CHECK BELOW rather than having its own.
+   * "The supervisor has gone home" and "the chart recorder was never installed" are the same
+   * event as far as §14.4's redundant-discovery promise is concerned, and giving civilians a
+   * separate path would be a second place for that promise to be broken. */
+  let sources = (pack.map.evidenceSources || []).slice();
+  for (const c of v.civilians || []) {
+    const i = sources.findIndex((s) => s.evidenceId === c.id);
+    if (i < 0) continue;
+    if (c.state === 'absent') { sources.splice(i, 1); continue; }
+    const moved = { ...sources[i] };
+    if (c.at) moved.at = c.at.slice();
+    if (c.state === 'shaken') moved.prompt = `${moved.prompt} — they are not keen`;
+    sources[i] = moved;
+  }
 
   /* 5. Evidence. Drop the named sources, then check what survives.
    *
@@ -172,7 +210,7 @@ export function applyVariation(pack, v) {
    * only two that reveal the same rule is not, and the difference is invisible in a list
    * of ids. This is the sentence in §14.4 that the whole module is arranged around. */
   const dropped = new Set(v.dropped);
-  map.evidenceSources = (pack.map.evidenceSources || []).filter((s) => !dropped.has(s.evidenceId));
+  map.evidenceSources = sources.filter((s) => !dropped.has(s.evidenceId));
 
   const rulePaths = new Map();
   for (const e of pack.anomaly.evidenceRules) {

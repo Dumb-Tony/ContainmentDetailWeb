@@ -1,4 +1,4 @@
-{
+﻿{
   "id": "blackthorn-caller",
   "contentRevision": "0.1.0",
   "displayName": "The quiet hollow",
@@ -9,6 +9,24 @@
   "_note": "THE SLICE'S FIELD MAP AND ITS LAST PROCEDURE FAMILY, in one package — GDD §26.2 names one forest research reserve and three families, and this is the forest and the auditory one.\n\nThey belong together, and not only because both were outstanding. Blackthorn's spatial argument is that there are NO LANES: 41.5% of the reserve has all twenty-four escape rays open and not one square metre of it is fenced bare. A heat fence outdoors is a ring, and two floodlights close one only while both stay within 1.9m of something moving at 2m/s. So the map cannot host a fence-family incident honestly — and the caller does not want one. It is restrained by silence, which is available everywhere and costs nothing to carry.\n\nThe reserve's own quiet is the mechanic. Mains down, one generator that is not running, seven solar waymarkers, and a drainage channel — 28dB of room tone across 2,304 square metres, which is why a walking operative carries fifteen metres here and why the four powered things in the cargo manifest are audible from most of the map.",
 
   "anomalySpawn": [6.0, 18.0],
+
+  "_variationNote": "GDD §14.4. The reserve varies in WEATHER more than anything else, and on this incident weather is not colour: the caller is restrained by silence, `sound.ambientDb` is what audibility is measured against, and steady rain puts six decibels on the room tone. That moves how far every lure carries and how close a squad can walk — a wet night is a genuinely different operation from a still one, on the same trees.\n\n⚠ A CIVILIAN WHO CAN BE ABSENT IS A DROPPABLE EVIDENCE PATH, and it does not count against dropMax. The contractor could be \"absent\" in an earlier draft, and a seed that removed him AND dropped the trail scuff stripped both discovery paths for crouch-is-quiet, — the rule the whole endgame turns on. The loader refused it, which is the system working, but a refused seed is an operation nobody can play. He is present or shaken now.  AND THE COMPOUND CIRCUIT IS NOT ON THE FAULT LIST. The gate is one of the reserve's two crossings and shutting it costs a longer walk; faulting the circuit that opens it would strand the north half of the map from extraction, which the map author measured and which is the unwinnable state §14.4 forbids.",
+  "variation": {
+    "origins": [[6.0, 18.0], [-11.6, 11.2], [20.0, 12.0], [-16.0, 15.4]],
+    "routes": ["door-culvert-gate", "door-station"],
+    "routesShutMax": 1,
+    "faults": ["circuit-ridge"],
+    "faultsMax": 1,
+    "droppable": ["trail-scuff", "flat-cells", "quiet-hollow"],
+    "dropMax": 1,
+    "civilians": [
+      { "id": "survivor-account", "positions": [[7.0, -16.0], [-9.6, -20.2]], "states": ["present", "shaken"] },
+      { "id": "contractor-account", "positions": [[-9.6, -20.2], [7.0, -16.0]], "states": ["present", "shaken"] }
+    ],
+    "falseLeads": ["generator-log"],
+    "weather": ["still", "cold", "wet", "wind"],
+    "times": ["night", "dawn", "day"]
+  },
   "_spawnNote": "The lookout clearing, at the top of the reserve and 38m from the vehicle. Traced to a seal by the map's own harness, and standable — several natural-looking coordinates on this map are inside solid blocks (the lookout plinth and the mast lockup both swallow a spawn and pre-fence it at 0/24). Far enough from the car park that the squad's arrival does not rouse it before anyone has learned anything.",
 
   "briefing": {

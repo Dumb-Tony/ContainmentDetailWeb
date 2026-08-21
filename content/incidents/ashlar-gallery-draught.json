@@ -1,4 +1,4 @@
-{
+﻿{
   "id": "ashlar-gallery-draught",
   "contentRevision": "0.1.0",
   "displayName": "The heating gallery",
@@ -9,6 +9,23 @@
   "_note": "THE THIRD PACKAGE, AND THE ONE THAT PROVES THE MODEL WORKS IN THE OTHER DIRECTION (GDD 15.1, 26.2). The first two are one anomaly each on one shared floor: same building, different thing. This is the same THING on a different building — the graybox-draught again, with every rule in its file untouched, on geometry that makes those rules mean something else.\n\nThe cold store's aisles are 4.2m and a floodlight's 40C contour is 3.375m across, so a lane needs two posts and heat is the scarce resource. Ashlar's heating gallery is 2.400m wide, so one post closes the tube across and only its two ends are left: heat is cheap here and the JOURNEY is what costs. A squad that learned 'bring four tripods' brings four tripods nine floors up a condemned block for no reason, and a squad that learned 'the fence is made of heat' has not noticed that the last lane here has to be closed with something cold, because a tripod set 3.6m from the transit case lifts the case past 40C and the bait stops working. That is what the doors are for.\n\nThis map is also the first one where the anomalySpawn and evidenceSources live ONLY here. ashlar-house-9.json is pure geometry — it does not know what happened in it.",
 
   "anomalySpawn": [-8.6, 10.6],
+
+  "_variationNote": "GDD §14.4. Ashlar varies in the WALK, because the walk is what this floor charges for. A jammed lobby door closes the only cross-link in the middle of the plan and turns a lap into a full circuit; a faulted landing circuit means the lobby never opens at all and the squad pays the long way round for the whole operation — which is a harder night and never an impossible one, because the loop is the loop.\n\n⚠ THE GALLERY CIRCUIT IS NOT ON THE FAULT LIST AND THE GALLERY DOORS ARE NOT ON THE ROUTE LIST. Both are the containment: the fire-stopping door is worth exactly one tripod and the lane door is the lane. A seed that faulted the gallery would make the authored pen unbuildable, which is precisely the unwinnable state §14.4 forbids — and it would arrive one night in four with nothing to say it had.",
+  "variation": {
+    "origins": [[-8.6, 10.6], [-5.3, 9.4], [10.9, 4.1], [-10.2, -6.3]],
+    "routes": ["door-lobby-north", "door-lobby-south"],
+    "routesShutMax": 1,
+    "faults": ["circuit-landing"],
+    "faultsMax": 1,
+    "droppable": ["stairwell-draught", "frost-boundary", "thermal-void"],
+    "dropMax": 1,
+    "civilians": [
+      { "id": "survivor-account", "positions": [[9.6, 6.6], [10.2, 5.3], [10.9, 4.1]], "states": ["present", "shaken"] }
+    ],
+    "falseLeads": ["maintenance-log"],
+    "weather": ["still", "cold", "wind"],
+    "times": ["night", "dawn", "day"]
+  },
 
   "briefing": {
     "headline": "Cold complaint, condemned block, ninth floor",

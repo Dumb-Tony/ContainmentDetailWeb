@@ -1,4 +1,4 @@
-{
+﻿{
   "id": "cold-storage-figure",
   "contentRevision": "0.2.0",
   "displayName": "The figure in aisle B",
@@ -9,6 +9,21 @@
   "_note": "The SAME FLOOR as cold-storage-draught, and a completely different operation. The squad walks in with the map already learned and every instinct wrong: the imager reads nothing, the breakers do not matter, and the aisles they used as fencing lanes last time are now sightlines they have to hold. GDD 15.2 calls this epistemic and operational variation; this is what it looks like when the map is a constant and the incident is the variable.\n\nIt starts in Aisle B, at the far end, because the supervisor's statement says so and because the aisle is a long straight run — a single camera at the south end holds the whole lane, and that is the discovery the procedure turns on.",
 
   "anomalySpawn": [-0.5, 9.0],
+
+  "_variationNote": "GDD §14.4. The figure is the one incident where the ORIGIN carries most of the variation: the whole operation is a sightline problem, and which end of which aisle it is standing in decides whether one camera holds it or three do. The four origins are the four aisle ends.\n\n⚠ NO ROUTES ARE ON THE LIST. Aisle B is the operation; jamming a door that changes which way a squad walks into it is variation, and jamming one that walls the aisle off is an unwinnable state. Neither door on this floor can be shut without risking the second, so this incident varies in everything except geometry.\n\n`camera-still` and `thermal-null` are NOT droppable. Both are instrument-gated and both are a rules path that cannot be replaced by walking somewhere — dropping one would leave a squad who spent cargo on the instrument with nothing to point it at.",
+  "variation": {
+    "origins": [[-0.5, 9.0], [-0.5, -1.0], [4.4, 9.0], [-5.4, 9.0]],
+    "faults": ["circuit-storage"],
+    "faultsMax": 1,
+    "droppable": ["scuff-runs", "driver-statement", "fault-counters", "switchboard-log"],
+    "dropMax": 2,
+    "civilians": [
+      { "id": "supervisor-statement", "positions": [[7.6, -8.2], [10.8, -11.2], [-6.4, -11.4]], "states": ["present", "shaken"] }
+    ],
+    "falseLeads": ["night-shift-roster"],
+    "weather": ["still", "cold", "wet"],
+    "times": ["night", "dawn"]
+  },
 
   "briefing": {
     "headline": "Repeat sighting, cold storage aisle B",
