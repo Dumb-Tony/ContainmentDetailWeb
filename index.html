@@ -378,6 +378,76 @@
     max-width:760px;max-height:50vh;overflow:auto;padding:12px;border:1px solid #3a1e1a;border-radius:6px;background:#150b09}
   #err-banner{position:fixed;left:0;right:0;top:0;z-index:60;display:none;padding:9px 14px;background:#5a1a14;
     color:#ffdcd6;font-family:var(--mono);font-size:12px;white-space:pre-wrap;max-height:40vh;overflow:auto}
+
+  /* ══ LOBBY BLOCK — BEGIN ══════════════════════════════════════════════════
+     GDD §11.4 session lobby (src/ui/lobby.js). Everything between these two markers
+     belongs to the lobby screen and nothing else on the page uses it; it is kept
+     contiguous so it can be moved or removed in one piece.
+
+     It rides on the .cd-panel stylesheet above — .sheet, .cols, h2, .small, .warn,
+     .joiner, .code, .wide, input.inline, ul.roster and .waiting are all reused as-is.
+     What is added here is the four things a lobby needs and a panel did not: a radio row,
+     a list of ROOMS (as opposed to people), a per-row liveness verdict, and the host's
+     action record.
+
+     ⚠ .caveat is load-bearing, not decoration. §18.1 requires the UI to distinguish
+     observed fact from interpretation, and every claim on this screen that comes from
+     somebody else's browser has to LOOK different from one this machine measured. That is
+     what the muted left-ruled block is for, and it is why .probe.live and .probe.dead are
+     the only bright colours in the block — a probe is the one fact on the page. */
+  .cd-lobby .lrow{display:flex;gap:9px;align-items:flex-start;padding:6px 0;font-size:12.5px;
+    line-height:1.5;cursor:pointer;color:var(--dim)}
+  .cd-lobby .lrow input{margin-top:3px;accent-color:var(--cyan)}
+  .cd-lobby .lrow b{color:var(--ink);font-weight:600}
+  .cd-lobby select{font:inherit;font-size:13px;padding:6px 9px;width:100%;background:#141b23;
+    color:var(--ink);border:1px solid var(--line);border-radius:5px;margin-bottom:6px}
+  /* The join field takes a word as often as a code, so it does not get the code's
+     30px monospace tracking — that made "night-shift" unreadable. */
+  .cd-lobby .joiner input{font-family:var(--sans);font-size:14px;letter-spacing:.02em}
+  .cd-lobby .code{font-size:24px;letter-spacing:.24em}
+
+  /* Until a room is actually open the player has not said whether they are hosting or
+     joining, so both halves are on screen and this is the seam between them. */
+  .cd-lobby h2.orjoin{display:flex;align-items:center;gap:10px;margin-top:22px}
+  .cd-lobby h2.orjoin::before,.cd-lobby h2.orjoin::after{content:"";flex:1;height:1px;background:var(--line)}
+
+  .cd-lobby ul.rooms{list-style:none;padding:0;margin:6px 0 0}
+  .cd-lobby ul.rooms li{display:grid;grid-template-columns:1fr auto auto;gap:2px 10px;align-items:center;
+    padding:7px 10px;margin-bottom:5px;background:var(--panel2);border:1px solid var(--line);
+    border-radius:5px;font-size:12.5px}
+  .cd-lobby ul.rooms li b{grid-column:1;font-family:var(--mono);font-size:13px;color:var(--ink)}
+  .cd-lobby ul.rooms li .lbl{grid-column:1;color:var(--dim);font-size:11.5px}
+  .cd-lobby ul.rooms li .age{grid-column:1;color:var(--faint);font-family:var(--mono);font-size:10.5px}
+  .cd-lobby ul.rooms li button{padding:4px 10px;font-size:12px}
+  /* A row the directory admits may be out of date is dimmed AND says so in words —
+     §18.1's redundant encoding, because a grey row alone reads as "disabled". */
+  .cd-lobby ul.rooms li.stale{opacity:.6;border-style:dashed}
+  .cd-lobby .probe{grid-column:1;font-family:var(--mono);font-size:10.5px;color:var(--faint)}
+  .cd-lobby .probe.live{color:var(--green)}
+  .cd-lobby .probe.dead{color:var(--red)}
+
+  .cd-lobby ul.roster.seats li{display:grid;grid-template-columns:1fr auto auto auto;gap:2px 10px;
+    align-items:center}
+  .cd-lobby ul.roster.seats li b{grid-column:1;font-size:13.5px;color:var(--ink)}
+  .cd-lobby ul.roster.seats li .seat{grid-column:1;font-size:10.5px}
+  .cd-lobby ul.roster.seats li.ready{border-left-color:var(--green)}
+  .cd-lobby ul.roster.seats li.ready .state{color:var(--green)}
+  .cd-lobby ul.roster.seats li.you{background:rgba(30,24,10,.55);border-left-color:var(--amber)}
+  .cd-lobby ul.roster.seats li button{padding:4px 10px;font-size:12px}
+
+  .cd-lobby .caveat{border-left:2px solid var(--line);padding-left:10px;color:var(--faint);
+    font-size:11.5px;line-height:1.55;margin-top:10px}
+  .cd-lobby .caveat b{color:var(--dim)}
+
+  .cd-lobby .logblock{border-top:1px solid var(--line);background:rgba(10,14,19,.4)}
+  .cd-lobby .logblock h2{display:flex;align-items:center;gap:10px}
+  .cd-lobby ul.log{list-style:none;padding:0;margin:0;max-height:200px;overflow:auto}
+  .cd-lobby ul.log li{display:flex;gap:10px;align-items:baseline;padding:3px 0;
+    border-bottom:1px solid #1b232c;font-size:12px}
+  .cd-lobby ul.log li .n{font-family:var(--mono);font-size:10.5px;color:var(--faint);min-width:34px}
+  .cd-lobby ul.log li b{color:var(--amber);font-weight:600;min-width:110px}
+  .cd-lobby ul.log li span{color:var(--dim)}
+  /* ══ LOBBY BLOCK — END ════════════════════════════════════════════════════ */
 </style>
 </head>
 <body>

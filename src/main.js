@@ -20,6 +20,7 @@ import { Audio, mixFor } from './audio/audio.js';
 import { Input } from './core/input.js';
 import { Settings, SettingsPanel } from './ui/settings.js';
 import { BaseScreen } from './ui/base.js';
+import { LobbyScreen } from './ui/lobby.js';
 import { CommsWheel, screenProjector } from './ui/commswheel.js';
 import { Progression, loadSite } from './sim/progression.js';
 import { escapeHtml } from './ui/hud.js';
@@ -125,7 +126,17 @@ async function boot() {
   const settings = Settings.restore();
   const input = new Input(window, settings.bindings(), settings.holdModes()).attach();
   input.onBindingsChanged = (table) => { settings.setBindings(table); settings.save(); };
-  const net = new NetSession(game, { snapshotHz: CONFIG_NET_HZ });
+  /**
+   * ⚠ THE LOBBY'S CLOCK IS INJECTED FROM HERE, AND IT IS WALL TIME.
+   *
+   * `src/net/**` is forbidden wall-clock access by the suite's own hygiene rule (section
+   * K5) and it defaults to simulation time, which is exactly wrong for a lobby: the
+   * mission clock is PAUSED behind an open panel, so a directory row would never age and a
+   * per-seat flood budget would refill at zero tokens a second — a seat that spent its
+   * budget in the room would be muted for the rest of the session. A lobby happens in the
+   * world, not in the mission, and it has to be timed against the world.
+   */
+  const net = new NetSession(game, { snapshotHz: CONFIG_NET_HZ, now: () => Date.now() });
   let pointerLocked = false;
 
   /* Pointer lock can only be requested from a user gesture, and the request REJECTS rather
@@ -227,8 +238,24 @@ async function boot() {
         location.href = u.toString();
         return;
       }
-      panels.showSquad(net);
+      /* The lobby, not the old squad panel: forming the squad is now a phase with its own
+       * state (who is in it, which seat, which operation, whether everybody is ready) and
+       * its own moderation controls, rather than a code to read aloud. GDD §11.4. */
+      lobby.show(op);
     },
+    onClose: () => {},
+  });
+
+  /**
+   * The room before the operation (GDD §11.4, §11.7). It owns discovery, the roster, the
+   * ready state and the host's moderation controls; it does not own the simulation and
+   * never touches `game` — everything it does goes through `net`, which is the one place
+   * that decides anything.
+   */
+  const lobby = new LobbyScreen(document.body, {
+    net, site, progression,
+    now: () => Date.now(),
+    onDeploy: () => { panels.showLoadout(); },
     onClose: () => {},
   });
 
@@ -410,12 +437,16 @@ async function boot() {
 
   /* The debug handle. The suite and any console probe drive the game through THIS, so
    * everything they exercise is the shipped object graph and not a parallel one. */
-  net.onStatus = () => { if (panels.open === 'squad') panels._renderSquad(); };
-  net.onRoster = () => { if (panels.open === 'squad') panels._renderSquad(); };
+  /* Three callbacks, one screen. The lobby re-renders on ANY of them because all three
+   * change something it prints: the status line, the roster, and the room itself. A
+   * screen that only redrew on one of them showed a seat that had gone. */
+  net.onStatus = () => { lobby.refresh(); if (panels.open === 'squad') panels._renderSquad(); };
+  net.onRoster = () => { lobby.refresh(); if (panels.open === 'squad') panels._renderSquad(); };
+  net.onLobby = () => { lobby.refresh(); };
   game.localId = net.localPlayerId;
 
   window.__CD = { game, renderer, hud, panels, audio, input, content, mixFor, net, ROLE, ACT,
-    commsWheel,
+    commsWheel, lobby,
     settings, settingsPanel, base, progression, site,
     get paused() { return game.clock.paused; } };
   window.dispatchEvent(new CustomEvent('cd-ready', { detail: window.__CD }));

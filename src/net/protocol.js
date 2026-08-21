@@ -32,6 +32,33 @@ export const MSG = Object.freeze({
   SNAP: 'snap',
   EVENT: 'event',       // host → client, a notice line
   BYE: 'bye',
+
+  /* ── the lobby, GDD §11.4 ───────────────────────────────────────────────
+   * The room BEFORE the operation, which is a different thing from the mission and gets
+   * its own messages rather than riding on SNAP. Two reasons, and the second is the one
+   * that matters: a lobby changes at human pace and a snapshot goes up twelve times a
+   * second, so folding the roster into SNAP would multiply the cheapest state in the game
+   * by the most expensive rate in it; and a lobby message carries CALLSIGNS, which SNAP
+   * also does — but SNAP is replaced wholesale on arrival and a lobby broadcast must be
+   * able to arrive without destroying anything the client owns. See `applyLobby`. */
+  LOBBY: 'lobby',       // host → clients, the whole room state
+  LACT: 'lact',         // client → host, a lobby-scoped request (ready, callsign)
+  KICK: 'kick',         // host → one client, "you were removed", with a reason ID
+
+  /* ── the volunteer directory ────────────────────────────────────────────
+   * Host → directory holder, and joiner ↔ directory holder. No game state ever crosses
+   * these: an advertisement is what `Lobby.describe()` returns and nothing else. */
+  ADVERT: 'adv',        // host → directory, "this room exists"
+  UNADVERT: 'unadv',    // host → directory, "it does not any more"
+  LIST: 'ls',           // joiner → directory, "what have you got"
+  ROOMS: 'rooms',       // directory → joiner, the rows
+});
+
+/** What a client may ask the LOBBY for. Distinct from ACT, which reaches the simulation:
+ *  nothing on this list touches the world, so nothing on it goes near `Game`. */
+export const LACT = Object.freeze({
+  READY: 'r',           // { v: 0|1 }
+  CALLSIGN: 'n',        // { n: string }
 });
 
 export const PROTOCOL_VERSION = 1;
@@ -254,5 +281,87 @@ export function applySnapshot(game, snap, { localId = null } = {}) {
   game.comms.decode(snap.pg || []);
   game.instances.decode(snap.ix || []);
   game.result = snap.rs || null;
+  return true;
+}
+
+/* ── the lobby, on the wire ───────────────────────────────────────────────
+ * Written here rather than in `lobby.js` for the reason the header gives: this file is the
+ * wire format and knows nothing about anything. It reads a Lobby by duck-typing — a
+ * `seats` Map and six scalars — so `lobby.js` need not import this file's encoder and
+ * there is no cycle between the model and the format.
+ */
+
+/**
+ * What every client is told about the room.
+ *
+ * ⚠ WHAT IS DELIBERATELY ABSENT: the action log, and the block list. Both are the host's
+ * moderation record, both carry callsigns, and neither is any of the other players'
+ * business — a client that received the host's log would be receiving a file about the
+ * people sitting next to it. `tools/net-tests.js` fails the build if either ever appears
+ * here. See the long note on `Lobby.log`.
+ */
+export function encodeLobby(lobby) {
+  return {
+    t: MSG.LOBBY,
+    v: PROTOCOL_VERSION,
+    ph: lobby.phase,
+    vs: lobby.visibility,
+    rm: lobby.roomName || '',
+    cd: lobby.code || '',
+    mx: lobby.maxSeats,
+    op: lobby.operation
+      ? { i: lobby.operation.id || '', l: lobby.operation.label || '', n: lobby.operation.incident || '' }
+      : null,
+    st: [...lobby.seats.values()].map((s) => ({
+      i: s.seatId,
+      n: s.callsign,
+      f: (s.ready ? 1 : 0) | (s.connected ? 2 : 0) | (s.host ? 4 : 0),
+    })),
+  };
+}
+
+/**
+ * Write a lobby broadcast into a client's Lobby, in place.
+ *
+ * ⚠⚠ THE SEAT MAP IS REPLACED WHOLESALE, AND THAT IS THE DANGEROUS PART.
+ *
+ * It is correct for a roster: the host owns who is in the room, and a client that kept its
+ * own idea of the seats would eventually disagree about who it is playing with. It is
+ * catastrophic for anything the CLIENT owns, and this project has already paid for that
+ * lesson once — `applySnapshot` replaced the client's notice list with the host's and
+ * destroyed every REFUSAL about eighty milliseconds after it arrived, which no loopback
+ * test could find because reading a notice immediately always finds it.
+ *
+ * The lobby's version of that bug is the REMOVAL NOTICE. A removed operative is told why
+ * and then hung up on; if the reason lived on the seat map, the next broadcast would erase
+ * it — except that there is no next broadcast, because the link just closed, so the reason
+ * would instead be erased by the broadcast that was already in flight when the host
+ * removed them. Which of those two happens depends on the wire. So the reason does NOT
+ * live here: `NetSession.removedWhy` holds it, nothing in this function can reach it, and
+ * `onClose` is written not to overwrite it.
+ *
+ * The same argument applies to the client's own READY flag, which is why a client never
+ * sets it locally: it asks, and the host's echo is the answer. An optimistic local toggle
+ * would be right for exactly as long as it took the next broadcast to arrive.
+ */
+export function applyLobby(lobby, m) {
+  if (!m || m.t !== MSG.LOBBY || m.v !== PROTOCOL_VERSION) return false;
+  lobby.phase = m.ph;
+  lobby.visibility = m.vs;
+  lobby.roomName = m.rm || '';
+  lobby.code = m.cd || null;
+  if (m.mx) lobby.maxSeats = m.mx;
+  lobby.operation = m.op ? { id: m.op.i, label: m.op.l, incident: m.op.n } : null;
+  lobby.seats.clear();
+  for (const s of m.st || []) {
+    lobby.seats.set(s.i, {
+      seatId: s.i,
+      callsign: s.n,
+      ready: !!(s.f & 1),
+      connected: !!(s.f & 2),
+      host: !!(s.f & 4),
+      sinceMs: 0,
+    });
+  }
   return true;
 }
