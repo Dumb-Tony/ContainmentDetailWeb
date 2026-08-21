@@ -281,11 +281,57 @@
       ],
       "_note": "THE SLICE'S FOREST MAP AND ITS AUDITORY FAMILY, which belong together. Blackthorn has no lanes — 41.5% of it has all twenty-four escape rays open and none of it is fenced bare — so it cannot host a fence incident honestly, and the caller does not want one. It is restrained by SILENCE, which is available everywhere and weighs nothing. A squad that arrives with the draught playbook deploys four humming objects and builds itself a beacon.",
       "incident": "blackthorn-caller"
+    },
+    {
+      "id": "op-cold-storage-passenger",
+      "name": "Coldharbour cold storage, level 2",
+      "mapId": "cold-storage-l2",
+      "anomalyId": "coldharbour-passenger",
+      "clearanceRequired": 1,
+      "difficulty": "Field",
+      "status": "authorised",
+      "distance": "Forty minutes. The same goods lift, the same stair, the same floor you have been on three times.",
+      "mandate": "Establish custody of whatever is at the north end of the west run and transfer it to the stair head.",
+      "optional": [
+        "Recover all issued equipment",
+        "Avoid a second contact",
+        "Bring the contractor up"
+      ],
+      "conditions": [
+        "One fatality on the floor since Tuesday. He was warm when they found him on the Wednesday.",
+        "One powered object on this level in eleven weeks, and it failed at 06:14 on Tuesday morning.",
+        "The fixed camera at the head of the west run has been turned to the wall and taped over from the aisle side. Nobody has claimed it."
+      ],
+      "_note": "THE FOURTH OPERATION ON THIS FLOOR, and the one that punishes knowing it. A squad arrives with three operations' worth of correct knowledge about cold storage level 2 and every piece of it is aimed at the wrong thing: nothing here is fenced by anything ever, a camera anywhere near the case makes the operation stutter, and restoring the mains only makes the floor bright enough to look at things by — which is the failure mode. The one habit that survives is the one nobody thinks of as a habit: get the case powered before anything else happens.",
+      "incident": "cold-storage-passenger"
+    },
+    {
+      "id": "op-ashlar-flat-lodger",
+      "name": "Ashlar House, Flat 5",
+      "mapId": "ashlar-house-9",
+      "anomalyId": "pinfold-lodger",
+      "clearanceRequired": 1,
+      "difficulty": "Field",
+      "status": "authorised",
+      "distance": "The same two hours and the same nine floors. You already know which stair.",
+      "mandate": "Establish custody of whatever is in Flat 5 and transfer it to the east landing.",
+      "optional": [
+        "Recover all issued equipment",
+        "Avoid a second contact",
+        "Recover the fitter's helmet camera intact"
+      ],
+      "conditions": [
+        "Five flats stripped out, the sixth abandoned after three half days.",
+        "One man off with a cold burn and a fractured wrist; the other walked out and will not go back.",
+        "The watchman has walked the ninth in the dark for four months and reports no trouble."
+      ],
+      "_note": "THE SECOND OPERATION ON THE NINTH FLOOR, and the one that inverts what the first taught. The gallery draught is a journey and a fence; this never leaves one flat and there is nothing to build. Ashlar's thirty-eight plasterboard walls were useless against the draught and are the answer here: they stop a sightline and nothing else, so a wall on this floor is privacy rather than protection. A squad that has done aisle B will deploy a camera on it out of habit and hold it rigid for that camera's whole battery.",
+      "incident": "ashlar-flat-lodger"
     }
   ],
 
 
-  "_boardNote": "Three operations, and every one of them is playable to custody — the board does not pad itself with contracts that do not exist. §18.1 does not allow the UI to lie about what is available, so a greyed-out fourth entry would be a promise this build cannot keep. Two of the three share a floor and two of the three share an anomaly, which is the whole of §15.2 in three rows: the building is a variable and the incident is a variable, and they vary independently.",
+  "_boardNote": "Seven operations, and every one of them is playable to custody — the board does not pad itself with contracts that do not exist. §18.1 does not allow the UI to lie about what is available, so a greyed-out entry would be a promise this build cannot keep. Three buildings carry seven incidents: cold storage level 2 alone has four, and the ninth floor of Ashlar has two. That is the whole of §15.2 in one column — the building is a variable and the incident is a variable, and they vary independently — and by the fourth trip down the same stair the point is no longer that the map is reused. It is that a squad arrives carrying three operations' worth of correct knowledge about that floor and has to work out which of it still applies.",
 
   "containmentWing": {
     "framing": "Entries record where it came from, what holding it costs, and what it has done since. They do not rank captures, do not count them as a score, and do not describe anything held here as a prize. An object in a cell is an ongoing operational commitment, not a result.",

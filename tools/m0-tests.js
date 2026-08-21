@@ -3681,8 +3681,26 @@ async function sectionAC() {
   const draught = senseOf('graybox-draught'), figure = senseOf('stillwater-figure'), tally = senseOf('ninety-one-tally');
   ok('AC3 the fence family is the only one that reads a gradient', draught.has('path-blocked-by-gradient')
     && !figure.has('path-blocked-by-gradient') && !tally.has('path-blocked-by-gradient'));
-  ok('AC4 the perception family is the only one that reads observation',
-    figure.has('observed') && !draught.has('observed') && !tally.has('observed'));
+  /* ⚠ THIS USED TO READ "the perception family is the only one that reads observation", and
+   * it tested three anomalies by name, so it went on passing after two more started reading
+   * it. THREE of the six now do. What separates them is not the sense — it is the SIGN.
+   * Watching the figure holds it still; watching the passenger or the lodger is what starts
+   * the trouble. Same quantity, opposite polarity, which is senses.js's argument made
+   * visible: a key names a quantity and the content decides what it means. */
+  const observers = anomalies.filter((a) => a.triggers.some((t) => t.when.sense === 'observed'));
+  const polarity = (a) => {
+    const d = a.triggers.filter((t) => t.when.sense === 'observed')
+      .reduce((s, t) => s + (t.pressureDelta || 0), 0);
+    return d < 0 ? 'restrained' : d > 0 ? 'provoked' : 'neutral';
+  };
+  note(`anomalies that read observation: ${observers.map((a) => `${a.id} (${polarity(a)})`).join(', ')}`);
+  ok('AC4 observation is read by more than one family, so it is a quantity and not a signature',
+    observers.length >= 3, observers.map((a) => a.id).join());
+  ok('AC4b and it does not mean the same thing in any two of them — at least one is restrained by being watched and at least one is provoked by it',
+    observers.some((a) => polarity(a) === 'restrained') && observers.some((a) => polarity(a) === 'provoked'),
+    observers.map((a) => `${a.id}:${polarity(a)}`).join());
+  ok('AC4c and the fence and recovery families still do not read it at all',
+    !draught.has('observed') && !tally.has('observed'));
   ok('AC5 the recovery family is the only one that reads a count',
     tally.has('instances-accounted') && !draught.has('instances-accounted') && !figure.has('instances-accounted'));
 
@@ -5120,6 +5138,29 @@ async function sectionAM(content) {
   }
   eq(`AM9 every polled trigger tolerates more delay than the worst wire${polledTight.length ? ` — ${polledTight.join(', ')}` : ''}`,
     polledTight.length, 0);
+
+  /* ⚠ AND A CAPABILITY MAY NOT DECLARE ONE AT ALL.
+   *
+   * Six of the six shipped anomalies put a `latencyToleranceMs` on their contact, at 250,
+   * 300, 300, 400, 400 and 900 — every one of them under the worst wire, and not one of
+   * them read by anything. Nothing in src/ consults the field on a capability and neither
+   * did this suite, so six numbers that looked like fairness budgets were comments, and an
+   * author reading a 250 next to a 2500 would reasonably conclude the engine treats them
+   * differently. It does not treat them at all.
+   *
+   * A capability does not need one. A trigger is a race between two observations of a
+   * moving world and the wire can genuinely decide it; a contact is decided by the host
+   * from host-authoritative positions and a client only learns about it late. The field is
+   * meaningful in exactly one place, so it is now allowed in exactly one place. */
+  const strayTolerance = [];
+  for (const id of INCIDENTS) {
+    const pack = await loadContent({ incident: id });
+    for (const c of pack.anomaly.capabilities || []) {
+      if (c.latencyToleranceMs !== undefined) strayTolerance.push(`${pack.anomaly.id}/${c.id}`);
+    }
+  }
+  eq(`AM9b no capability declares a latency tolerance nothing reads${strayTolerance.length ? ` — ${strayTolerance.join(', ')}` : ''}`,
+    strayTolerance.length, 0);
 
   /* ── 5. a drop mid-operation, on a bad wire ───────────────────────────────
    * Section M does this on a clean link. The thing that changes on a bad one is that the

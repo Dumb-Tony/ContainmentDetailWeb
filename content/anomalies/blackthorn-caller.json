@@ -127,7 +127,6 @@
       "effect": "It arrives at what it was running toward. An operative who is the loudest thing on the reserve when it resolves is what it arrives at.",
       "rangeMetres": 1.1,
       "cooldownMs": 6000,
-      "latencyToleranceMs": 400,
       "compounding": true,
       "applies": [
         { "condition": "exposure", "severity": "serious" },
@@ -141,8 +140,7 @@
       "availableInStates": ["casting", "running"],
       "effect": "Cells near it go flat fast while it is attending to something. A lure that runs out is a lure that stops, which is the failure this capability is really about.",
       "rangeMetres": 5,
-      "cooldownMs": 0,
-      "latencyToleranceMs": 2000
+      "cooldownMs": 0
     }
   ],
 

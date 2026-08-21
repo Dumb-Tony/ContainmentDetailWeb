@@ -102,7 +102,6 @@
       "effect": "Handling one bare is unpleasant and cumulatively harmful, but it is not an attack and it is not what the incident is about. An operative who carries the whole set one at a time will feel it; one who shares the walk will not.",
       "rangeMetres": 0.35,
       "cooldownMs": 45000,
-      "latencyToleranceMs": 400,
       "compounding": true,
       "applies": [
         { "condition": "exposure", "severity": "minor" }

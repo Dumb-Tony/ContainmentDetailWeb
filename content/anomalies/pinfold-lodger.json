@@ -91,7 +91,7 @@
       "condition": "at least one operative or powered remote camera has it in view, unobstructed",
       "telegraph": "The room noise drops out of the space it is in, and the floor under it goes bright, before anything is cold.",
       "pressureDelta": 2,
-      "latencyToleranceMs": 300,
+      "latencyToleranceMs": 900,
       "_note": "NO SUSTAIN, AND FROM ANY STATE, deliberately mirroring the caller's `disturbed`. Setting is instantaneous and slackening takes five seconds, and that asymmetry is the whole endgame: an operative who glances round to check where the case is has spent five seconds they have to buy again. §8.2 is paid on the other side of the pair — see `let-be`."
     },
     {
@@ -113,7 +113,7 @@
       "condition": "no operative and no powered camera has held it in view for a continuous five seconds",
       "telegraph": "The room noise comes back into the space it is in, about a second before the edges of it go soft.",
       "pressureDelta": -1,
-      "latencyToleranceMs": 400,
+      "latencyToleranceMs": 900,
       "_note": "THE SUSTAIN IS THE PROCEDURE. Five seconds is long enough that it cannot be done by flinching and short enough that it can be done inside one contact cooldown — 7000ms — so an operative who takes station correctly eats exactly one contact and not two. A squad that does not know the figure is five will consistently turn back round at three and buy nothing. The asymmetry with `noticed`, which has no sustain at all, is where §8.2 is paid: a client whose camera feed is 80ms stale cannot lose the operation to a dropped packet, because losing it requires five continuous seconds and gaining it requires none."
     },
     {
@@ -136,7 +136,6 @@
       "effect": "It gets hold of whatever is inside its reach and does not let go quickly. A wrenched joint and a cold burn; survivable once, and the second one puts an operative on the floor.",
       "rangeMetres": 2.2,
       "cooldownMs": 7000,
-      "latencyToleranceMs": 300,
       "compounding": true,
       "applies": [
         { "condition": "mobility-injury", "severity": "serious" },

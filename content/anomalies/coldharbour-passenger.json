@@ -89,7 +89,7 @@
       "condition": "any operative or powered remote camera holds it in view, unobstructed, for two continuous seconds",
       "telegraph": "What it is on starts shedding heat from the top down about a second before anything else happens — thirty degrees in two seconds on the imager, and without one, frost closing back over a casing that was dry a moment ago.",
       "pressureDelta": 1,
-      "latencyToleranceMs": 300,
+      "latencyToleranceMs": 900,
       "_note": "TWO SECONDS, NOT AN INSTANT, and the asymmetry is the one senses.js argues for: the transition that COSTS the squad carries the sustain, so a flicker of coverage never decides it. A glance is free; a look is not. It also means the rule can be learned safely — put eyes on the body, watch the casing frost over, look away again, and nothing has started.\n\n⚠ AND THIS IS THE ONLY WAY IN. There is no other trigger out of `settled`. A squad that never looks at anything is a squad standing in a cold room with a fully charged case and no operation, which is the correct outcome and not a stall: §8.4 wants containment to be a state the squad CREATES."
     },
     {
@@ -111,7 +111,7 @@
       "condition": "anything holds it in view for two continuous seconds while it is resting on something",
       "telegraph": "The case stops cycling under load and frost starts back across the lid from the hinge end.",
       "pressureDelta": 2,
-      "latencyToleranceMs": 300,
+      "latencyToleranceMs": 900,
       "_note": "THE WAY BACK IS `takes`, AND IT COSTS ONE AND A HALF SECONDS RATHER THAN THE OPERATION. Look at the case and it lets go; look away and, because the case is still inside its reach, it takes the case again. That is deliberately cheap. §27.2 criterion 3 asks that a squad recover from one ordinary procedural mistake, and glancing at the thing you are working on is the most ordinary mistake available on this floor. What it costs is the drain — `bleeds-charge` runs for the whole of `unhoused`, so a squad that keeps looking pays for it out of the case's twelve minutes and finds out at the end.\n\n⚠ AND A CAMERA LEFT POINTING AT IT DOES NOT STALL THE OPERATION, IT MAKES IT STUTTER. `takes` reads heat and not observation, so a watched passenger still takes the case a second and a half after it lets go, and then lets go again two seconds after that. MEASURED: a 3.5-second cycle, indefinitely, with the notice channel announcing both halves of it. The seal is genuinely available in the two-second half of every cycle — this is not an unwinnable state and §14.4 is satisfied — but the drain runs through the other half, so the case's twelve minutes come out at about five. The pressure deltas on `takes` and `disturbed` are -2 and +2 so that the loop is net zero: a squad that has left a camera on is being told, repeatedly, rather than being punished by a ratchet they cannot see."
     },
     {
@@ -134,7 +134,6 @@
       "effect": "It is on nothing and something warm has come inside its reach. It does not travel to you and it does not choose you; you walked into the radius. Serious burn and a minor injury getting out of it. Survivable once, and the man who took one on the Wednesday has not been back on site.",
       "rangeMetres": 1.1,
       "cooldownMs": 6000,
-      "latencyToleranceMs": 300,
       "compounding": true,
       "applies": [
         { "condition": "exposure", "severity": "serious" },
@@ -150,7 +149,6 @@
       "effect": "Cells within five metres flatten at roughly four times their rated rate for as long as it is on nothing. The case is the thing within five metres and the case is the thing that runs out, which is the whole of the clock.",
       "rangeMetres": 5,
       "cooldownMs": 0,
-      "latencyToleranceMs": 2000,
       "counterableBy": ["it-does-not-travel"],
       "_engineNote": "⚠ THE NUMBERS ON THIS CAPABILITY ARE DESCRIPTIVE, NOT AUTHORITATIVE, and that is an engine defect rather than a choice. src/sim/deployables.js `stepPower` implements the drain from `anomaly.isAwake` and two CONFIG constants; it never reads this capability, its `rangeMetres`, its `availableInStates`, or whether the anomaly authored one at all. MEASURED: deleting this entry from the file changes the drain by nothing. `availableInStates` is set to the only state of kind `active` and `rangeMetres` to CONFIG.anomaly.batteryDrainRadiusM so that the file and the engine agree today. They agree by hand."
     },

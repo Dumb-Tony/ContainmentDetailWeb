@@ -120,7 +120,6 @@
       "effect": "It arrives at arm's length and takes hold. Serious mobility injury and cognitive stress; survivable once, and nobody has been recorded surviving it twice.",
       "rangeMetres": 1.4,
       "cooldownMs": 4000,
-      "latencyToleranceMs": 900,
       "compounding": true,
       "applies": [
         { "condition": "mobility-injury", "severity": "serious" },

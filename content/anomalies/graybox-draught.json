@@ -141,7 +141,6 @@
       "effect": "Rapid heat loss on contact: exposure condition plus mobility injury. Survivable once; compounding on repeat.",
       "rangeMetres": 1.2,
       "cooldownMs": 3000,
-      "latencyToleranceMs": 250,
       "compounding": true,
       "applies": [
         { "condition": "exposure", "severity": "serious" },
