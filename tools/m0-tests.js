@@ -1797,7 +1797,10 @@ async function sectionR() {
   ok('R4 the map file itself carries no anomalySpawn', rawMap.anomalySpawn === undefined);
   ok('R5 and no evidence — geometry only', rawMap.evidenceSources === undefined);
   eq('R6 the incident supplies the spawn', ash.map.anomalySpawn.join(), '-8.6,10.6');
-  eq('R7 and the evidence on the floor', ash.map.evidenceSources.length, 6);
+  /* Eleven, not six: the six the cold store's list could honestly be re-sited into, plus
+   * the five Ashlar's own second paths were authored as (§27.2 counted per PACKAGE — see
+   * AC1c and the incident's `_evidenceNote`). */
+  eq('R7 and the evidence on the floor', ash.map.evidenceSources.length, 11);
 
   const site = new Site(ash.map);
   const heat = new HeatField();
@@ -4911,16 +4914,42 @@ async function sectionAJ() {
   const twoPaths = anomaly.evidenceRules.filter((e) => e.revealsRule).reduce((m, e) => {
     (m[e.revealsRule] = m[e.revealsRule] || []).push(e.id); return m;
   }, {});
-  const placedIds = new Set((a1.map.evidenceSources || []).map((s) => s.evidenceId));
-  const doomed = Object.entries(twoPaths).find(([, ids]) => ids.filter((id) => placedIds.has(id)).length >= 2);
-  ok('AJ8 some rule has two paths that are BOTH placed objects, so the refusal is testable',
-    !!doomed, doomed ? `${doomed[0]}: ${doomed[1].join()}` : 'none');
-  if (doomed) {
-    const res = applyVariation(a1, { ...bad, dropped: doomed[1].filter((id) => placedIds.has(id)) });
-    ok('AJ9 stripping both paths for one rule is a REFUSAL, not a warning',
+  /**
+   * ⚠ THIS HAS TO TEST THE VALIDATOR, NOT THE CONTENT, AND IT WAS TESTING THE CONTENT.
+   *
+   * It picked any shipped rule with two PLACED paths and dropped them. That worked while
+   * some rule had exactly two, both objects on the floor. The draught then gained a third
+   * entry per rule for Ashlar and an `earnedBy` on three of them, and a rule with an earned
+   * path SURVIVES having every object removed — correctly, because the squad can still go
+   * and earn it. So the assertion quietly became "dropping two of three is accepted", which
+   * it is, and the refusal it exists to prove stopped being exercised at all.
+   *
+   * The content getting more robust must not be able to switch the check off. So the pack
+   * is synthesised: one rule, every path an object, nothing earned, and then every one of
+   * them dropped.
+   */
+  const synth = JSON.parse(JSON.stringify(a1));
+  const target = Object.entries(twoPaths).find(([, ids]) => ids.length >= 2);
+  ok('AJ8 the draught has a rule with more than one path, so a doomed pack can be built',
+    !!target, target ? `${target[0]}: ${target[1].join()}` : 'none');
+  if (target) {
+    const [rule, ids] = target;
+    synth.map.evidenceSources = (synth.map.evidenceSources || []).filter((s) => !ids.includes(s.evidenceId));
+    for (const id of ids) {
+      synth.map.evidenceSources.push({ evidenceId: id, at: [0, 0], label: id, prompt: 'Examine', requiresEquipment: [] });
+      const e = synth.anomaly.evidenceRules.find((x) => x.id === id);
+      if (e) delete e.earnedBy;
+    }
+    const res = applyVariation(synth, { ...bad, dropped: ids });
+    ok('AJ9 stripping every path for one rule is a REFUSAL, not a warning',
       res.problems.length > 0, res.problems.join(' | ') || 'accepted');
     ok('AJ10 and the refusal names the rule a squad could no longer learn',
-      res.problems.some((t) => t.includes(doomed[0])), res.problems.join(' | '));
+      res.problems.some((t) => t.includes(rule)), res.problems.join(' | '));
+    /* And the same pack with ONE path left is accepted, so AJ9 is measuring the emptying
+     * rather than the dropping. */
+    const okRes = applyVariation(synth, { ...bad, dropped: ids.slice(1) });
+    ok('AJ10a while leaving one path standing is accepted, so it is the emptying that is refused',
+      okRes.problems.length === 0, okRes.problems.join(' | '));
   }
 
   /* ── §14.4's second promise: no seed is unwinnable ────────────────────────── */

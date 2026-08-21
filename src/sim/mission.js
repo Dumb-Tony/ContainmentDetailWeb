@@ -175,9 +175,31 @@ export class Mission {
 
     add('Infrastructure damage', 'None', `${this.tally.circuitsRestored} circuit${this.tally.circuitsRestored === 1 ? '' : 's'} restored, no structural damage.`);
 
+    /**
+     * ⚠ THIS GRADED THE DRAUGHT AND CALLED IT THE MISSION.
+     *
+     * It read `ledger.has('frost-boundary') && ledger.has('thermal-void')` — two of
+     * `graybox-draught`'s evidence ids, written into the mission model — so an operation
+     * against any of the other five anomalies could log every observation on the floor and
+     * still be reported as Partial, for ever, with no way to move it. The debrief is the
+     * one place a squad finds out what the operation was worth, and for five of six
+     * incidents it was answering a question about a different anomaly.
+     *
+     * Graded on the fraction of the anomaly's own RULES the squad documented, which is
+     * what "research completion" means in any file, and reported as the count so the
+     * number can be argued with rather than taken.
+     */
+    const ruleIds = new Set();
+    const documented = new Set();
+    for (const r of ledger.rules.values()) {
+      if (!r.revealsRule) continue;
+      ruleIds.add(r.revealsRule);
+      if (ledger.has(r.id)) documented.add(r.revealsRule);
+    }
+    const share = ruleIds.size ? documented.size / ruleIds.size : 0;
     add('Research completion',
-      ledger.has('frost-boundary') && ledger.has('thermal-void') ? 'Substantial' : 'Partial',
-      `${ledger.entries.length}/${ledger.rules.size} evidence channels reached.`);
+      share >= 0.75 ? 'Substantial' : share >= 0.4 ? 'Partial' : 'Thin',
+      `${documented.size} of ${ruleIds.size} rules documented; ${ledger.entries.length} of ${ledger.rules.size} observations logged.`);
 
     const mins = simTimeMs / 60000;
     add('Time to stabilisation',
