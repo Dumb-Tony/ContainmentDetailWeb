@@ -41,6 +41,7 @@ import {
 } from '../sim/comms.js';
 import { formatCaption } from '../audio/audio.js';
 import { escapeHtml } from './hud.js';
+import { t as msg } from '../core/i18n.js';
 
 const el = (tag, cls, parent) => {
   const n = document.createElement(tag);
@@ -219,7 +220,7 @@ export class CommsWheel {
       this._wedges.push(w);
     });
     this.hub = el('div', 'hub', this.node);
-    this.hub.textContent = 'release to cancel';
+    this.hub.textContent = msg('comms.wheel.cancel');
   }
 
   /* ── opening, aiming, sending ────────────────────────────────────────────── */
@@ -305,15 +306,15 @@ export class CommsWheel {
     if (!ph) return;
     const me = this.game.viewPlayer;
     if (!me) return;
-    if (me.alive === false) { this.onRefuse('You are off the net.'); return; }
-    if (me.downed && !ph.whileDowned) { this.onRefuse('You are on the floor. Call for help.'); return; }
+    if (me.alive === false) { this.onRefuse(msg('comms.refuse.offTheNet')); return; }
+    if (me.downed && !ph.whileDowned) { this.onRefuse(msg('comms.refuse.downed')); return; }
 
     const anchor = ANCHORS[ph.anchor];
     let aim = { x: me.x, z: me.z };
     if (anchor.needsSight) {
       aim = aimPoint(me);
       if (!canMark(me, aim.x, aim.z, this.game.site.blockingRects())) {
-        this.onRefuse('You cannot see that from here.');
+        this.onRefuse(msg('comms.refuse.noSight'));
         return;
       }
     }
@@ -323,7 +324,7 @@ export class CommsWheel {
   _paint() {
     this._wedges.forEach((w, i) => w.classList.toggle('on', i === this.selection));
     const pick = this.selection === null ? null : WHEEL_ORDER[this.selection];
-    this.hub.textContent = pick ? COMMS_CAPTIONS[pick].text : 'release to cancel';
+    this.hub.textContent = pick ? COMMS_CAPTIONS[pick].text : msg('comms.wheel.cancel');
     this.hub.classList.toggle('armed', !!pick);
   }
 
@@ -347,7 +348,7 @@ export class CommsWheel {
 
   _nameOf(ownerId) {
     const p = this.game.playerById(ownerId);
-    return p ? p.name : 'Somebody';
+    return p ? p.name : msg('comms.unknownSpeaker');
   }
 
   /**
@@ -458,7 +459,7 @@ export class CommsWheel {
       node.style.top = `${Math.max(pad, Math.min(h - padBottom, top))}px`;
 
       const d = me ? Math.hypot(p.x - me.x, p.z - me.z) : 0;
-      const dtxt = `${d.toFixed(0)}m`;
+      const dtxt = msg('comms.marker.distance', { metres: d.toFixed(0) });
       const dn = node.querySelector('.d');
       if (dn.textContent !== dtxt) dn.textContent = dtxt;
       node.style.setProperty('--age', String(1 - ageFraction(p, nowMs)));

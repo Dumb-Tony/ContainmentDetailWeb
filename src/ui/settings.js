@@ -17,6 +17,18 @@
  * behind a DOM the test harness cannot reach, and §19 is exactly the part of the design
  * that must not be assertable only by looking at it.
  *
+ * ── AND IT IS THE SCREEN THAT MOST HAS TO BE READABLE (GDD §23 Milestone 5) ───
+ *
+ * A settings panel a player cannot read is an accessibility feature they cannot reach, so
+ * this is the one screen where an untranslated label removes a promise §19.1 makes rather
+ * than merely looking untidy. Every label, blurb, option word, key name and refusal is a
+ * message; the SCHEMA carries only structure.
+ *
+ * ⚠ A CHOICE FIELD'S VALUES ARE IDS. 'hold', 'largest', 'minimap', 'reduced' are compared
+ * against, saved to localStorage and read by the renderer; they are not display text. Each
+ * choice field names an `optionsKey` and the label for a value is `<optionsKey>.<value>` —
+ * the same id-and-label split `phase`, `pressure` and `grade` make.
+ *
  * ── §19.2 SELF-CHECK: WHICH OPTION COVERS WHICH OF THIS BUILD'S CUES ──────────
  *
  * §19.2 forbids a required anomaly rule from depending SOLELY on fine colour
@@ -56,6 +68,7 @@ import { CONFIG } from '../config.js';
 import { BUSES } from '../audio/audio.js';
 import { DEFAULT_HOLD_MODES, HOLD_MODE, HOLDABLE, DEFAULT_BINDINGS } from '../core/input.js';
 import { escapeHtml } from './hud.js';
+import { t as msg } from '../core/i18n.js';
 
 export const SETTINGS_KEY = 'cd.settings.v1';
 export const SETTINGS_VERSION = 1;
@@ -75,10 +88,15 @@ export const SETTINGS_VERSION = 1;
  * colour", so every one of these five roles also has a glyph in SHAPES below, and the rule
  * for new UI is: colour AND shape AND text, never colour alone. The palettes exist so the
  * colour channel is useful too — not so it can be the only one.
+ *
+ * ⚠ `label` IS A GETTER, and the preset's KEY is its id. The id is written into a save file
+ * and compared against; the label is read off the message table at the moment it is drawn,
+ * so a consumer that asks the preset for its name and the panel that renders the `<option>`
+ * cannot come back with two different words.
  */
 export const PALETTES = Object.freeze({
   default: Object.freeze({
-    label: 'Default',
+    get label() { return msg('settings.palette.default'); },
     vars: Object.freeze({
       '--amber': '#e5a13a', '--red': '#e0503f', '--cyan': '#5fd0d8',
       '--green': '#5fbe86', '--hot': '#fff4d8',
@@ -88,7 +106,7 @@ export const PALETTES = Object.freeze({
    * intact, so the five roles are pulled onto it. Values are the Okabe-Ito set, which is
    * the one with published separation figures rather than the one that looked right. */
   deuteranopia: Object.freeze({
-    label: 'Deuteranopia (green-weak)',
+    get label() { return msg('settings.palette.deuteranopia'); },
     vars: Object.freeze({
       '--amber': '#f0e442', '--red': '#ff6f4d', '--cyan': '#56b4e9',
       '--green': '#0072b2', '--hot': '#fff4d8',
@@ -100,7 +118,7 @@ export const PALETTES = Object.freeze({
    * one colour that means "immediate hazard". Hazard therefore goes magenta here: it keeps
    * a blue component, so it stays bright. */
   protanopia: Object.freeze({
-    label: 'Protanopia (red-weak)',
+    get label() { return msg('settings.palette.protanopia'); },
     vars: Object.freeze({
       '--amber': '#f0e442', '--red': '#e26fb4', '--cyan': '#56b4e9',
       '--green': '#0072b2', '--hot': '#fff4d8',
@@ -110,14 +128,14 @@ export const PALETTES = Object.freeze({
    * not, so red and green stay exactly as authored and the instrument cyan moves to violet
    * where it cannot be confused with the powered-circuit green. */
   tritanopia: Object.freeze({
-    label: 'Tritanopia (blue-weak)',
+    get label() { return msg('settings.palette.tritanopia'); },
     vars: Object.freeze({
       '--amber': '#ff9d00', '--red': '#e0503f', '--cyan': '#b06fe0',
       '--green': '#5fbe86', '--hot': '#ffffff',
     }),
   }),
   highContrast: Object.freeze({
-    label: 'High contrast',
+    get label() { return msg('settings.palette.highContrast'); },
     vars: Object.freeze({
       '--amber': '#ffc247', '--red': '#ff6f5e', '--cyan': '#66e6ee',
       '--green': '#66e39a', '--hot': '#ffffff',
@@ -135,7 +153,8 @@ export const CONTRAST_VARS = Object.freeze({
 
 /* GDD §18.5's interaction language as glyphs, so every treatment survives with the colour
  * removed. Five roles, five outlines that differ in SILHOUETTE and not merely in fill —
- * a filled circle and a filled square are one bad monitor away from being the same mark. */
+ * a filled circle and a filled square are one bad monitor away from being the same mark.
+ * A silhouette is not language and is not localised. */
 export const SHAPES = Object.freeze({
   ordinary: '□',      // white outline: ordinary interactable
   instrument: '◇',    // cyan brackets: instrument target or data source
@@ -207,92 +226,88 @@ export const DEFAULT_SETTINGS = Object.freeze({
 });
 
 /* The schema is the single description of every field: it validates the model AND builds
- * the panel. Two lists would drift, and the one that drifts is always the validator. */
+ * the panel. Two lists would drift, and the one that drifts is always the validator.
+ *
+ * ⚠ IT CARRIES NO PROSE. A group's name and blurb are `settings.group.<id>` and
+ * `settings.blurb.<id>`; a field's label is `settings.field.<path>`, keyed by the same
+ * dotted path the validator already uses, so there is exactly one place a field is named
+ * and it is the place a translator opens. `groupLabel`, `groupBlurb` and `fieldLabel`
+ * below are the accessors, exported because the pause screen will want two of them. */
 export const SETTINGS_SCHEMA = Object.freeze([
   {
-    id: 'controls', label: 'Controls',
-    blurb: 'Every action can be moved. Keys the browser owns — Escape, F5, F12 — are refused, '
-      + 'because a key that also reloads the page is not a binding.',
+    id: 'controls',
     fields: [
-      { path: 'input.holdModes.sprint', label: 'Sprint', kind: 'choice', options: [HOLD_MODE.HOLD, HOLD_MODE.TOGGLE] },
-      { path: 'input.holdModes.crouch', label: 'Crouch', kind: 'choice', options: [HOLD_MODE.HOLD, HOLD_MODE.TOGGLE] },
-      { path: 'input.holdModes.imager', label: 'Thermal imager', kind: 'choice', options: [HOLD_MODE.HOLD, HOLD_MODE.TOGGLE] },
+      { path: 'input.holdModes.sprint', kind: 'choice', optionsKey: 'settings.opt.holdMode', options: [HOLD_MODE.HOLD, HOLD_MODE.TOGGLE] },
+      { path: 'input.holdModes.crouch', kind: 'choice', optionsKey: 'settings.opt.holdMode', options: [HOLD_MODE.HOLD, HOLD_MODE.TOGGLE] },
+      { path: 'input.holdModes.imager', kind: 'choice', optionsKey: 'settings.opt.holdMode', options: [HOLD_MODE.HOLD, HOLD_MODE.TOGGLE] },
     ],
   },
   {
-    id: 'captions', label: 'Captions',
-    blurb: 'Every audio cue in the build has a written line (GDD §17.3). Non-speech captions '
-      + 'are bracketed; direction is shown where the sound has one.',
+    id: 'captions',
     fields: [
-      { path: 'captions.enabled', label: 'Captions', kind: 'toggle' },
-      { path: 'captions.nonSpeech', label: 'Non-speech captions', kind: 'toggle' },
-      { path: 'captions.speaker', label: 'Show speaker', kind: 'toggle' },
-      { path: 'captions.direction', label: 'Show direction', kind: 'toggle' },
-      { path: 'captions.size', label: 'Size', kind: 'range', min: 11, max: 28, step: 1, unit: 'px' },
-      { path: 'captions.opacity', label: 'Background opacity', kind: 'range', min: 0.2, max: 1, step: 0.05 },
-      { path: 'captions.maxLines', label: 'Lines on screen', kind: 'range', min: 1, max: 5, step: 1 },
-      { path: 'captions.holdMs', label: 'Hold time', kind: 'range', min: 1500, max: 12000, step: 100, unit: 'ms' },
+      { path: 'captions.enabled', kind: 'toggle' },
+      { path: 'captions.nonSpeech', kind: 'toggle' },
+      { path: 'captions.speaker', kind: 'toggle' },
+      { path: 'captions.direction', kind: 'toggle' },
+      { path: 'captions.size', kind: 'range', min: 11, max: 28, step: 1, unit: 'px' },
+      { path: 'captions.opacity', kind: 'range', min: 0.2, max: 1, step: 0.05 },
+      { path: 'captions.maxLines', kind: 'range', min: 1, max: 5, step: 1 },
+      { path: 'captions.holdMs', kind: 'range', min: 1500, max: 12000, step: 100, unit: 'ms' },
     ],
   },
   {
-    id: 'vision', label: 'Vision',
-    blurb: 'Colour presets change the five signal colours only. Shape redundancy is on by '
-      + 'default and should stay on — §18.5 requires every treatment to work without colour.',
+    id: 'vision',
     fields: [
-      { path: 'vision.palette', label: 'Colour vision', kind: 'choice', options: Object.keys(PALETTES), labels: PALETTES },
-      { path: 'vision.highContrast', label: 'High contrast', kind: 'toggle' },
-      { path: 'vision.shapes', label: 'Shape and icon redundancy', kind: 'toggle' },
-      { path: 'vision.uiScale', label: 'UI scale', kind: 'range', min: 0.8, max: 2.0, step: 0.05, unit: '×' },
+      { path: 'vision.palette', kind: 'choice', optionsKey: 'settings.palette', options: Object.keys(PALETTES) },
+      { path: 'vision.highContrast', kind: 'toggle' },
+      { path: 'vision.shapes', kind: 'toggle' },
+      { path: 'vision.uiScale', kind: 'range', min: 0.8, max: 2.0, step: 0.05, unit: '×' },
     ],
   },
   {
-    id: 'camera', label: 'Camera',
-    blurb: 'Field of view and five effect intensities. Photosensitivity-safe mode clamps '
-      + 'shake, grain and distortion regardless of what is set here.',
+    id: 'camera',
     fields: [
-      { path: 'camera.fov', label: 'Field of view', kind: 'range', min: 60, max: 110, step: 1, unit: '°' },
-      { path: 'camera.shake', label: 'Camera shake', kind: 'range', min: 0, max: 1, step: 0.05 },
-      { path: 'camera.headBob', label: 'Head bob', kind: 'range', min: 0, max: 1, step: 0.05 },
-      { path: 'camera.motionBlur', label: 'Motion blur', kind: 'range', min: 0, max: 1, step: 0.05 },
-      { path: 'camera.filmGrain', label: 'Film grain', kind: 'range', min: 0, max: 1, step: 0.05 },
-      { path: 'camera.distortion', label: 'Lens distortion', kind: 'range', min: 0, max: 1, step: 0.05 },
+      { path: 'camera.fov', kind: 'range', min: 60, max: 110, step: 1, unit: '°' },
+      { path: 'camera.shake', kind: 'range', min: 0, max: 1, step: 0.05 },
+      { path: 'camera.headBob', kind: 'range', min: 0, max: 1, step: 0.05 },
+      { path: 'camera.motionBlur', kind: 'range', min: 0, max: 1, step: 0.05 },
+      { path: 'camera.filmGrain', kind: 'range', min: 0, max: 1, step: 0.05 },
+      { path: 'camera.distortion', kind: 'range', min: 0, max: 1, step: 0.05 },
     ],
   },
   {
-    id: 'audio', label: 'Audio',
-    blurb: 'Five separate buses. Turning anomaly cues down never removes information — the '
-      + 'caption channel carries the same content.',
+    id: 'audio',
     fields: [
-      { path: 'volume.master', label: 'Master', kind: 'range', min: 0, max: 1, step: 0.02 },
-      { path: 'volume.voice', label: 'Voice', kind: 'range', min: 0, max: 1, step: 0.02 },
-      { path: 'volume.anomaly', label: 'Anomaly cues', kind: 'range', min: 0, max: 1, step: 0.02 },
-      { path: 'volume.instruments', label: 'Instruments', kind: 'range', min: 0, max: 1, step: 0.02 },
-      { path: 'volume.ambience', label: 'Ambience', kind: 'range', min: 0, max: 1, step: 0.02 },
-      { path: 'volume.music', label: 'Music', kind: 'range', min: 0, max: 1, step: 0.02 },
+      { path: 'volume.master', kind: 'range', min: 0, max: 1, step: 0.02 },
+      { path: 'volume.voice', kind: 'range', min: 0, max: 1, step: 0.02 },
+      { path: 'volume.anomaly', kind: 'range', min: 0, max: 1, step: 0.02 },
+      { path: 'volume.instruments', kind: 'range', min: 0, max: 1, step: 0.02 },
+      { path: 'volume.ambience', kind: 'range', min: 0, max: 1, step: 0.02 },
+      { path: 'volume.music', kind: 'range', min: 0, max: 1, step: 0.02 },
     ],
   },
   {
-    id: 'assists', label: 'Assists',
-    blurb: 'These widen the window to act and the size of what you read. None of them tells '
-      + 'you what the anomaly is — that is the part the game is made of.',
+    id: 'assists',
     fields: [
-      { path: 'assists.procedureTiming', label: 'Procedure timing', kind: 'range', min: 1, max: 2, step: 0.1, unit: '×' },
-      { path: 'assists.evidenceLegibility', label: 'Evidence legibility', kind: 'choice', options: ['standard', 'large', 'largest'] },
-      { path: 'assists.navigationAids', label: 'Navigation aid', kind: 'choice', options: ['off', 'compass', 'minimap'] },
+      { path: 'assists.procedureTiming', kind: 'range', min: 1, max: 2, step: 0.1, unit: '×' },
+      { path: 'assists.evidenceLegibility', kind: 'choice', optionsKey: 'settings.opt.legibility', options: ['standard', 'large', 'largest'] },
+      { path: 'assists.navigationAids', kind: 'choice', optionsKey: 'settings.opt.navigation', options: ['off', 'compass', 'minimap'] },
     ],
   },
   {
-    id: 'safety', label: 'Safety',
-    blurb: 'Photosensitivity-safe mode suppresses flashes and rapid contrast changes. The '
-      + 'slice contains no gore; the setting is here so content added later has a switch '
-      + 'that already exists rather than one bolted on afterwards.',
+    id: 'safety',
     fields: [
-      { path: 'safety.photosensitive', label: 'Photosensitivity-safe mode', kind: 'toggle' },
-      { path: 'safety.contentWarnings', label: 'Content warnings', kind: 'toggle' },
-      { path: 'safety.gore', label: 'Gore', kind: 'choice', options: ['none', 'reduced', 'standard'] },
+      { path: 'safety.photosensitive', kind: 'toggle' },
+      { path: 'safety.contentWarnings', kind: 'toggle' },
+      { path: 'safety.gore', kind: 'choice', optionsKey: 'settings.opt.gore', options: ['none', 'reduced', 'standard'] },
     ],
   },
 ]);
+
+/** The name of a schema group, its explanation, and the name of one field. */
+export const groupLabel = (id) => msg(`settings.group.${id}`);
+export const groupBlurb = (id) => msg(`settings.blurb.${id}`);
+export const fieldLabel = (path) => msg(`settings.field.${path}`);
 
 const FIELD_BY_PATH = new Map();
 for (const group of SETTINGS_SCHEMA) for (const f of group.fields) FIELD_BY_PATH.set(f.path, f);
@@ -589,34 +604,61 @@ const el = (tag, cls, parent) => {
   return n;
 };
 
-/** Human names for key codes. Anything unlisted prints its own code, which is ugly and
- *  honest — a player who rebound to IntlBackslash should see IntlBackslash, not a guess. */
-const KEY_LABELS = Object.freeze({
+/**
+ * Key codes whose cap carries a GLYPH rather than a word. These are not localised and must
+ * not be: ↑ and ; and ` are the same mark on every keyboard in the world, and a translated
+ * arrow is a worse arrow.
+ *
+ * ⚠ THE NAMED KEYS ARE THE OPPOSITE CASE and they used to be in this same table. A German
+ * keyboard says Strg and Umschalt, a French one says Entrée; a rebinding list that insists
+ * on Ctrl and Shift is telling that player to look for a key that is not on their keyboard.
+ * Those live in the message table under `settings.key.<Code>` and are resolved below.
+ */
+const KEY_GLYPHS = Object.freeze({
   ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→',
-  ShiftLeft: 'L Shift', ShiftRight: 'R Shift', ControlLeft: 'L Ctrl', ControlRight: 'R Ctrl',
-  AltLeft: 'L Alt', AltRight: 'R Alt', Space: 'Space', Tab: 'Tab', Enter: 'Enter',
-  Backspace: 'Backspace', CapsLock: 'Caps', Backquote: '`', Minus: '-', Equal: '=',
+  Backquote: '`', Minus: '-', Equal: '=',
   BracketLeft: '[', BracketRight: ']', Semicolon: ';', Quote: "'", Comma: ',', Period: '.', Slash: '/',
 });
 
+/** Codes whose label is a WORD, and therefore a message. Listed so an unknown code can
+ *  still fall through to printing itself, which is ugly and honest. */
+const NAMED_KEYS = Object.freeze([
+  'ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight', 'AltLeft', 'AltRight',
+  'Space', 'Tab', 'Enter', 'Backspace', 'CapsLock',
+]);
+
+/**
+ * Human name for a key code. Anything unlisted prints its own code, which is ugly and
+ * honest — a player who rebound to IntlBackslash should see IntlBackslash, not a guess,
+ * and the same goes for the gamepad codes in DEFAULT_BINDINGS.
+ */
 export function keyLabel(code) {
-  if (!code) return '—';
-  if (KEY_LABELS[code]) return KEY_LABELS[code];
+  if (!code) return msg('settings.key.none');
+  if (KEY_GLYPHS[code]) return KEY_GLYPHS[code];
+  if (NAMED_KEYS.includes(code)) return msg(`settings.key.${code}`);
   if (code.startsWith('Key')) return code.slice(3);
   if (code.startsWith('Digit')) return code.slice(5);
-  if (code.startsWith('Numpad')) return `Num ${code.slice(6)}`;
+  if (code.startsWith('Numpad')) return msg('settings.key.numpad', { key: code.slice(6) });
   return code;
 }
 
-/** The order and the wording the controls list uses. Actions the player never presses
- *  deliberately (there are none yet) would simply be left off. */
-const ACTION_LABELS = Object.freeze({
-  moveUp: 'Move forward', moveDown: 'Move back', moveLeft: 'Move left', moveRight: 'Move right',
-  sprint: 'Sprint', crouch: 'Crouch',
-  interact: 'Context verb', use: 'Use or deploy held item', imager: 'Thermal imager',
-  tablet: 'Field tablet', abort: 'Abort procedure', settings: 'Settings',
-  slot1: 'Slot 1', slot2: 'Slot 2', slot3: 'Slot 3', slot4: 'Slot 4', slot5: 'Slot 5',
-});
+/**
+ * The ORDER the controls list uses. The wording is `settings.action.<id>`.
+ *
+ * ⚠ `comms` WAS MISSING FROM THIS LIST while being present in DEFAULT_BINDINGS, so the ping
+ * wheel was bound to Z and could not be rebound — and §19.1 opens the controls group with
+ * "every action can be moved". A list that decides which actions are rebindable by omission
+ * is a list that silently removes one.
+ */
+const ACTION_ORDER = Object.freeze([
+  'moveUp', 'moveDown', 'moveLeft', 'moveRight',
+  'sprint', 'crouch',
+  'interact', 'use', 'imager', 'tablet', 'comms', 'abort', 'settings',
+  'slot1', 'slot2', 'slot3', 'slot4', 'slot5',
+]);
+
+/** The name of a bindable action. Unknown ids print themselves rather than nothing. */
+export const actionLabel = (action) => (ACTION_ORDER.includes(action) ? msg(`settings.action.${action}`) : action);
 
 /**
  * The settings screen. Same contract as Panels — `show()`, `hide()`, `isOpen` — and the
@@ -674,11 +716,11 @@ export class SettingsPanel {
 
   _render() {
     const nav = SETTINGS_SCHEMA.map((g) =>
-      `<button data-tab="${g.id}" class="${g.id === this.tab ? 'on' : ''}">${g.label}</button>`).join('');
+      `<button data-tab="${g.id}" class="${g.id === this.tab ? 'on' : ''}">${escapeHtml(groupLabel(g.id))}</button>`).join('');
     const group = SETTINGS_SCHEMA.find((g) => g.id === this.tab) || SETTINGS_SCHEMA[0];
 
     const body = `<div class="pad">
-      <p class="small">${escapeHtml(group.blurb)}</p>
+      <p class="small">${escapeHtml(groupBlurb(group.id))}</p>
       <div class="setgrid">${group.fields.map((f) => this._field(f)).join('')}</div>
       ${this.tab === 'controls' ? this._bindings() : ''}
       ${this.tab === 'vision' ? this._swatches() : ''}
@@ -686,12 +728,18 @@ export class SettingsPanel {
     </div>`;
 
     const persist = canPersist()
-      ? '<span class="waiting">Saved to this browser.</span>'
-      : '<span class="waiting">This browser refuses local storage — settings last until you close the tab.</span>';
+      ? `<span class="waiting">${msg('settings.savedHere')}</span>`
+      : `<span class="waiting">${msg('settings.noStorage')}</span>`;
 
-    this._shell('Settings', 'Accessibility baseline — GDD §19',
+    /* ⚠ THE GROUP NAME KEEPS ITS OWN CASE. This read `Reset ${group.label.toLowerCase()}`,
+     * and lower-casing a translated noun is wrong in German (every noun is capitalised) and
+     * dangerous in Turkish (I lower-cases to a dotless ı). The message carries the sentence
+     * and the label arrives as the table spells it. */
+    this._shell(msg('settings.title'), msg('settings.sub'),
       `<nav class="tabs">${nav}</nav>${body}`,
-      `${persist}<button class="ghost" data-reset>Reset ${escapeHtml(group.label.toLowerCase())}</button><button class="go" data-close>Close</button>`);
+      `${persist}<button class="ghost" data-reset>${
+        escapeHtml(msg('settings.reset', { group: groupLabel(group.id) }))
+      }</button><button class="go" data-close>${msg('settings.close')}</button>`);
 
     this._wire(group);
   }
@@ -699,21 +747,22 @@ export class SettingsPanel {
   _field(f) {
     const v = this.settings.get(f.path);
     const id = f.path.replace(/\./g, '-');
+    const label = fieldLabel(f.path);
     if (f.kind === 'toggle') {
       return `<label class="setrow chk" for="${id}">
         <input type="checkbox" id="${id}" data-path="${f.path}" ${v ? 'checked' : ''}>
-        <span>${escapeHtml(f.label)}</span></label>`;
+        <span>${escapeHtml(label)}</span></label>`;
     }
     if (f.kind === 'choice') {
       const opts = f.options.map((o) => {
-        const text = f.labels && f.labels[o] ? f.labels[o].label : o;
+        const text = f.optionsKey ? msg(`${f.optionsKey}.${o}`) : o;
         return `<option value="${escapeHtml(o)}" ${v === o ? 'selected' : ''}>${escapeHtml(text)}</option>`;
       }).join('');
-      return `<label class="setrow" for="${id}"><span>${escapeHtml(f.label)}</span>
+      return `<label class="setrow" for="${id}"><span>${escapeHtml(label)}</span>
         <select id="${id}" data-path="${f.path}">${opts}</select></label>`;
     }
     const shown = `${v}${f.unit || ''}`;
-    return `<label class="setrow" for="${id}"><span>${escapeHtml(f.label)}</span>
+    return `<label class="setrow" for="${id}"><span>${escapeHtml(label)}</span>
       <input type="range" id="${id}" data-path="${f.path}" min="${f.min}" max="${f.max}" step="${f.step}" value="${v}">
       <b class="setval" data-val="${f.path}">${escapeHtml(shown)}</b></label>`;
   }
@@ -721,41 +770,42 @@ export class SettingsPanel {
   /* The remapping list. Reads the live Input, not the saved copy, so what is on screen is
    * what the keyboard will actually do. */
   _bindings() {
-    if (!this.input) return '<p class="small">No input device attached.</p>';
-    const rows = Object.keys(ACTION_LABELS)
+    if (!this.input) return `<p class="small">${msg('settings.bindings.noInput')}</p>`;
+    const rows = ACTION_ORDER
       .filter((a) => a in this.input.bindings)
       .map((action) => {
         const codes = this.input.bindingFor(action);
         const keys = codes.length
           ? codes.map((c) => `<kbd>${escapeHtml(keyLabel(c))}</kbd>`).join(' ')
-          : '<em class="unbound">unbound</em>';
+          : `<em class="unbound">${msg('settings.bindings.unbound')}</em>`;
         const waiting = this.awaiting === action;
         return `<tr class="${waiting ? 'awaiting' : ''}">
-          <td class="name"><b>${escapeHtml(ACTION_LABELS[action])}</b></td>
-          <td class="keys">${waiting ? '<em class="press">press a key…</em>' : keys}</td>
-          <td class="qty"><button data-bind="${action}">${waiting ? 'Cancel' : 'Change'}</button></td>
+          <td class="name"><b>${escapeHtml(actionLabel(action))}</b></td>
+          <td class="keys">${waiting ? `<em class="press">${msg('settings.bindings.awaiting')}</em>` : keys}</td>
+          <td class="qty"><button data-bind="${action}">${
+  waiting ? msg('settings.bindings.cancel') : msg('settings.bindings.change')}</button></td>
         </tr>`;
       }).join('');
-    return `<h2>Key bindings</h2>
+    return `<h2>${msg('settings.bindings.head')}</h2>
       <table class="items binds"><tbody>${rows}</tbody></table>
-      <p class="small">Binding a key that is already in use takes it off the other action and says so.</p>`;
+      <p class="small">${msg('settings.bindings.note')}</p>`;
   }
 
   /* Colour is never the only channel, so the preview shows the glyph beside the swatch —
    * it is also the fastest way for a player to check that the preset actually helps. */
   _swatches() {
     const roles = [
-      ['--green', 'ordinary', 'Powered / nominal'],
-      ['--cyan', 'instrument', 'Instrument target'],
-      ['--amber', 'degraded', 'Degraded or uncertain'],
-      ['--red', 'hazard', 'Immediate hazard'],
-      ['--hot', 'custody', 'Custody-critical'],
+      ['--green', 'ordinary'],
+      ['--cyan', 'instrument'],
+      ['--amber', 'degraded'],
+      ['--red', 'hazard'],
+      ['--hot', 'custody'],
     ];
     const vars = this.settings.cssVars();
-    const cells = roles.map(([varName, shapeKey, label]) =>
+    const cells = roles.map(([varName, shapeKey]) =>
       `<li><i style="background:${escapeHtml(vars[varName] || '')}"></i>
-        <b>${escapeHtml(SHAPES[shapeKey])}</b><span>${escapeHtml(label)}</span></li>`).join('');
-    return `<h2>Signal preview</h2><ul class="swatches">${cells}</ul>`;
+        <b>${escapeHtml(SHAPES[shapeKey])}</b><span>${escapeHtml(msg(`settings.swatch.${shapeKey}`))}</span></li>`).join('');
+    return `<h2>${msg('settings.swatch.head')}</h2><ul class="swatches">${cells}</ul>`;
   }
 
   _wire(group) {
@@ -772,7 +822,7 @@ export class SettingsPanel {
         this.input.resetBindings();
         this.input.setHoldModes(this.settings.holdModes());
       }
-      this.flash = `${group.label} reset.`;
+      this.flash = msg('settings.flash.groupReset', { group: groupLabel(group.id) });
       this._commit();
     };
 
@@ -816,16 +866,21 @@ export class SettingsPanel {
       this.input.captureNext((code, reserved) => {
         this.awaiting = null;
         if (reserved) {
-          this.flash = `${keyLabel(code)} belongs to the browser and cannot be bound.`;
+          this.flash = msg('settings.flash.reserved', { key: keyLabel(code) });
           this._render();
           return;
         }
         const res = this.input.rebind(action, code);
-        if (!res.ok) this.flash = `${keyLabel(code)} refused: ${res.reason}.`;
+        /* ⚠ `refused: ${res.reason}` PRINTED A MACHINE WORD AT A PERSON — 'bad-code',
+         * 'unknown-action'. The reason is an id and stays one; the sentence is keyed by it,
+         * so each refusal is a whole message rather than a colon and a token. */
+        if (!res.ok) this.flash = msg(`settings.flash.refused.${res.reason}`, { key: keyLabel(code) });
         else if (res.displaced.length) {
-          this.flash = `${keyLabel(code)} bound. It was taken off `
-            + res.displaced.map((a) => ACTION_LABELS[a] || a).join(', ') + '.';
-        } else this.flash = `${keyLabel(code)} bound to ${ACTION_LABELS[action] || action}.`;
+          this.flash = msg('settings.flash.displaced', {
+            key: keyLabel(code),
+            actions: res.displaced.map((a) => actionLabel(a)).join(', '),
+          });
+        } else this.flash = msg('settings.flash.bound', { key: keyLabel(code), action: actionLabel(action) });
         this.settings.setBindings(this.input.bindingsToJSON());
         this._commit();
       });

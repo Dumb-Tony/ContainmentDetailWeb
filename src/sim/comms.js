@@ -35,6 +35,7 @@
 
 import { dist } from './geometry.js';
 import { sees } from './perception.js';
+import { t as msg } from '../core/i18n.js';
 
 /* ── the six kinds (GDD §11.3, verbatim) ──────────────────────────────────────
  *
@@ -52,14 +53,20 @@ import { sees } from './perception.js';
  * The six differ in OUTLINE, not in fill: triangle, ringed dot, star, arrow, diamond,
  * cross. §18.5's own standard — "a filled circle and a filled square are one bad monitor
  * away from being the same mark".
+ *
+ * ⚠ THE GLYPH IS NOT A MESSAGE AND THE LABEL IS. A silhouette is not language — ▼ means the
+ * same thing to every player and a "translated" triangle is a worse triangle — so the glyph
+ * stays here beside the kind. The label is a getter onto `comms.kind.<id>`, because the KEY
+ * of this table is the id: it is compared against, it names a CSS class, and it is what a
+ * phrase declares. The id stays the id; the word beside it comes from the table.
  */
 export const PING_KINDS = Object.freeze({
-  danger: { glyph: '▼', label: 'Danger' },
-  evidence: { glyph: '◉', label: 'Evidence' },
-  objective: { glyph: '★', label: 'Objective' },
-  move: { glyph: '➤', label: 'Move' },
-  watch: { glyph: '◇', label: 'Watch' },
-  help: { glyph: '✚', label: 'Help' },
+  danger: { glyph: '▼', get label() { return msg('comms.kind.danger'); } },
+  evidence: { glyph: '◉', get label() { return msg('comms.kind.evidence'); } },
+  objective: { glyph: '★', get label() { return msg('comms.kind.objective'); } },
+  move: { glyph: '➤', get label() { return msg('comms.kind.move'); } },
+  watch: { glyph: '◇', get label() { return msg('comms.kind.watch'); } },
+  help: { glyph: '✚', get label() { return msg('comms.kind.help'); } },
 });
 
 /* ── where a call lives ───────────────────────────────────────────────────────
@@ -186,18 +193,38 @@ export const PHRASES = Object.freeze({
  * ⚠ THIS TEXT IS ALSO THE WHEEL LABEL. One string, so what the player picks and what the
  * squad reads are the same sentence — a wheel that says "danger" and sends "it is here"
  * is a small lie that costs a callout the first time somebody notices.
+ *
+ * ⚠ AND `text` IS A GETTER, WHILE THE KEY OF THE ROW IS THE PHRASE ID. The id travels over
+ * the wire (net/protocol.js), is compared against here, and keys both tables; the WORDS are
+ * `comms.phrase.<id>` in content/locales. A getter rather than a call at every use site
+ * because this row is `formatCaption`'s shape and audio.js's formatter reads `.text` — one
+ * accessor, so a caption a squad hears and a wedge a player picks cannot come back in two
+ * different languages.
+ *
+ * A MISSING MESSAGE RESOLVES TO ITS OWN KEY rather than to an empty string (core/i18n.js
+ * says why), so `!cap.text` can no longer see one. `commsProblems()` therefore refuses a
+ * caption whose text IS a bare message key as well as one that has none.
  */
+/**
+ * ⚠ AND IT IS DEFINED WITH `defineProperty`, NOT SPREAD INTO A LITERAL. `{ ...row }` copies
+ * a getter's VALUE at the moment it spreads, which is module load — so the table would have
+ * frozen the English text at boot and gone on printing it under every other locale, with
+ * nothing failing. The accessor has to survive into the frozen object.
+ */
+const withText = (id, row) => Object.freeze(Object.defineProperty({ ...row }, 'text', {
+  get: () => msg(`comms.phrase.${id}`), enumerable: true,
+}));
 export const COMMS_CAPTIONS = Object.freeze({
-  contact: { text: 'it is here', kind: 'speech', priority: 3, directional: true },
-  hold: { text: 'hold — leave that alone', kind: 'speech', priority: 3, directional: true },
-  evidence: { text: 'something to log here', kind: 'speech', priority: 1, directional: true },
-  'set-up-here': { text: 'set up here', kind: 'speech', priority: 2, directional: true },
-  'bring-kit': { text: 'bring kit here', kind: 'speech', priority: 1, directional: true },
-  'on-it': { text: 'I have this one', kind: 'speech', priority: 1, directional: true },
-  ready: { text: 'in position', kind: 'speech', priority: 2, directional: false },
-  'on-me': { text: 'on me', kind: 'speech', priority: 2, directional: true },
-  'watch-this': { text: 'keep this in view', kind: 'speech', priority: 2, directional: true },
-  help: { text: 'I am in trouble', kind: 'speech', priority: 3, directional: true },
+  contact: withText('contact', { kind: 'speech', priority: 3, directional: true }),
+  hold: withText('hold', { kind: 'speech', priority: 3, directional: true }),
+  evidence: withText('evidence', { kind: 'speech', priority: 1, directional: true }),
+  'set-up-here': withText('set-up-here', { kind: 'speech', priority: 2, directional: true }),
+  'bring-kit': withText('bring-kit', { kind: 'speech', priority: 1, directional: true }),
+  'on-it': withText('on-it', { kind: 'speech', priority: 1, directional: true }),
+  ready: withText('ready', { kind: 'speech', priority: 2, directional: false }),
+  'on-me': withText('on-me', { kind: 'speech', priority: 2, directional: true }),
+  'watch-this': withText('watch-this', { kind: 'speech', priority: 2, directional: true }),
+  help: withText('help', { kind: 'speech', priority: 3, directional: true }),
 });
 
 /* ── how far a call reaches ───────────────────────────────────────────────────
@@ -246,6 +273,11 @@ export function commsProblems(phrases = PHRASES, captions = COMMS_CAPTIONS) {
       continue;
     }
     if (!cap.text) p.push(`phrase ${id}: caption has no text`);
+    /* ⚠ A KEY THAT RESOLVES TO ITSELF IS NOT TEXT. `t()` returns the key when the message
+     * table has no line for it, loudly and on purpose, so a phrase added without a message
+     * would sail past the emptiness check above and put `comms.phrase.door-jammed` on five
+     * people's screens. */
+    else if (/^comms\.phrase\./.test(cap.text)) p.push(`phrase ${id}: caption text is an unresolved message key (${cap.text})`);
     if (cap.kind !== 'speech') p.push(`phrase ${id}: caption kind must be "speech" — somebody said this`);
     if (![1, 2, 3].includes(cap.priority)) p.push(`phrase ${id}: caption priority must be 1, 2 or 3, got ${cap.priority}`);
     if (anchor && !!cap.directional !== anchor.placed) {
@@ -348,12 +380,12 @@ export class PingBoard {
     /* A phrase id the vocabulary does not contain is REFUSED, not passed through as an
      * inert marker with no words. An unknown id can only come from a modified client or a
      * version skew, and both deserve a sentence rather than a blank icon. */
-    if (!ph) return { ok: false, why: 'That phrase is not on the wheel.' };
-    if (!ownerId) return { ok: false, why: 'That call had nobody behind it.' };
+    if (!ph) return { ok: false, why: msg('comms.refuse.notAPhrase') };
+    if (!ownerId) return { ok: false, why: msg('comms.refuse.noCaller') };
 
     const last = this._lastAt.get(ownerId);
     if (last !== undefined && atMs >= last && atMs - last < this.minGapMs) {
-      return { ok: false, why: 'Give the last call a moment.' };
+      return { ok: false, why: msg('comms.refuse.tooSoon') };
     }
 
     /* Unique: the newer copy wins. Re-marking the mass as it walks should MOVE the marker,
@@ -514,14 +546,14 @@ export class PingBoard {
  */
 export function requestPing(board, caller, phraseId, aim = {}, ctx = {}) {
   const ph = PHRASES[phraseId];
-  if (!ph) return { ok: false, why: 'That phrase is not on the wheel.' };
-  if (!caller || !caller.id) return { ok: false, why: 'That call had nobody behind it.' };
-  if (caller.alive === false) return { ok: false, why: 'You are off the net.' };
+  if (!ph) return { ok: false, why: msg('comms.refuse.notAPhrase') };
+  if (!caller || !caller.id) return { ok: false, why: msg('comms.refuse.noCaller') };
+  if (caller.alive === false) return { ok: false, why: msg('comms.refuse.offTheNet') };
 
   /* §9.5 again: down is not dead. A downed operative has one verb and this is the phrase
    * that carries it — `whileDowned` is a field, not a branch on the id, so a second
    * anomaly can add "I cannot move" without touching this line. */
-  if (caller.downed && !ph.whileDowned) return { ok: false, why: 'You are on the floor. Call for help.' };
+  if (caller.downed && !ph.whileDowned) return { ok: false, why: msg('comms.refuse.downed') };
 
   const anchor = ANCHORS[ph.anchor];
   let x = 0, z = 0;
@@ -530,8 +562,8 @@ export function requestPing(board, caller, phraseId, aim = {}, ctx = {}) {
   } else if (anchor.placed) {
     x = Number(aim.x) || 0; z = Number(aim.z) || 0;
     if (anchor.needsSight) {
-      if (dist(caller.x, caller.z, x, z) > MARK_RANGE_M) return { ok: false, why: 'That is too far away to mark.' };
-      if (!canMark(caller, x, z, ctx.blockers || [])) return { ok: false, why: 'You cannot see that from here.' };
+      if (dist(caller.x, caller.z, x, z) > MARK_RANGE_M) return { ok: false, why: msg('comms.refuse.tooFar') };
+      if (!canMark(caller, x, z, ctx.blockers || [])) return { ok: false, why: msg('comms.refuse.noSight') };
     }
   }
 

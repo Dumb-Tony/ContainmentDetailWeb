@@ -26,6 +26,7 @@
  */
 
 import { CONFIG } from '../config.js';
+import { t as msg } from '../core/i18n.js';
 
 /**
  * Pure. Returns target values for the continuous voices, in 0..1 gains and Hz.
@@ -132,31 +133,45 @@ export const CUES = Object.freeze({
  * `directional` marks the lines where WHERE it came from is part of the information, so
  * the HUD can append a bearing when the caller supplies one — §19.2 forbids a rule that
  * depends on stereo hearing, and this is how that promise is kept.
+ *
+ * ⚠ THE KEY IS THE SIMULATION EVENT AND THE WORDS ARE `caption.<KEY>` IN content/locales.
+ * §19.2 makes these the whole channel for a player who cannot hear, so a caption left in one
+ * language is a required rule left in one language — and the milestone that keyed the HUD
+ * would have skipped these entirely, because a caption table looks like data.
+ *
+ * `text` is an ACCESSOR, defined rather than spread: `{ ...row }` copies a getter's value at
+ * module load, so a spread table would have frozen English at boot and gone on printing it
+ * under every other locale with nothing failing. `formatCaption` reads `.text`, so one
+ * accessor keeps the sound and its written line in the same language.
  */
+const captioned = (key, row) => Object.freeze(Object.defineProperty({ ...row }, 'text', {
+  get: () => msg(`caption.${key}`), enumerable: true,
+}));
+
 export const CAPTIONS = Object.freeze({
-  CONTACT: { text: 'a rush of cold, close', kind: 'nonspeech', priority: 3, directional: true },
-  SEAL_ATTEMPT: { text: 'case latches strain', kind: 'nonspeech', priority: 2, directional: false },
-  CUSTODY_VERIFIED: { text: 'case tone steadies — custody verified', kind: 'nonspeech', priority: 3, directional: false },
-  CUSTODY_LOST: { text: 'the note falls away — custody lost', kind: 'nonspeech', priority: 3, directional: false },
-  DEPLOYED: { text: 'unit sets down and powers up', kind: 'nonspeech', priority: 1, directional: false },
-  RETRIEVED: { text: 'unit powers down and is lifted', kind: 'nonspeech', priority: 1, directional: false },
-  CIRCUIT_CHANGED: { text: 'the floor takes power', kind: 'nonspeech', priority: 2, directional: false },
-  DOOR_CHANGED: { text: 'a door drives on its motor', kind: 'nonspeech', priority: 2, directional: true },
-  BATTERY_DEAD: { text: 'a cell dies', kind: 'nonspeech', priority: 3, directional: false },
-  EVIDENCE_LOGGED: { text: 'logged', kind: 'nonspeech', priority: 1, directional: false },
+  CONTACT: captioned('CONTACT', { kind: 'nonspeech', priority: 3, directional: true }),
+  SEAL_ATTEMPT: captioned('SEAL_ATTEMPT', { kind: 'nonspeech', priority: 2, directional: false }),
+  CUSTODY_VERIFIED: captioned('CUSTODY_VERIFIED', { kind: 'nonspeech', priority: 3, directional: false }),
+  CUSTODY_LOST: captioned('CUSTODY_LOST', { kind: 'nonspeech', priority: 3, directional: false }),
+  DEPLOYED: captioned('DEPLOYED', { kind: 'nonspeech', priority: 1, directional: false }),
+  RETRIEVED: captioned('RETRIEVED', { kind: 'nonspeech', priority: 1, directional: false }),
+  CIRCUIT_CHANGED: captioned('CIRCUIT_CHANGED', { kind: 'nonspeech', priority: 2, directional: false }),
+  DOOR_CHANGED: captioned('DOOR_CHANGED', { kind: 'nonspeech', priority: 2, directional: true }),
+  BATTERY_DEAD: captioned('BATTERY_DEAD', { kind: 'nonspeech', priority: 3, directional: false }),
+  EVIDENCE_LOGGED: captioned('EVIDENCE_LOGGED', { kind: 'nonspeech', priority: 1, directional: false }),
 
   /* The continuous voices. These come from captionsForMixChange, not from the event bus,
    * because they describe a sound that is ALREADY PLAYING rather than one that fired. The
    * wording is the content file's own `audioCue` text, so what the player reads and what
    * the anomaly document promises are the same sentence. */
-  WHISTLE_SHARPENS: { text: 'the whistle sharpens', kind: 'nonspeech', priority: 3, directional: true },
-  WHISTLE_DROPS: { text: 'the whistle drops', kind: 'nonspeech', priority: 2, directional: true },
-  FLUTTER_BEGINS: { text: 'the note breaks into a flutter', kind: 'nonspeech', priority: 3, directional: true },
-  NOTE_SUSTAINS: { text: 'the flutter returns to a sustained note', kind: 'nonspeech', priority: 3, directional: true },
-  HEATER_CYCLE: { text: 'the case heater cycles', kind: 'nonspeech', priority: 2, directional: false },
-  DRAUGHT_STILLS: { text: 'the draught stills', kind: 'nonspeech', priority: 2, directional: false },
-  IMAGER_CONTACT: { text: 'the imager tone rises — contact held', kind: 'nonspeech', priority: 2, directional: false },
-  BREATH_HARD: { text: 'you are breathing hard', kind: 'nonspeech', priority: 1, directional: false },
+  WHISTLE_SHARPENS: captioned('WHISTLE_SHARPENS', { kind: 'nonspeech', priority: 3, directional: true }),
+  WHISTLE_DROPS: captioned('WHISTLE_DROPS', { kind: 'nonspeech', priority: 2, directional: true }),
+  FLUTTER_BEGINS: captioned('FLUTTER_BEGINS', { kind: 'nonspeech', priority: 3, directional: true }),
+  NOTE_SUSTAINS: captioned('NOTE_SUSTAINS', { kind: 'nonspeech', priority: 3, directional: true }),
+  HEATER_CYCLE: captioned('HEATER_CYCLE', { kind: 'nonspeech', priority: 2, directional: false }),
+  DRAUGHT_STILLS: captioned('DRAUGHT_STILLS', { kind: 'nonspeech', priority: 2, directional: false }),
+  IMAGER_CONTACT: captioned('IMAGER_CONTACT', { kind: 'nonspeech', priority: 2, directional: false }),
+  BREATH_HARD: captioned('BREATH_HARD', { kind: 'nonspeech', priority: 1, directional: false }),
 });
 
 /** Every cue that has no caption. §17.3 says there must be none; this is how a suite asks. */
@@ -195,11 +210,11 @@ export function captionsForMixChange(prev, next) {
   return out;
 }
 
-/** Compass words, because a bearing in degrees is not a caption. */
-const DIRECTION_WORDS = Object.freeze({
-  ahead: 'ahead', behind: 'behind', left: 'to your left', right: 'to your right',
-  above: 'above', below: 'below',
-});
+/** Compass words, because a bearing in degrees is not a caption. The SET is closed and its
+ *  members are ids the simulation produces (`bearingWord` returns them); the words are
+ *  `direction.<id>`. A bearing the caller invents falls through and prints itself. */
+const DIRECTIONS = Object.freeze(['ahead', 'behind', 'left', 'right', 'above', 'below']);
+const directionWord = (d) => (DIRECTIONS.includes(d) ? msg(`direction.${d}`) : d);
 
 /**
  * PURE. One caption row plus its context, rendered to the line the HUD prints.
@@ -210,7 +225,7 @@ export function formatCaption(row, ctx = {}) {
   if (!row) return '';
   const body = ctx.text || row.text;
   const dir = ctx.showDirection !== false && row.directional && ctx.direction
-    ? ` — ${DIRECTION_WORDS[ctx.direction] || ctx.direction}` : '';
+    ? ` — ${directionWord(ctx.direction)}` : '';
   if (row.kind === 'speech') {
     const who = ctx.showSpeaker !== false && (ctx.speaker || row.speaker);
     return who ? `${who}: "${body}"${dir}` : `"${body}"${dir}`;

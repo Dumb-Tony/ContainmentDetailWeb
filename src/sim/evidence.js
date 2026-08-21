@@ -37,7 +37,20 @@ import { dist } from './geometry.js';
  * Each claim names the rule it is about, so the debrief can say which rules the squad
  * actually worked out. `truth` is what the simulation does; it is never shown before the
  * debrief and never used to auto-resolve a claim.
+ *
+ * ⚠ AND THE TEXT IS NOT IN content/locales, FOR THE SAME REASON THE PLANNER'S IS NOT
+ * (ui/panels.js, PROCEDURE_FIELDS). A claim is a STATEMENT ABOUT AN ANOMALY: it is authored
+ * beside the evidence that supports it, reviewed by whoever wrote that anomaly, and
+ * localised with the package. Putting these seven in the UI locale would hand one anomaly's
+ * opinions to the UI's reviewer and ship them translated — the original defect with a second
+ * language on top. Section AP of the suite compares this array to the shipped draught's own
+ * `claims` block character for character, so a translated copy here would also be a drift.
+ *
+ * The `i18n-exempt` markers are what tools/i18n-tests.js section D honours: a named region
+ * with a stated reason, counted and printed every run.
  */
+/* i18n-exempt:content — the graybox draught's own board, kept as the documented fallback for
+ * a definition that ships no claims. Content prose; localised with the package. */
 export const CLAIMS = Object.freeze([
   /* ⚠ THE BOARD HAS TO KNOW ABOUT THE EVIDENCE THAT EXISTS. `supportFor` returns "strong"
    * only on two hits with a confirmed one among them, so a claim listing a single source
@@ -67,6 +80,7 @@ export const CLAIMS = Object.freeze([
     text: 'It travels on the building airflow and follows the ductwork.',
     truth: false, supportedBy: ['stairwell-draught'] },
 ]);
+/* i18n-exempt:end */
 
 export class EvidenceLedger {
   constructor(anomalyDef) {

@@ -34,6 +34,21 @@
  */
 
 import { mulberry32, hashStr } from '../core/rng.js';
+import { t as msg } from '../core/i18n.js';
+
+/**
+ * A weather or time-of-day row, with its words read from the message table.
+ *
+ * ⚠ THE KEY IS THE ID AND THE LABEL IS NOT. `still`, `cold`, `wet`, `wind` are what a seed
+ * chooses, what `applyVariation` compares against and what a saved profile records for
+ * §13's archive; the LABEL and the LINE are prose and belong in content/locales. Accessors
+ * rather than a spread, for the reason audio.js records: `{ ...row }` copies a getter's
+ * value at module load, which would freeze English at boot with nothing failing.
+ */
+const worded = (group, id, row) => Object.freeze(Object.defineProperties({ ...row }, {
+  label: { get: () => msg(`${group}.${id}.label`), enumerable: true },
+  line: { get: () => msg(`${group}.${id}.line`), enumerable: true },
+}));
 
 /** The eight axes §14.4 names. Closed, for the same reason the senses are. */
 export const VARIATION_AXES = Object.freeze([
@@ -52,21 +67,17 @@ export const VARIATION_AXES = Object.freeze([
  * has to notice.
  */
 export const WEATHER = Object.freeze({
-  still: { label: 'Still and dry', ambientDeltaC: 0, ambientDeltaDb: 0,
-    line: 'Still, dry, nothing moving outside.' },
-  cold: { label: 'Hard frost', ambientDeltaC: -3, ambientDeltaDb: -2,
-    line: 'Hard frost since midnight. The floor is colder than the forecast said and quieter with it.' },
-  wet: { label: 'Steady rain', ambientDeltaC: 1, ambientDeltaDb: 6,
-    line: 'Steady rain on the roof. Warmer than it should be, and you cannot hear yourself think.' },
-  wind: { label: 'Gusting', ambientDeltaC: -1, ambientDeltaDb: 3,
-    line: 'Gusting hard from the north-east. Everything loose is making a noise.' },
+  still: worded('weather', 'still', { ambientDeltaC: 0, ambientDeltaDb: 0 }),
+  cold: worded('weather', 'cold', { ambientDeltaC: -3, ambientDeltaDb: -2 }),
+  wet: worded('weather', 'wet', { ambientDeltaC: 1, ambientDeltaDb: 6 }),
+  wind: worded('weather', 'wind', { ambientDeltaC: -1, ambientDeltaDb: 3 }),
 });
 
 /** Times of day, which change what the mains are doing and who is still on site. */
 export const TIMES = Object.freeze({
-  night: { label: 'Night', line: 'Small hours. Nobody on site but the person who called it in.' },
-  dawn: { label: 'First light', line: 'First light. The site wakes up in about two hours whatever happens.' },
-  day: { label: 'Daylight', line: 'Middle of the day. Two contractors are being kept off the floor for you.' },
+  night: worded('time', 'night', {}),
+  dawn: worded('time', 'dawn', {}),
+  day: worded('time', 'day', {}),
 });
 
 const pick = (rand, list) => list[Math.floor(rand() * list.length) % list.length];
@@ -246,9 +257,13 @@ export function applyVariation(pack, v) {
     if (r.left === 0) problems.push(`variation "${v.seed}" removes every discovery path for rule ${rule} (§14.4: critical procedure items always have redundant discovery paths)`);
   }
 
-  /* 6. Weather, into both fields and the briefing. */
+  /* 6. Weather, into both fields and the briefing.
+   *
+   * ⚠ THE BRIEFING LINE IS ONE MESSAGE, not `label + '. ' + line`. Two whole sentences glued
+   * with a full stop is still assembly, and a language that wants the consequence before the
+   * condition has no way to say so. `weather.known` carries both and decides the order. */
   const w = WEATHER[v.weather] || WEATHER.still;
-  const t = TIMES[v.time] || TIMES.night;
+  const tod = TIMES[v.time] || TIMES.night;
 
   const incident = {
     ...pack.incident,
@@ -256,8 +271,8 @@ export function applyVariation(pack, v) {
       ...pack.incident.briefing,
       known: [
         ...(pack.incident.briefing.known || []),
-        { text: `${w.label}. ${w.line}`, confidence: 'probable' },
-        { text: `${t.label}. ${t.line}`, confidence: 'probable' },
+        { text: msg('weather.known', { label: w.label, line: w.line }), confidence: 'probable' },
+        { text: msg('time.known', { label: tod.label, line: tod.line }), confidence: 'probable' },
       ],
     } : pack.incident.briefing,
   };
@@ -266,7 +281,7 @@ export function applyVariation(pack, v) {
    * are about state rather than geometry. `Game.applyVariation` does that; the record
    * travels on the pack so it is available to whoever builds one. */
   return {
-    pack: { ...pack, map, incident, variation: v, weather: w, time: t },
+    pack: { ...pack, map, incident, variation: v, weather: w, time: tod },
     problems,
   };
 }

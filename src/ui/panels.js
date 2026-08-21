@@ -10,6 +10,19 @@
  * The planner's option lists deliberately contain the false leads. "The failed chiller is
  * the anchor" is on the target list because the maintenance log says so, and choosing it
  * produces a perfectly executable plan that does not work.
+ *
+ * ── WHAT IS KEYED HERE AND WHAT IS INTERPOLATED (GDD §23 Milestone 5) ─────────
+ *
+ * Every sentence this file says on its own behalf is a key in content/locales. Every
+ * sentence it repeats on somebody else's behalf is interpolated: an incident's headline, an
+ * item's displayName, a room's name, a claim's text, a planner option, a refusal string
+ * progression.js composed. The test is not "is it prose" but "who reviews it" — a briefing
+ * has a designer's reviewer and a button label has the UI's, and the two must not end up in
+ * one file.
+ *
+ * ⚠ THE IMPORT IS `msg`, NOT `t`. Three functions in this file bind a local `t` (a tab id,
+ * a transition, a list line), and a shadowed translator fails as "t is not a function" at
+ * the one moment the screen is being drawn.
  */
 
 import { CONFIG } from '../config.js';
@@ -17,7 +30,7 @@ import { recommendedManifest } from '../game.js';
 import { INCIDENTS } from '../sim/content.js';
 import { GameClock } from '../core/clock.js';
 import { escapeHtml } from './hud.js';
-import { t as msg } from '../core/i18n.js';
+import { t as msg, plural } from '../core/i18n.js';
 
 /**
  * The procedure card — GDD §18.4. Five fields the squad fills in and commits to, never
@@ -41,7 +54,21 @@ import { t as msg } from '../core/i18n.js';
  * exported as the DOCUMENTED FALLBACK for a package that has not authored one yet, which is
  * the same shape `CLAIMS` took in `sim/evidence.js` — and, like `CLAIMS`, a suite reports
  * every anomaly still relying on it, so the fallback cannot quietly become the design.
+ *
+ * ⚠ AND THAT IS WHY THEY ARE NOT IN content/locales. These options are CONTENT: they are one
+ * anomaly's procedure card standing in for an unauthored one, with a designer's reviewer,
+ * and the en-GB `_note` forbids content prose in the UI locale. A translated fallback would
+ * be the draught's opinions, reviewed by the UI's reviewer, presented as everybody's — the
+ * original defect with a second language on top. The `label` on each field IS chrome and IS
+ * localised; the tablet reads `tablet.procedure.field.<key>` and never `f.label`.
+ *
+ * The `i18n-exempt` markers below are what tools/i18n-tests.js section D honours. They name
+ * a REGION and a REASON, they are visible where the exemption applies rather than in a list
+ * somewhere else, and the suite counts them and prints them every run — so an exemption is a
+ * thing somebody has to defend rather than a thing that can be slipped in.
  */
+/* i18n-exempt:content — the draught's procedure card, standing in for an unauthored one.
+ * Content prose with a designer's reviewer; localised with the package, not with the engine. */
 const PROCEDURE_FIELDS = [
   {
     key: 'target', label: 'Target', options: [
@@ -90,6 +117,7 @@ const ABORTS = [
   'Thermal coverage of the approach lost for longer than 5s',
   'Pressure reaches Breach',
 ];
+/* i18n-exempt:end */
 
 /**
  * The planner an anomaly authors, or the draught's as a documented fallback.
@@ -133,7 +161,7 @@ export class Panels {
     this.tab = 'briefing';
     this.manifest = new Map();
     this.plan = { target: '', state: '', trigger: '', transfer: '', maintained: new Set(), abort: ABORTS[0] };
-    this.callsign = 'Operative';
+    this.callsign = msg('panels.squad.defaultCallsign');
     this.net = null;
   }
 
@@ -150,24 +178,35 @@ export class Panels {
    * same thing. The ambient line was worse than wrong: it read `CONFIG.heat.ambientC`, the
    * CONSTANT, so §14.4's weather could move the real ambient three degrees and this went on
    * printing 6C — the one number on the card a squad plans their fence around.
+   *
+   * ⚠ AND `circuit${n === 1 ? '' : 's'}` WAS ENGLISH GRAMMAR WRITTEN IN JAVASCRIPT. Two forms
+   * is English's rule; Polish has three. Each of these is a plural GROUP, and which form
+   * comes out is Intl.PluralRules' decision rather than a comparison's.
    */
   _conditions(g) {
     const out = [];
     const circuits = [...g.site.circuits.values()];
     if (circuits.length) {
       const dead = circuits.filter((c) => !c.on).length;
-      out.push(`${circuits.length} circuit${circuits.length === 1 ? '' : 's'} on this floor, ${dead === circuits.length ? 'all dead' : `${dead} dead`}. `
-        + circuits.map((c) => escapeHtml(c.switchLabel || c.displayName)).join('; ') + '.');
+      const names = circuits.map((c) => escapeHtml(c.switchLabel || c.displayName)).join('; ');
+      out.push(dead === circuits.length
+        ? plural('panels.conditions.circuitsAllDead', circuits.length, { names })
+        : plural('panels.conditions.circuitsSomeDead', circuits.length, { dead, names }));
     }
-    const amb = g.heat.ambientC;
+    const amb = g.heat.ambientC.toFixed(1);
     const w = g.content.weather;
-    out.push(`Ambient ${amb.toFixed(1)}C${w && w.ambientDeltaC ? ` — ${escapeHtml(w.label.toLowerCase())}, ${w.ambientDeltaC > 0 ? 'up' : 'down'} ${Math.abs(w.ambientDeltaC)} on the forecast` : ''}.`);
+    if (w && w.ambientDeltaC) {
+      out.push(msg(w.ambientDeltaC > 0 ? 'panels.conditions.ambientUp' : 'panels.conditions.ambientDown',
+        { celsius: amb, weather: escapeHtml(w.label.toLowerCase()), delta: Math.abs(w.ambientDeltaC) }));
+    } else {
+      out.push(msg('panels.conditions.ambient', { celsius: amb }));
+    }
     const doors = g.site.doors.length;
     if (doors) {
       const shut = g.site.doors.filter((d) => !d.open).length;
-      out.push(`${doors} door${doors === 1 ? '' : 's'}, ${shut} shut on arrival.`);
+      out.push(plural('panels.conditions.doors', doors, { shut }));
     }
-    return out.map((t) => `<li>${t}</li>`).join('');
+    return out.map((line) => `<li>${line}</li>`).join('');
   }
 
   _shell(title, sub, body, footer) {
@@ -197,56 +236,58 @@ export class Panels {
     const g = this.game;
     const roster = g.players.map((p) => `<li class="${p.connected ? '' : 'off'}">
       <b>${escapeHtml(p.name)}</b>
-      <span>${p.id === net.localPlayerId ? 'you' : p.connected ? 'ready' : 'no radio'}</span></li>`).join('');
+      <span>${p.id === net.localPlayerId ? msg('panels.squad.you')
+    : p.connected ? msg('panels.squad.ready') : msg('panels.squad.noRadio')}</span></li>`).join('');
 
     const hosting = net.role === 'host';
     const joined = net.role === 'client';
 
-    this._shell('Squad', 'Foundation regional response · 1–5 operatives', `
+    this._shell(msg('panels.squad.title'), msg('panels.squad.sub'), `
       <div class="cols">
         <section>
-          <h2>Deploy alone</h2>
-          <p>The whole operation is possible solo. It is simply slower, and there is nobody
-             to come and get you off the floor.</p>
-          <button class="go wide" data-solo ${net.online ? 'disabled' : ''}>Deploy solo</button>
+          <h2>${msg('panels.squad.soloHead')}</h2>
+          <p>${msg('panels.squad.soloBody')}</p>
+          <button class="go wide" data-solo ${net.online ? 'disabled' : ''}>${msg('panels.squad.soloButton')}</button>
 
-          <h2>Host an operation</h2>
-          <p>Your machine runs the mission. Everyone else connects to you with the code.</p>
-          <button class="wide" data-host ${net.online ? 'disabled' : ''}>Open a room</button>
+          <h2>${msg('panels.squad.hostHead')}</h2>
+          <p>${msg('panels.squad.hostBody')}</p>
+          <button class="wide" data-host ${net.online ? 'disabled' : ''}>${msg('panels.squad.hostButton')}</button>
           ${net.code ? `<div class="code">${net.code}</div>` : ''}
 
-          <h2>Join one</h2>
+          <h2>${msg('panels.squad.joinHead')}</h2>
           <div class="joiner">
-            <input data-code placeholder="CODE" maxlength="5" ${net.online ? 'disabled' : ''}>
-            <button data-join ${net.online ? 'disabled' : ''}>Join</button>
+            <input data-code placeholder="${escapeHtml(msg('panels.squad.codePlaceholder'))}" maxlength="5" ${net.online ? 'disabled' : ''}>
+            <button data-join ${net.online ? 'disabled' : ''}>${msg('panels.squad.joinButton')}</button>
           </div>
-          <p class="small">Callsign <input data-name value="${escapeHtml(this.callsign)}" maxlength="14" class="inline"></p>
+          <p class="small">${msg('panels.squad.callsignLabel')} <input data-name value="${escapeHtml(this.callsign)}" maxlength="14" class="inline"></p>
         </section>
         <section>
-          <h2>On the roster</h2>
+          <h2>${msg('panels.squad.rosterHead')}</h2>
           <ul class="roster">${roster}</ul>
           <p class="small status">${escapeHtml(net.status)}</p>
-          <h2>What a second operative changes</h2>
+          <h2>${msg('panels.squad.secondHead')}</h2>
           <ul>
-            <li>A fence goes up in a fraction of the time — a tripod is a long item, so each
-                of you can only carry one at a time.</li>
-            <li>Somebody can watch the imager while somebody else has both hands on the case.</li>
-            <li>A contact that puts you on the floor is survivable. Alone it is not.</li>
-            <li>Two on the case move it at nearly full pace; one drags it at three quarters.</li>
+            <li>${msg('panels.squad.secondFence')}</li>
+            <li>${msg('panels.squad.secondImager')}</li>
+            <li>${msg('panels.squad.secondContact')}</li>
+            <li>${msg('panels.squad.secondCase')}</li>
           </ul>
-          <p class="small">Joining is open until the squad commits to a procedure. After
-             that the operation is running and the door is shut.</p>
+          <p class="small">${msg('panels.squad.joiningOpen')}</p>
         </section>
       </div>`,
-      hosting
-        ? `<span class="waiting">Share the code, then brief the squad when everyone is on the roster.</span><button class="go" data-deploy>Brief us</button>`
-        : joined
-          ? `<span class="waiting">Waiting for the host to brief the squad…</span>`
-          : `<span class="waiting">Deploy alone, open a room for friends, or join one with a code.</span>`);
+    hosting
+      ? `<span class="waiting">${msg('panels.squad.hostFooter')}</span><button class="go" data-deploy>${msg('panels.squad.briefButton')}</button>`
+      : joined
+        ? `<span class="waiting">${msg('panels.squad.joinedFooter')}</span>`
+        : `<span class="waiting">${msg('panels.squad.idleFooter')}</span>`);
 
     const q = (s) => this.node.querySelector(s);
     const nameField = q('[data-name]');
-    if (nameField) nameField.onchange = () => { this.callsign = nameField.value.trim().slice(0, 14) || 'Operative'; };
+    if (nameField) {
+      nameField.onchange = () => {
+        this.callsign = nameField.value.trim().slice(0, 14) || msg('panels.squad.defaultCallsign');
+      };
+    }
     const solo = q('[data-solo]');
     if (solo) solo.onclick = () => { this.open = null; this.node.style.display = 'none'; this.showLoadout(); };
     const hostBtn = q('[data-host]');
@@ -287,53 +328,54 @@ export class Panels {
     const warn = [];
     const have = (id) => (this.manifest.get(id) || 0) > 0;
     const heatUnits = (this.manifest.get('floodlight-tripod') || 0) + (this.manifest.get('portable-heater') || 0);
-    if (!have('thermal-imager')) warn.push('No thermal instrument. You will be working from traces alone.');
-    if (!have('reinforced-transit-case')) warn.push('No custody container. Nothing on this manifest can take custody of anything.');
-    if (heatUnits === 0) warn.push('No heat-emitting equipment.');
-    else if (heatUnits < 2) warn.push('One heat emitter. The storage aisles are 4.2m across.');
-    if (!have('trauma-kit')) warn.push('No medical capacity.');
+    if (!have('thermal-imager')) warn.push(msg('panels.card.warnNoThermal'));
+    if (!have('reinforced-transit-case')) warn.push(msg('panels.card.warnNoCase'));
+    if (heatUnits === 0) warn.push(msg('panels.card.warnNoHeat'));
+    else if (heatUnits < 2) warn.push(msg('panels.card.warnOneHeat'));
+    if (!have('trauma-kit')) warn.push(msg('panels.card.warnNoMedical'));
 
     /* The briefing is the INCIDENT's, not the map's — two operations on this floor read
      * completely differently, and that is the point of them sharing it (GDD §15.2). */
     const inc = g.content.incident || {};
     const brief = inc.briefing || {};
-    const known = (brief.known || []).map((k) =>
-      `<li>${escapeHtml(k.text)} <span class="conf">confidence: ${escapeHtml(k.confidence)}</span></li>`).join('');
+    const known = (brief.known || []).map((k) => `<li>${escapeHtml(k.text)} <span class="conf">${
+      msg('panels.card.confidence', { word: escapeHtml(k.confidence) })}</span></li>`).join('');
     const others = INCIDENTS.filter((id) => id !== inc.id);
 
-    this._shell(`Operation card — ${escapeHtml(g.site.displayName)}`,
-      `Foundation regional response · ${escapeHtml(inc.displayName || inc.id || '')}`, `
+    this._shell(msg('panels.card.title', { site: escapeHtml(g.site.displayName) }),
+      msg('panels.card.sub', { incident: escapeHtml(inc.displayName || inc.id || '') }), `
       <div class="cols">
         <section class="brief">
-          <h2>Incident</h2>
+          <h2>${msg('panels.card.incidentHead')}</h2>
           <p><b>${escapeHtml(brief.headline || '')}</b></p>
           <p>${escapeHtml(brief.report || '')}</p>
-          <h2>Conditions</h2>
+          <h2>${msg('panels.card.conditionsHead')}</h2>
           <ul>
             ${this._conditions(g)}
             ${known}
           </ul>
-          <h2>Mandate</h2>
-          <p><b>Primary:</b> establish custody of the anomaly and transfer it to the stair head.</p>
-          <p><b>Optional:</b> recover all issued equipment · avoid a second contact · preserve a sample.</p>
-          <p class="small">Reports may be incomplete. They are not deliberately false.</p>
-          ${others.length ? `<h2>Other open operations</h2>
-            <p class="small">The same floor, a different incident. Everything you learned about
-               the building still applies; nothing you learned about the anomaly does.</p>
-            ${others.map((id) => `<button class="wide" data-incident="${id}">Deploy to ${escapeHtml(id.replace(/^cold-storage-/, ''))} instead</button>`).join('')}` : ''}
+          <h2>${msg('panels.card.mandateHead')}</h2>
+          <p>${msg('panels.card.mandatePrimary')}</p>
+          <p>${msg('panels.card.mandateOptional')}</p>
+          <p class="small">${msg('panels.card.reportsIncomplete')}</p>
+          ${others.length ? `<h2>${msg('panels.card.otherHead')}</h2>
+            <p class="small">${msg('panels.card.otherBody')}</p>
+            ${others.map((id) => `<button class="wide" data-incident="${id}">${
+  msg('panels.card.otherButton', { name: escapeHtml(id.replace(/^cold-storage-/, '')) })}</button>`).join('')}` : ''}
         </section>
         <section class="kit">
-          <h2>Cargo manifest</h2>
+          <h2>${msg('panels.card.manifestHead')}</h2>
           <div class="budget ${used > budget ? 'over' : ''}">
             <div class="bar"><i style="width:${Math.min(100, (used / budget) * 100)}%"></i></div>
-            <span>${used} of ${budget} volume</span>
+            <span>${msg('panels.card.budget', { used, budget })}</span>
           </div>
           <table class="items"><tbody>${rows}</tbody></table>
-          ${warn.length ? `<div class="warn"><b>Coverage</b><ul>${warn.map((w) => `<li>${w}</li>`).join('')}</ul></div>` : ''}
+          ${warn.length ? `<div class="warn"><b>${msg('panels.card.coverageHead')}</b><ul>${
+  warn.map((w) => `<li>${w}</li>`).join('')}</ul></div>` : ''}
         </section>
       </div>`,
-      `<button class="ghost" data-reset>Recommended manifest</button>
-       <button class="go" data-deploy ${used > budget ? 'disabled' : ''}>Deploy</button>`);
+      `<button class="ghost" data-reset>${msg('panels.card.recommended')}</button>
+       <button class="go" data-deploy ${used > budget ? 'disabled' : ''}>${msg('panels.card.deploy')}</button>`);
 
     this.node.querySelectorAll('[data-inc]').forEach((b) => b.onclick = () => {
       const id = b.dataset.inc;
@@ -375,7 +417,11 @@ export class Panels {
   _renderTablet() {
     const g = this.game;
     const tabs = ['briefing', 'evidence', 'board', 'procedure'];
-    const nav = tabs.map((t) => `<button data-tab="${t}" class="${t === this.tab ? 'on' : ''}">${t[0].toUpperCase() + t.slice(1)}</button>`).join('');
+    /* ⚠ THE TAB LABEL WAS `id[0].toUpperCase() + id.slice(1)` — English capitalisation
+     * performed on an identifier, which is also the wrong WORD in any language whose term
+     * for "evidence" is not "evidence". The id stays the id; the label is a message. */
+    const nav = tabs.map((id) => `<button data-tab="${id}" class="${id === this.tab ? 'on' : ''}">${
+      msg(`tablet.tab.${id}`)}</button>`).join('');
     let body = '';
 
     if (this.tab === 'briefing') {
@@ -417,25 +463,32 @@ export class Panels {
         <ul>${known}<li>${msg('tablet.briefing.ambient', { celsius: g.heat.ambientC.toFixed(1) })}</li></ul>
         <h2>${msg('tablet.briefing.controls')}</h2>
         <div class="keys">
-          <div><kbd>W A S D</kbd> move · <kbd>Shift</kbd> sprint · <kbd>Ctrl</kbd> crouch</div>
-          <div><kbd>F</kbd> the context verb (it says what it will do)</div>
-          <div><kbd>E</kbd> use or deploy what is in hand · <kbd>1</kbd>–<kbd>5</kbd> select a slot</div>
-          <div><kbd>Q</kbd> thermal imager on/off · <kbd>Tab</kbd> tablet · <kbd>Esc</kbd> release the mouse</div>
+          <div>${msg('tablet.briefing.keysMove')}</div>
+          <div>${msg('tablet.briefing.keysVerb')}</div>
+          <div>${msg('tablet.briefing.keysUse')}</div>
+          <div>${msg('tablet.briefing.keysScreens')}</div>
         </div></div>`;
     }
 
     if (this.tab === 'evidence') {
+      /* `type`, `reliability`, `dimension` and `integrity` are the EVIDENCE RULE's own
+       * fields, read from the anomaly package. They are interpolated, never keyed — a
+       * vocabulary a content author can extend cannot live in the engine's locale. */
       const rows = g.ledger.entries.map((e) => `
-        <li class="ev ${e.isFalseLead ? '' : ''}">
-          <div class="head"><b>#${e.seq} ${e.type}</b>
-            <span class="rel ${e.reliability}">${e.reliability}</span>
-            <span class="when">${GameClock.formatMs(e.simTimeMs)} · ${escapeHtml(e.room)}</span></div>
+        <li class="ev">
+          <div class="head"><b>${msg('tablet.evidence.head', { seq: e.seq, type: escapeHtml(e.type) })}</b>
+            <span class="rel ${e.reliability}">${escapeHtml(e.reliability)}</span>
+            <span class="when">${msg('tablet.evidence.when', {
+    time: GameClock.formatMs(e.simTimeMs), room: escapeHtml(e.room),
+  })}</span></div>
           <p>${escapeHtml(e.raw)}</p>
-          <div class="prov">recorded by ${e.source} · integrity ${e.integrity} · dimension: ${e.dimension}</div>
+          <div class="prov">${msg('tablet.evidence.provenance', {
+    source: escapeHtml(e.source), integrity: escapeHtml(e.integrity), dimension: escapeHtml(e.dimension),
+  })}</div>
         </li>`).join('');
       body = `<div class="pad">
-        <p class="small">Raw observations, in the order they were made. The ledger records what was seen; what it means is on the board.</p>
-        <ul class="evlist">${rows || '<li class="empty">Nothing logged yet.</li>'}</ul></div>`;
+        <p class="small">${msg('tablet.evidence.intro')}</p>
+        <ul class="evlist">${rows || `<li class="empty">${msg('tablet.evidence.empty')}</li>`}</ul></div>`;
     }
 
     if (this.tab === 'board') {
@@ -444,53 +497,74 @@ export class Panels {
        * draught's opinions on the tablet — the lodger's board offered "a sustained heat
        * gradient above 40C stops it dead" about a thing that has never been recorded
        * moving, and offered it with support, because two evidence ids happened to be
-       * spelled the same in both files. */
+       * spelled the same in both files.
+       *
+       * ⚠ AND THE SUPPORT WORD IS AN ID AS WELL AS A LABEL. `supportFor()` returns it, this
+       * turns it into a CSS class, and a suite compares against 'strong'. So the slug goes
+       * on the element and the message goes in the text. */
       const rows = g.ledger.claims.map((c) => {
         const sup = g.ledger.supportFor(c);
         const st = g.ledger.claimState.get(c.id);
+        const slug = sup.word.replace(/ /g, '-');
+        const word = msg(`tablet.board.support.${slug}`);
+        const support = sup.hits.length
+          ? plural('tablet.board.supportWithHits', sup.hits.length, { word })
+          : msg('tablet.board.supportOnly', { word });
         return `<li class="claim">
-          <div class="txt">${escapeHtml(c.text)}<span class="dim">${c.dimension}</span></div>
-          <div class="sup ${sup.word.replace(/ /g, '-')}">${sup.word}${sup.hits.length ? ` · ${sup.hits.length} observation${sup.hits.length === 1 ? '' : 's'}` : ''}</div>
+          <div class="txt">${escapeHtml(c.text)}<span class="dim">${escapeHtml(c.dimension)}</span></div>
+          <div class="sup ${slug}">${support}</div>
           <div class="btns">
-            <button data-claim="${c.id}" data-val="believed" class="${st === 'believed' ? 'on' : ''}">believe</button>
-            <button data-claim="${c.id}" data-val="excluded" class="${st === 'excluded' ? 'on' : ''}">exclude</button>
+            <button data-claim="${c.id}" data-val="believed" class="${st === 'believed' ? 'on' : ''}">${msg('tablet.board.believe')}</button>
+            <button data-claim="${c.id}" data-val="excluded" class="${st === 'excluded' ? 'on' : ''}">${msg('tablet.board.exclude')}</button>
           </div></li>`;
       }).join('');
       body = `<div class="pad">
-        <p class="small">Contradictions stay on the board. Nothing here is ticked for you, and the support word never becomes a percentage.</p>
+        <p class="small">${msg('tablet.board.intro')}</p>
         <ul class="claims">${rows}</ul></div>`;
     }
 
     if (this.tab === 'procedure') {
-      const sel = (f) => `<label>${f.label}
+      /* The field LABEL is chrome and is keyed off `f.key`; the OPTIONS are the anomaly's
+       * planner block or the draught's card, and are content. See PROCEDURE_FIELDS. */
+      const sel = (f) => `<label>${msg(`tablet.procedure.field.${f.key}`)}
         <select data-field="${f.key}">
-          <option value="">—</option>
-          ${f.options.map((o) => `<option ${this.plan[f.key] === o ? 'selected' : ''}>${o}</option>`).join('')}
+          <option value="">${msg('tablet.procedure.unset')}</option>
+          ${f.options.map((o) => `<option ${this.plan[f.key] === o ? 'selected' : ''}>${escapeHtml(o)}</option>`).join('')}
         </select></label>`;
       /* ⚠ THE PLANNER IS THE LOADED ANOMALY'S PLANNER, for the same reason the board is.
        * These were the draught's four fields shown for every incident, so a squad planning
        * the caller — which hunts sound and is stopped by silence — was offered a heat
        * gradient, a chiller and a freight door, and nothing about being quiet. */
       const planner = plannerFor(g.anomaly.def);
-      const maint = planner.maintained.map((m, i) => `<label class="chk"><input type="checkbox" data-maint="${i}" ${this.plan.maintained.has(m) ? 'checked' : ''}>${m}</label>`).join('');
-      const abort = `<label>Abort condition<select data-abort>${planner.aborts.map((a) => `<option ${this.plan.abort === a ? 'selected' : ''}>${a}</option>`).join('')}</select></label>`;
+      const maint = planner.maintained.map((m, i) => `<label class="chk"><input type="checkbox" data-maint="${i}" ${
+        this.plan.maintained.has(m) ? 'checked' : ''}>${escapeHtml(m)}</label>`).join('');
+      const abort = `<label>${msg('tablet.procedure.abort')}<select data-abort>${
+        planner.aborts.map((a) => `<option ${this.plan.abort === a ? 'selected' : ''}>${escapeHtml(a)}</option>`).join('')}</select></label>`;
       const committed = g.mission.procedure;
       body = `<div class="pad plan">
-        <p class="small">Five fields. The planner does not know whether your plan is right — it produces the checklist you said you would follow.</p>
+        <p class="small">${msg('tablet.procedure.intro')}</p>
         ${planner.fields.map(sel).join('')}
-        <div class="maint"><span>Maintained conditions</span>${maint}</div>
+        <div class="maint"><span>${msg('tablet.procedure.maintained')}</span>${maint}</div>
         ${abort}
-        ${committed ? `<div class="card"><b>Committed at ${GameClock.formatMs(committed.committedMs)}</b>
+        ${committed ? `<div class="card"><b>${msg('tablet.procedure.committed', { time: GameClock.formatMs(committed.committedMs) })}</b>
           <ol>${[committed.target, committed.state, committed.trigger, committed.transfer].filter(Boolean).map((x) => `<li>${escapeHtml(x)}</li>`).join('')}</ol>
-          <div class="ab">Abort: ${escapeHtml(committed.abort)}</div></div>` : ''}
+          <div class="ab">${msg('tablet.procedure.abortLine', { condition: escapeHtml(committed.abort) })}</div></div>` : ''}
       </div>`;
     }
 
-    this._shell('Field tablet', `${g.mission.phase} · ${GameClock.formatMs(g.clock.simTimeMs)} · incident pressure ${g.mission.stageName}`,
-      `<nav class="tabs">${nav}</nav>${body}`,
-      this.tab === 'procedure'
-        ? `<button class="ghost" data-close>Close</button><button class="go" data-commit>Commit procedure</button>`
-        : `<button class="ghost" data-close>Close</button>`);
+    /* ⚠ THE PHASE AND THE PRESSURE STAGE ARE IDS. `PHASE.ARRIVAL` is the literal 'Arrival'
+     * and `stageNames[0]` is 'Latent'; both are compared against and carried in a snapshot,
+     * and both were also printed here raw — an English word inside an otherwise translated
+     * line, which is exactly what the pseudolocale showed on the HUD. */
+    this._shell(msg('tablet.shell.title'), msg('tablet.shell.sub', {
+      phase: msg(`phase.${g.mission.phase}`),
+      time: GameClock.formatMs(g.clock.simTimeMs),
+      stage: msg(`pressure.${g.mission.stageName}`),
+    }),
+    `<nav class="tabs">${nav}</nav>${body}`,
+    this.tab === 'procedure'
+      ? `<button class="ghost" data-close>${msg('tablet.shell.close')}</button><button class="go" data-commit>${msg('tablet.shell.commit')}</button>`
+      : `<button class="ghost" data-close>${msg('tablet.shell.close')}</button>`);
 
     this.node.querySelectorAll('[data-tab]').forEach((b) => b.onclick = () => this.showTablet(b.dataset.tab));
     this.node.querySelector('[data-close]').onclick = () => this.hide();
@@ -507,10 +581,12 @@ export class Panels {
     const ab = this.node.querySelector('[data-abort]');
     if (ab) ab.onchange = () => { this.plan.abort = ab.value; };
     const commit = this.node.querySelector('[data-commit]');
-    if (commit) commit.onclick = () => {
-      g.commitProcedure({ ...this.plan, maintained: Array.from(this.plan.maintained) });
-      this.hide();
-    };
+    if (commit) {
+      commit.onclick = () => {
+        g.commitProcedure({ ...this.plan, maintained: Array.from(this.plan.maintained) });
+        this.hide();
+      };
+    }
   }
 
   /* ── the cargo manifest, in the field ────────────────────────────────────── */
@@ -527,13 +603,15 @@ export class Panels {
       return `<tr class="${n ? '' : 'gone'}">
         <td class="name"><b>${it.displayName}</b><span>${escapeHtml(it.summary || '')}</span></td>
         <td class="vol">${it.bulk}</td><td class="qty">${n}</td>
-        <td><button data-take="${itemId}" ${n ? '' : 'disabled'}>Take</button></td></tr>`;
+        <td><button data-take="${itemId}" ${n ? '' : 'disabled'}>${msg('panels.cache.take')}</button></td></tr>`;
     }).join('');
     const held = g.player.heldItemId;
-    this._shell('Cargo manifest', 'Mobile command point · everything you did not carry in is here',
+    this._shell(msg('panels.cache.title'), msg('panels.cache.sub'),
       `<div class="pad"><table class="items"><tbody>${rows}</tbody></table>
-       <p class="small">Slots: two belt (compact), two general, one long. Return anything you are not using — a mistake here is meant to be recoverable.</p></div>`,
-      `${held ? `<button class="ghost" data-return>Return the ${g.itemsById.get(held).displayName}</button>` : ''}<button class="go" data-close>Close</button>`);
+       <p class="small">${msg('panels.cache.slots')}</p></div>`,
+      `${held ? `<button class="ghost" data-return>${
+        msg('panels.cache.returnItem', { name: g.itemsById.get(held).displayName })}</button>` : ''
+      }<button class="go" data-close>${msg('panels.cache.close')}</button>`);
 
     this.node.querySelectorAll('[data-take]').forEach((b) => b.onclick = () => {
       const err = g.takeFromCache(b.dataset.take);
@@ -553,24 +631,29 @@ export class Panels {
     const dims = result.dims.map((d) => `<li><b>${d.name}</b><span class="w">${d.word}</span><p>${escapeHtml(d.why)}</p></li>`).join('');
     const rules = g.ledger.claims.map((c) => {
       const s = g.ledger.claimState.get(c.id);
-      const mark = s === null ? '—' : (s === 'believed') === c.truth ? '✓' : '✕';
+      const mark = s === null ? msg('debrief.screen.unmarked') : (s === 'believed') === c.truth ? '✓' : '✕';
       return `<li class="${mark === '✓' ? 'ok' : mark === '✕' ? 'bad' : 'un'}"><span>${mark}</span>${escapeHtml(c.text)}
-        <em>${c.truth ? 'the site behaved this way' : 'the site never behaved this way'}</em></li>`;
+        <em>${c.truth ? msg('debrief.screen.markedTrue') : msg('debrief.screen.markedFalse')}</em></li>`;
     }).join('');
-    const trans = g.anomaly.transitions.map((t) => `<li><b>${GameClock.formatMs(t.simTimeMs)}</b> ${t.from} → ${t.to} <em>(${t.triggerId})</em><p>${escapeHtml(t.telegraph)}</p></li>`).join('');
+    /* The state names and the trigger id are the anomaly package's own vocabulary. */
+    const trans = g.anomaly.transitions.map((tr) => `<li><b>${GameClock.formatMs(tr.simTimeMs)}</b> ${
+      msg('debrief.screen.transition', { from: escapeHtml(tr.from), to: escapeHtml(tr.to) })} <em>${
+      msg('debrief.screen.trigger', { trigger: escapeHtml(tr.triggerId) })}</em><p>${escapeHtml(tr.telegraph)}</p></li>`).join('');
 
-    this._shell(`Debrief — ${result.overall}`,
-      result.failReason ? escapeHtml(result.failReason) : 'Operation closed.',
+    /* ⚠ `result.overall` IS AN ID. base.js maps it onto a CSS pill and a saved profile has a
+     * whole history written in it, so the value stays English and the label sits beside it. */
+    this._shell(msg('debrief.screen.title', { grade: msg(`grade.${result.overall}`) }),
+      result.failReason ? escapeHtml(result.failReason) : msg('debrief.screen.closed'),
       `<div class="cols">
-        <section><h2>Assessment</h2><ul class="dims">${dims}</ul></section>
+        <section><h2>${msg('debrief.screen.assessment')}</h2><ul class="dims">${dims}</ul></section>
         <section>
-          <h2>What it did, and why</h2>
-          <ul class="trans">${trans || '<li class="empty">It never changed state.</li>'}</ul>
-          <h2>Rules, marked against the site</h2>
+          <h2>${msg('debrief.screen.transitions')}</h2>
+          <ul class="trans">${trans || `<li class="empty">${msg('debrief.screen.noTransitions')}</li>`}</ul>
+          <h2>${msg('debrief.screen.rules')}</h2>
           <ul class="rules">${rules}</ul>
         </section>
       </div>`,
-      `<button class="go" data-again>Run it again</button>`);
+      `<button class="go" data-again>${msg('debrief.screen.again')}</button>`);
     this.node.querySelector('[data-again]').onclick = () => window.location.reload();
   }
 }

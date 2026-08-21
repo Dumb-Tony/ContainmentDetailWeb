@@ -327,11 +327,57 @@
       ],
       "_note": "THE SECOND OPERATION ON THE NINTH FLOOR, and the one that inverts what the first taught. The gallery draught is a journey and a fence; this never leaves one flat and there is nothing to build. Ashlar's thirty-eight plasterboard walls were useless against the draught and are the answer here: they stop a sightline and nothing else, so a wall on this floor is privacy rather than protection. A squad that has done aisle B will deploy a camera on it out of habit and hold it rigid for that camera's whole battery.",
       "incident": "ashlar-flat-lodger"
+    },
+    {
+      "id": "op-harrowbank-ballast",
+      "name": "Harrowbank switching compound",
+      "mapId": "harrowbank-switchyard",
+      "anomalyId": "harrowbank-ballast",
+      "clearanceRequired": 1,
+      "difficulty": "Field",
+      "status": "authorised",
+      "distance": "An hour and fifty on the trunk road, then four miles of unmade track. The compound gate is padlocked and the incomer is open, so nothing on the site has power until somebody walks in and throws it.",
+      "mandate": "Establish custody of whatever is on the north half of the compound, together with every part of it that is loose on the ground, and transfer the case to the vehicle.",
+      "optional": [
+        "Recover all issued equipment",
+        "Avoid a second contact",
+        "Lift a sample of the ground dust before the case is closed"
+      ],
+      "conditions": [
+        "Three-man gang withdrawn after two days. One of them is in hospital with a crush injury and nothing fell on him.",
+        "Stone barrowed out to the skip was back in the yard by the afternoon. Twice, on two weighbridge tickets twenty-six hours apart.",
+        "The compound has been dark for nine days. Both yard circuits are dead and the two breakers are in different halves of the site."
+      ],
+      "_note": "THE FIRST OPERATION ON A COMPOUND RATHER THAN IN A BUILDING, and the first one where the site's own containment is worth nothing to the job. Harrowbank hands a squad six ready-made pens — five switch bays and an oil bund, all cast concrete, all reading three escape rays bare — and this incident does not need one of them. What it needs is for the yard to be stripped while something walks it, and the only thing on the site that helps with that is a burning object placed as far from the transit case as a person can carry it. A squad that walks in with the draught's loadout has brought a beacon and stood behind it.",
+      "incident": "harrowbank-ballast"
+    },
+    {
+      "id": "op-cold-storage-toll",
+      "name": "Coldharbour cold storage, level 2",
+      "mapId": "cold-storage-l2",
+      "anomalyId": "netherfold-toll",
+      "clearanceRequired": 1,
+      "difficulty": "Field",
+      "status": "authorised",
+      "distance": "Forty minutes. The fifth time down that stair, and the first time the floor has hurt somebody who was standing still.",
+      "mandate": "Establish custody of whatever is in one of the four floor gullies on level 2 and transfer it to the stair head.",
+      "optional": [
+        "Recover all issued equipment",
+        "No operative below two conditions at extraction",
+        "Lift a rime sample from an unoccupied gully"
+      ],
+      "conditions": [
+        "One attendant hospitalised with cold burns to both hands and no account of twenty minutes.",
+        "Both men who were on the floor are on site and both of them went back the following night on purpose.",
+        "Four gullies on the same run, all the same fitting, all with an old rime ring round them. The site does not know which one is meant."
+      ],
+      "_note": "THE FIFTH OPERATION ON THIS FLOOR AND THE FIRST WITH A PRICE ON IT. Four operations' worth of correct knowledge about cold storage level 2 and none of it applies: the aisles do not matter, a camera does nothing at all, and the imager finds the thing in four seconds and then has no further job. What is left is a fee — eighteen unbroken seconds of something warm inside two metres — and the only thing on this floor that can pay it without a battery in it is a person. The optional line about conditions at extraction is not decoration; the minimum grade of this procedure has an injury in it by design.",
+      "incident": "cold-storage-toll"
     }
   ],
 
 
-  "_boardNote": "Seven operations, and every one of them is playable to custody — the board does not pad itself with contracts that do not exist. §18.1 does not allow the UI to lie about what is available, so a greyed-out entry would be a promise this build cannot keep. Three buildings carry seven incidents: cold storage level 2 alone has four, and the ninth floor of Ashlar has two. That is the whole of §15.2 in one column — the building is a variable and the incident is a variable, and they vary independently — and by the fourth trip down the same stair the point is no longer that the map is reused. It is that a squad arrives carrying three operations' worth of correct knowledge about that floor and has to work out which of it still applies.",
+  "_boardNote": "Nine operations, and every one of them is playable to custody — the board does not pad itself with contracts that do not exist. §18.1 does not allow the UI to lie about what is available, so a greyed-out entry would be a promise this build cannot keep. FOUR SITES CARRY NINE INCIDENTS: cold storage level 2 alone has five, the ninth floor of Ashlar has two, and Blackthorn Reserve and Harrowbank have one each. That is the whole of §15.2 in one column — the site is a variable and the incident is a variable, and they vary independently — and by the fifth trip down the same stair the point is no longer that the map is reused. It is that a squad arrives carrying four operations' worth of correct knowledge about that floor and has to work out which of it still applies. On the fifth, none of it does.\n\nThe column is deliberately not sorted by difficulty. Every entry is Field grade at clearance 1 and the order is the order they were authorised, because a board that ranked them would be answering the one question §18.4's planner exists to make the squad answer for itself.",
 
   "containmentWing": {
     "framing": "Entries record where it came from, what holding it costs, and what it has done since. They do not rank captures, do not count them as a score, and do not describe anything held here as a prize. An object in a cell is an ongoing operational commitment, not a result.",
@@ -531,6 +577,62 @@
           "requires": { "rules": 5, "research": 180 },
           "text": "The five-second figure sits inside the seven-second contact cooldown, so an operative who takes station correctly eats exactly one contact and not two. A squad that does not know the figure is five will turn back round at three and buy nothing.",
           "grants": "Both figures appear on the briefing."
+        }
+      ]
+    },
+    {
+      "anomalyId": "harrowbank-ballast",
+      "designation": "HB-12 (provisional)",
+      "classFraming": "A thermal negative with weight in it that holds a set of ordinary objects and cannot be lifted while it holds any of them. It moves toward the hottest thing it can find, sits on that thing for about half a minute, and then chooses again. Concrete stops it and a heat gradient does not, which is the reverse of GB-04 on both counts and the wing has asked that the two not be filed together.",
+      "holding": "sealed case with its own ballast inside it, locker-scale, contents not to be separated from it under any circumstances",
+      "cellRequirement": "object",
+      "operationalCost": "Cheap to hold and expensive to handle. It draws no environmental control at all — nothing in the file is about temperature once the lid is over — but the case cannot be opened and cannot be inventoried, because taking one stone out of it is the same act as releasing it. Cell 3 therefore holds a sealed container the wing is not permitted to look inside, which the standing orders had no wording for and now do.",
+      "insights": [
+        {
+          "id": "hb-12-what-it-holds",
+          "requires": { "rules": 2 },
+          "text": "It will not go in a box while it owns anything. Every piece of it that is loose has to be in the case and nothing else may be, because a case with the wrong thing in it counts as full of nothing.",
+          "grants": "A line on the operation card before the squad deploys."
+        },
+        {
+          "id": "hb-12-the-hottest-thing",
+          "requires": { "rules": 4 },
+          "text": "It goes to the hottest object on the site and not to the nearest person, and the transit case at 39C is an object. Whatever is left burning is where it will be, and it is only dangerous on the way there.",
+          "grants": "The archive files the decoy as procedure rather than the squad discovering it by being walked at."
+        },
+        {
+          "id": "hb-12-the-cure-is-the-release",
+          "requires": { "rules": 5, "research": 200 },
+          "text": "Turning the case out is the only way to clear a wrong object from it, and it is also what puts every part of it back on the ground. Two recovery crews have now written down the same afternoon: the skip went, and the shift after that was the worst one they had.",
+          "grants": "The briefing carries the warning instead of the debrief carrying the explanation."
+        }
+      ]
+    },
+    {
+      "anomalyId": "netherfold-toll",
+      "designation": "NF-08 (provisional)",
+      "classFraming": "A thermal negative that does not move, does not respond to being watched and does not respond to sound. What it responds to is warmth staying inside two metres of it without a break, and after enough of that it stops and will go in a box. It is the only entry in this file whose containment has a price rather than a procedure.",
+      "holding": "sealed case, heater cycling, cell interior channel on, one operative",
+      "cellRequirement": "thermal",
+      "operationalCost": "It wants Cell 1, and Cell 1 is where GB-04 is. That is a scheduling problem rather than a technical one and it is written here because it is going to be somebody's afternoon: the wing has one position rated for a thermal negative and two things that read as one. Holding cost otherwise is low — a sealed case draws nothing from it, because it only takes while something warm is inside the reach and the reach is inside the case.",
+      "insights": [
+        {
+          "id": "nf-08-the-fee",
+          "requires": { "rules": 2 },
+          "text": "Something warm has to stay inside two metres of it, unbroken, for eighteen seconds. It does not care what the warm thing is and it does not care who is watching.",
+          "grants": "A line on the operation card before the squad deploys."
+        },
+        {
+          "id": "nf-08-step-out",
+          "requires": { "rules": 4 },
+          "text": "Three seconds after it stops, anything warm still standing in its reach starts the whole fee again from nothing. There is no partial credit and no warning beyond the rime edge starting to move.",
+          "grants": "The archive files the last move rather than the squad losing a fee to it."
+        },
+        {
+          "id": "nf-08-what-can-pay",
+          "requires": { "rules": 5, "research": 160 },
+          "text": "Anything with a cell in it inside those two metres empties about twelve times faster than rated, so a portable heater will pay the fee once and will not pay it twice. The only payer with nothing to drain is a person, and two of the three site staff who have worked this out did it by accident.",
+          "grants": "The briefing carries the trade instead of a squad spending a case's cells finding it."
         }
       ]
     }

@@ -18,9 +18,26 @@
  * to colour the overall word. That is a deliberate borrow, not a mistake: the two scales
  * mean different things and happen to want the same green-amber-red, and reusing it costs
  * no new CSS. If the reliability colours are ever restyled, look here.
+ *
+ * ── WHAT IS KEYED AND WHAT IS INTERPOLATED (GDD §23 Milestone 5) ──────────────
+ *
+ * The furniture is keyed; everything the model or the site file says is interpolated.
+ * Department names, upgrade names and blurbs, cell labels, room names and purposes, dossier
+ * designations, condition names, treatment names, and every refusal progression.js composed
+ * are all read out of content/site.json or the progression tables — a site that shipped with
+ * different rooms would need no line of content/locales.
+ *
+ * ⚠ THE IMPORT IS `msg`. Four functions here bind a local `t` — a standing tier, a clearance
+ * tier, a treatment, an upgrade — and a shadowed translator fails as "t is not a function"
+ * at the moment the screen is drawn.
+ *
+ * ⚠ AND `operation${n === 1 ? '' : 's'}` APPEARED EIGHT TIMES IN THIS FILE. That is English's
+ * plural rule written out; Polish has three forms and Arabic six. Every one is now a plural
+ * GROUP selected by Intl.PluralRules.
  */
 
 import { escapeHtml } from './hud.js';
+import { t as msg, plural } from '../core/i18n.js';
 import {
   DEPARTMENTS, RESOURCES, CLEARANCE_TIERS, UPGRADES, TREATMENTS,
   STANDING_FLOOR, STANDING_CEILING, standingTier, clearanceTier,
@@ -41,6 +58,19 @@ const OVERALL_PILL = {
 
 const money = (n) => `${n < 0 ? '−' : ''}${Math.abs(Math.round(n))}`;
 const signed = (n) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${Math.abs(Math.round(n))}`;
+
+/**
+ * The label for an overall grade. ⚠ THE VALUE IS AN ID: `grade()` returns it, OVERALL_PILL
+ * keys a CSS class off it, and a saved profile has years of operations recorded in it. So
+ * the id stays English in the data and the label comes from the table — the same split
+ * `phase` and `pressure` make, found the same way.
+ */
+const gradeLabel = (word) => (word ? msg(`grade.${word}`) : '');
+
+/** The label a fitted-equipment row prints for one changed field, in the item's own unit. */
+const issuedValue = (field, value) => (value === undefined
+  ? msg('base.issued.missing')
+  : msg(`base.issued.unit.${field}`, { value }));
 
 export class BaseScreen {
   /**
@@ -111,12 +141,13 @@ export class BaseScreen {
     const nav = rooms.map((r) => {
       const openRoom = pr.roomOpen(r);
       const need = clearanceTier(r.clearanceRequired || 0).name;
+      const why = escapeHtml(msg('base.shell.requiresTier', { tier: need }));
       return `<button data-room="${r.id}" class="${r.id === this.tab ? 'on' : ''}"
-        ${openRoom ? '' : `disabled title="Requires ${escapeHtml(need)}"`}>${escapeHtml(r.name.split(' ')[0])}</button>`;
+        ${openRoom ? '' : `disabled title="${why}"`}>${escapeHtml(r.name.split(' ')[0])}</button>`;
     }).join('');
 
     const room = rooms.find((r) => r.id === this.tab) || rooms[0] || null;
-    let body = '<div class="pad"><p class="empty">The site file names no rooms.</p></div>';
+    let body = `<div class="pad"><p class="empty">${msg('base.shell.noRooms')}</p></div>`;
     if (room) {
       if (this.tab === 'operations') body = this._operations(room);
       else if (this.tab === 'logistics') body = this._logistics(room);
@@ -128,16 +159,19 @@ export class BaseScreen {
 
     const op = this._authorisedOperation();
     const footer = this.tab === 'operations' && op
-      ? `<span class="waiting">${escapeHtml(this.site.condition === 'underfunded'
-          ? 'Everything you take is everything you have.' : '')}</span>
-         <button class="ghost" data-close>Close</button>
-         <button class="go" data-deploy>Take the operation</button>`
-      : `<button class="go" data-close>Close</button>`;
+      ? `<span class="waiting">${this.site.condition === 'underfunded' ? msg('base.shell.underfunded') : ''}</span>
+         <button class="ghost" data-close>${msg('base.shell.close')}</button>
+         <button class="go" data-deploy>${msg('base.shell.takeOperation')}</button>`
+      : `<button class="go" data-close>${msg('base.shell.close')}</button>`;
 
-    this._shell(escapeHtml(this.site.displayName || 'Foundation site'),
-      `${escapeHtml(tier.name)} · ${p.operationsCompleted} operation${p.operationsCompleted === 1 ? '' : 's'} closed · ${escapeHtml(this.site.standing || '')}`,
+    this._shell(escapeHtml(this.site.displayName || msg('base.shell.fallbackName')),
+      msg('base.shell.sub', {
+        tier: escapeHtml(tier.name),
+        operations: plural('base.shell.operationsClosed', p.operationsCompleted),
+        standing: escapeHtml(this.site.standing || ''),
+      }),
       `${this._ledger()}<nav class="tabs">${nav}</nav>${this._notice()}
-       <div class="pad"><h2>${escapeHtml(room ? room.name : 'Site')}</h2>
+       <div class="pad"><h2>${escapeHtml(room ? room.name : this.site.displayName || '')}</h2>
          <p class="small">${escapeHtml(room ? room.purpose : '')}</p></div>${body}`,
       footer);
 
@@ -146,7 +180,7 @@ export class BaseScreen {
 
   _notice() {
     if (!this.notice) return '';
-    return `<div class="pad"><div class="warn"><b>Counter</b><ul><li>${escapeHtml(this.notice)}</li></ul></div></div>`;
+    return `<div class="pad"><div class="warn"><b>${msg('base.shell.counter')}</b><ul><li>${escapeHtml(this.notice)}</li></ul></div></div>`;
   }
 
   /** The four §12.2 resources, across the top, on every tab. */
@@ -154,22 +188,23 @@ export class BaseScreen {
     const pr = this.progression;
     const p = pr.profile;
     const tier = clearanceTier(pr.clearance);
-    const next = CLEARANCE_TIERS.find((t) => t.level === pr.clearance + 1);
+    const next = CLEARANCE_TIERS.find((c) => c.level === pr.clearance + 1);
     const desc = (id) => escapeHtml((RESOURCES.find((r) => r.id === id) || {}).what || '');
     return `<div class="ledgerbar">
-      <div class="fig" title="${desc('requisition')}"><b>${money(p.requisition)}</b><span>requisition</span></div>
-      <div class="fig" title="${desc('research')}"><b>${money(p.research)}</b><span>research data</span></div>
-      <div class="fig" title="${desc('clearance')}"><b>${escapeHtml(tier.name)}</b><span>clearance${next ? ` · next at ${this._clearanceNeed(next)}` : ''}</span></div>
-      <div class="fig"><b>${p.containment.length}</b><span>in custody</span></div>
+      <div class="fig" title="${desc('requisition')}"><b>${money(p.requisition)}</b><span>${msg('base.ledger.requisition')}</span></div>
+      <div class="fig" title="${desc('research')}"><b>${money(p.research)}</b><span>${msg('base.ledger.research')}</span></div>
+      <div class="fig" title="${desc('clearance')}"><b>${escapeHtml(tier.name)}</b><span>${
+  next ? msg('base.ledger.clearanceNext', { need: this._clearanceNeed(next) }) : msg('base.ledger.clearance')}</span></div>
+      <div class="fig"><b>${p.containment.length}</b><span>${msg('base.ledger.inCustody')}</span></div>
     </div>`;
   }
 
-  _clearanceNeed(t) {
-    const r = t.requires || {};
+  _clearanceNeed(tier) {
+    const r = tier.requires || {};
     const bits = [];
-    if (r.operations !== undefined) bits.push(`${r.operations} operations`);
-    if (r.custodies !== undefined) bits.push(`${r.custodies} custodies`);
-    if (r.research !== undefined) bits.push(`${r.research} research earned`);
+    if (r.operations !== undefined) bits.push(plural('base.ledger.needOperations', r.operations));
+    if (r.custodies !== undefined) bits.push(plural('base.ledger.needCustodies', r.custodies));
+    if (r.research !== undefined) bits.push(plural('base.ledger.needResearch', r.research));
     return escapeHtml(bits.join(', '));
   }
 
@@ -199,28 +234,36 @@ export class BaseScreen {
            ${gated ? '' : `data-op="${escapeHtml(o.id)}"`}>
         <b>${escapeHtml(o.name)}</b>
         <p>${escapeHtml(o.mandate)}</p>
-        <p class="small">${escapeHtml(o.difficulty || 'Field')} · ${escapeHtml(o.distance || '')}</p>
+        <p class="small">${msg('base.ops.opMeta', {
+    difficulty: escapeHtml(o.difficulty || msg('base.ops.difficultyDefault')),
+    distance: escapeHtml(o.distance || ''),
+  })}</p>
         <ul>${(o.conditions || []).map((c) => `<li>${escapeHtml(c)}</li>`).join('')}</ul>
-        <p class="small">Optional: ${(o.optional || []).map((x) => escapeHtml(x)).join(' · ')}</p>
-        ${gated ? `<p class="small lock">Not authorised. Requires ${escapeHtml(clearanceTier(o.clearanceRequired).name)} clearance.</p>` : ''}
+        <p class="small">${msg('base.ops.optional', { list: (o.optional || []).map((x) => escapeHtml(x)).join(' · ') })}</p>
+        ${gated ? `<p class="small lock">${msg('base.ops.locked', { tier: escapeHtml(clearanceTier(o.clearanceRequired).name) })}</p>` : ''}
       </div>`;
       }).join('')
-      : '<p class="empty">The board is empty. Regional has nothing for this squad.</p>';
+      : `<p class="empty">${msg('base.ops.boardEmpty')}</p>`;
 
     const known = op ? pr.insightsFor(op.anomalyId).filter((i) => i.unlocked) : [];
-    const knownHtml = known.length
-      ? `<h2>What the archive already knows</h2><ul>${known.map((i) => `<li>${escapeHtml(i.text)}</li>`).join('')}</ul>`
-      : `<h2>What the archive already knows</h2><p class="small">Nothing yet. The first squad down works it out in the dark.</p>`;
+    const knownHtml = `<h2>${msg('base.ops.archiveHead')}</h2>${known.length
+      ? `<ul>${known.map((i) => `<li>${escapeHtml(i.text)}</li>`).join('')}</ul>`
+      : `<p class="small">${msg('base.ops.archiveEmpty')}</p>`}`;
 
     const roster = pr.fieldable().map((o) => {
       const c = pr.conditionOf(o.id);
       return `<li class="${c ? 'off' : ''}"><b>${escapeHtml(o.name)}</b>
-        <span>${c ? `${escapeHtml(c.name)} · ${c.operationsRemaining} op${c.operationsRemaining === 1 ? '' : 's'}` : 'fit'}</span></li>`;
+        <span>${c ? msg('base.ops.unfit', {
+    condition: escapeHtml(c.name),
+    operations: plural('base.ops.opsRemaining', c.operationsRemaining),
+  }) : msg('base.ops.fit')}</span></li>`;
     }).join('');
 
     const warns = [];
-    if (handicap.cargoVolume < 0) warns.push(`Injuries on the roster reduce what the squad can carry by ${Math.abs(handicap.cargoVolume)} volume.`);
-    if (handicap.stabiliseFactor > 1) warns.push(`Field stabilisation will take ${Math.round((handicap.stabiliseFactor - 1) * 100)}% longer with the current roster.`);
+    if (handicap.cargoVolume < 0) warns.push(msg('base.ops.warnCargo', { volume: Math.abs(handicap.cargoVolume) }));
+    if (handicap.stabiliseFactor > 1) {
+      warns.push(msg('base.ops.warnStabilise', { percent: Math.round((handicap.stabiliseFactor - 1) * 100) }));
+    }
     /* Occupancy is one warning and RATING is a different one. The corridor can have a cell
      * free and still have nothing the selected operation's anomaly is rated for, which is
      * the case the requisition upgrade exists to solve — so say which of the two it is
@@ -229,36 +272,43 @@ export class BaseScreen {
     const takenNow = new Set(pr.profile.containment.map((c) => c.cellId));
     const freeNow = cellsNow.filter((c) => !takenNow.has(c.id));
     if (!freeNow.length) {
-      warns.push('Every holding position in the corridor is occupied. A new capture has nowhere rated to go and will be held on the bay bus.');
+      warns.push(msg('base.ops.warnCorridorFull'));
     } else if (op) {
       const d = pr.dossierFor(op.anomalyId);
       const need = d && d.cellRequirement;
       if (need && !freeNow.some((c) => !c.capability || c.capability === need)) {
-        warns.push(`Nothing free in the corridor is rated ${need}, which is what this one needs. It can still be brought back; it will be logged in an improvised position.`);
+        warns.push(msg('base.ops.warnNoRating', { rating: escapeHtml(need) }));
       }
     }
 
+    /* Three whole sentences, printed one after another. Not a template with holes in it —
+     * the vehicle bay line and the injury line each stand alone or do not appear. */
+    const budgetNote = [msg('base.ops.standardManifest', { volume: budget })];
+    if (effects.cargoVolumeBudget) budgetNote.push(msg('base.ops.bayAdds', { volume: effects.cargoVolumeBudget }));
+    if (handicap.cargoVolume) budgetNote.push(msg('base.ops.injuriesCost', { volume: Math.abs(handicap.cargoVolume) }));
+
     return `<div class="cols">
       <section>
-        <h2>Mission board</h2>
+        <h2>${msg('base.ops.boardHead')}</h2>
         ${board}
         <p class="small">${this._boardLine(all)}</p>
         ${knownHtml}
       </section>
       <section>
-        <h2>Regional picture</h2>
+        <h2>${msg('base.ops.regionalHead')}</h2>
         <ul>
-          <li>${escapeHtml(status.weather || '—')}</li>
-          <li>${escapeHtml(status.region || '—')}</li>
-          <li>${escapeHtml(status.readiness || '—')}</li>
+          <li>${escapeHtml(status.weather || msg('base.ops.unknown'))}</li>
+          <li>${escapeHtml(status.region || msg('base.ops.unknown'))}</li>
+          <li>${escapeHtml(status.readiness || msg('base.ops.unknown'))}</li>
         </ul>
-        <h2>Readiness</h2>
+        <h2>${msg('base.ops.readinessHead')}</h2>
         <ul class="roster">${roster}</ul>
         ${adjusted === null ? '' : `<div class="budget"><div class="bar"><i style="width:${Math.min(100, (adjusted / Math.max(1, budget + 4)) * 100)}%"></i></div>
-          <span>${adjusted} cargo volume</span></div>
-          <p class="small">Standard manifest is ${budget}. ${effects.cargoVolumeBudget ? `The vehicle bay adds ${effects.cargoVolumeBudget}. ` : ''}${handicap.cargoVolume ? `Injuries cost ${Math.abs(handicap.cargoVolume)}.` : ''}</p>`}
-        ${warns.length ? `<div class="warn"><b>Before you go</b><ul>${warns.map((w) => `<li>${escapeHtml(w)}</li>`).join('')}</ul></div>` : ''}
-        <h2>Department standing</h2>
+          <span>${msg('base.ops.cargoVolume', { volume: adjusted })}</span></div>
+          <p class="small">${budgetNote.map((s) => `<span>${s}</span>`).join(' ')}</p>`}
+        ${warns.length ? `<div class="warn"><b>${msg('base.ops.beforeYouGo')}</b><ul>${
+    warns.map((w) => `<li>${w}</li>`).join('')}</ul></div>` : ''}
+        <h2>${msg('base.ops.standingHead')}</h2>
         ${this._standing()}
       </section>
     </div>${this._siteUpgrades(room)}`;
@@ -269,14 +319,18 @@ export class BaseScreen {
     const pr = this.progression;
     return `<ul class="dims">${DEPARTMENTS.map((d) => {
       const v = pr.standing(d.id);
-      const t = standingTier(v);
+      const tier = standingTier(v);
       const pct = ((v - STANDING_FLOOR) / (STANDING_CEILING - STANDING_FLOOR)) * 100;
-      return `<li><b>${escapeHtml(d.name)}</b><span class="w">${escapeHtml(t.name)} · ${signed(v)}</span>
+      return `<li><b>${escapeHtml(d.name)}</b><span class="w">${msg('base.standing.value', {
+        tier: escapeHtml(tier.name), amount: signed(v),
+      })}</span>
         <div class="budget"><div class="bar"><i style="width:${Math.max(2, Math.min(100, pct))}%"></i></div>
-          <span>×${t.priceMultiplier.toFixed(2)}</span></div>
-        <p>Values ${escapeHtml(d.values.toLowerCase())}. Watches ${escapeHtml(d.watches.toLowerCase())}.</p></li>`;
+          <span>${msg('base.standing.multiplier', { multiplier: tier.priceMultiplier.toFixed(2) })}</span></div>
+        <p>${msg('base.standing.watches', {
+        values: escapeHtml(d.values.toLowerCase()), watches: escapeHtml(d.watches.toLowerCase()),
+      })}</p></li>`;
     }).join('')}</ul>
-    <p class="small">Standing changes what a department charges. It never closes a counter — GDD §12.3.</p>`;
+    <p class="small">${msg('base.standing.note')}</p>`;
   }
 
   /* ── armory and logistics counter (§13.2) ────────────────────────────────── */
@@ -294,7 +348,8 @@ export class BaseScreen {
       const issued = pr.itemAsIssued(it);
       return `<label>${escapeHtml(it.displayName)}
         <select data-fit="${it.id}">
-          <option value="" ${cur === '' ? 'selected' : ''}>Standard ${escapeHtml(it.displayName.toLowerCase())}</option>
+          <option value="" ${cur === '' ? 'selected' : ''}>${
+  msg('base.armory.standardVariant', { item: escapeHtml(it.displayName.toLowerCase()) })}</option>
           ${owned.map((u) => `<option value="${u.id}" ${cur === u.id ? 'selected' : ''}>${escapeHtml(u.name)}</option>`).join('')}
         </select>
         <span class="issued">${this._issuedLine(it, issued)}</span></label>`;
@@ -310,11 +365,13 @@ export class BaseScreen {
           <span>${escapeHtml(u.blurb)}</span>
           <span>${u.gains.map((g) => `<em class="gain">+${escapeHtml(g)}</em>`).join(' ')}
                 ${u.losses.map((l) => `<em class="loss">−${escapeHtml(l)}</em>`).join(' ')}</span>
-          <span>${escapeHtml(dept ? dept.name : '')} · ${escapeHtml(standingTier(pr.standing(u.department)).name.toLowerCase())} rate</span></td>
-        <td class="vol">${price}${u.costResearch ? `<br>${u.costResearch}R` : ''}</td>
+          <span>${escapeHtml(dept ? dept.name : '')} · ${msg('base.armory.rate', {
+    tier: escapeHtml(standingTier(pr.standing(u.department)).name.toLowerCase()),
+  })}</span></td>
+        <td class="vol">${price}${u.costResearch ? `<br>${msg('base.armory.researchCost', { count: u.costResearch })}` : ''}</td>
         <td class="qty">${owned
-          ? '<b>held</b>'
-          : `<button data-buy="${u.id}" ${afford ? '' : 'disabled'}>Order</button>`}</td>
+    ? `<b>${msg('base.armory.held')}</b>`
+    : `<button data-buy="${u.id}" ${afford ? '' : 'disabled'}>${msg('base.armory.order')}</button>`}</td>
       </tr>`;
     }).join('');
 
@@ -322,50 +379,58 @@ export class BaseScreen {
 
     return `<div class="cols">
       <section class="plan">
-        <h2>Fitted equipment</h2>
-        <p class="small">One variant per family. The standard tool is always on the list, because
-           GDD §10.1 does not allow a new tier to make the old one irrelevant.</p>
-        ${fits || '<p class="empty">No equipment file loaded.</p>'}
+        <h2>${msg('base.armory.fittedHead')}</h2>
+        <p class="small">${msg('base.armory.fittedNote')}</p>
+        ${fits || `<p class="empty">${msg('base.armory.noItems')}</p>`}
       </section>
       <section>
-        <h2>Requisition</h2>
+        <h2>${msg('base.armory.requisitionHead')}</h2>
         <table class="items"><tbody>${rows}</tbody></table>
-        <p class="small">Price is the department's rate at your current standing. Research-data
-           costs do not move with standing — analysis is analysis.</p>
-        <h2>Recovery</h2>
+        <p class="small">${msg('base.armory.priceNote')}</p>
+        <h2>${msg('base.armory.recoveryHead')}</h2>
         ${lost}
       </section>
     </div>${this._siteUpgrades(room)}`;
   }
 
-  /** What the fitted variant actually does to the issued item, in the item's own units. */
+  /**
+   * What the fitted variant actually does to the issued item, in the item's own units.
+   *
+   * ⚠ THE ROW IS ONE MESSAGE AND THE LABEL IS ANOTHER, rather than `label + ' ' + from`. A
+   * translator moves "battery 20 min → 34 min" as a line; handed "battery" on its own they
+   * have to guess where it goes, and in a language that puts the measure first it goes
+   * somewhere else.
+   */
   _issuedLine(base, issued) {
     const bits = [];
-    const cmp = (field, label, unit = '') => {
+    const cmp = (field) => {
       if (base[field] === undefined && issued[field] === undefined) return;
       if (base[field] === issued[field]) return;
-      const from = base[field] === undefined ? '—' : `${base[field]}${unit}`;
-      const to = issued[field] === undefined ? '—' : `${issued[field]}${unit}`;
-      bits.push(`${label} ${from} → ${to}`);
+      bits.push(msg('base.issued.change', {
+        label: msg(`base.issued.label.${field}`),
+        from: issuedValue(field, base[field]),
+        to: issuedValue(field, issued[field]),
+      }));
     };
-    cmp('cargoVolume', 'volume');
-    cmp('bulk', 'slot');
-    cmp('batteryMinutes', 'battery', ' min');
-    cmp('heatOutputCelsius', 'output', 'C');
-    cmp('heatFalloffMetres', 'falloff', 'm');
-    cmp('feedRadiusMetres', 'feed', 'm');
-    cmp('barrierWidthMetres', 'width', 'm');
-    return bits.length ? escapeHtml(bits.join(' · ')) : 'as issued';
+    cmp('cargoVolume');
+    cmp('bulk');
+    cmp('batteryMinutes');
+    cmp('heatOutputCelsius');
+    cmp('heatFalloffMetres');
+    cmp('feedRadiusMetres');
+    cmp('barrierWidthMetres');
+    return bits.length ? escapeHtml(bits.join(' · ')) : msg('base.issued.asIssued');
   }
 
   _lastLoss() {
     const h = this.progression.profile.history;
     const last = h[h.length - 1];
-    if (!last) return '<p class="small">Nothing has come back yet, because nothing has gone out.</p>';
+    if (!last) return `<p class="small">${msg('base.armory.nothingBack')}</p>`;
     const dim = (last.dims || []).find((d) => /stewardship/i.test(d.name));
-    return `<p class="small">Operation ${last.operation}: equipment stewardship read
-      <b>${escapeHtml(dim ? dim.word : 'unrecorded')}</b>. Anything left on the floor was reordered out of
-      that operation's requisition.</p>`;
+    return `<p class="small">${msg('base.armory.lastLoss', {
+      operation: last.operation,
+      word: escapeHtml(dim ? dim.word : msg('base.armory.unrecorded')),
+    })}</p>`;
   }
 
   /* ── archive terminal (§13.2) ────────────────────────────────────────────── */
@@ -386,8 +451,12 @@ export class BaseScreen {
     const bits = [];
     if (s.weather) bits.push(escapeHtml(s.weather));
     if (s.time) bits.push(escapeHtml(s.time.toLowerCase()));
-    for (const id of s.shut || []) bits.push(`${escapeHtml(id.replace(/^door-/, '').replace(/-/g, ' '))} jammed`);
-    for (const id of s.faulted || []) bits.push(`${escapeHtml(id.replace(/^circuit-/, ''))} circuit faulted`);
+    for (const id of s.shut || []) {
+      bits.push(msg('base.archive.jammed', { name: escapeHtml(id.replace(/^door-/, '').replace(/-/g, ' ')) }));
+    }
+    for (const id of s.faulted || []) {
+      bits.push(msg('base.archive.faulted', { name: escapeHtml(id.replace(/^circuit-/, '')) }));
+    }
     if (!bits.length) return '';
     return `<p class="small night">${bits.join(' · ')}</p>`;
   }
@@ -397,37 +466,41 @@ export class BaseScreen {
     const hist = pr.profile.history.slice().reverse();
     const rows = hist.map((h) => {
       const pill = OVERALL_PILL[h.overall] || 'unreliable';
-      const dims = (h.dims || []).map((d) => `${d.name}: ${d.word}`).join(' · ');
+      const dims = (h.dims || []).map((d) => msg('base.archive.dim', { name: d.name, word: d.word })).join(' · ');
       return `<li class="ev">
-        <div class="head"><b>Operation ${h.operation}</b>
-          <span class="rel ${pill}">${escapeHtml(h.overall)}</span>
-          <span class="when">${h.minutes ? `${Number(h.minutes).toFixed(1)} min` : '—'} · ${escapeHtml(h.mapId || 'unrecorded')}</span></div>
-        <p>${escapeHtml(h.failReason || 'Operation closed.')}</p>
+        <div class="head"><b>${msg('base.archive.operation', { operation: h.operation })}</b>
+          <span class="rel ${pill}">${escapeHtml(gradeLabel(h.overall))}</span>
+          <span class="when">${msg('base.archive.when', {
+    minutes: h.minutes ? msg('base.archive.minutes', { minutes: Number(h.minutes).toFixed(1) }) : msg('base.archive.unmeasured'),
+    map: escapeHtml(h.mapId || msg('base.archive.unrecorded')),
+  })}</span></div>
+        <p>${escapeHtml(h.failReason || msg('base.archive.closed'))}</p>
         ${this._nightLine(h)}
-        <div class="prov">requisition ${signed(h.requisition)} · research ${signed(h.research)} · ${escapeHtml(dims)}</div>
+        <div class="prov">${msg('base.archive.provenance', {
+    requisition: signed(h.requisition), research: signed(h.research), dims: escapeHtml(dims),
+  })}</div>
       </li>`;
     }).join('');
 
     const files = (this.site.dossiers || []).map((d) => {
       const k = pr.knowledgeFor(d.anomalyId);
       const ins = pr.insightsFor(d.anomalyId);
-      return `<li><b>${escapeHtml(d.designation)}</b><span class="w">${k.operations} operation${k.operations === 1 ? '' : 's'}</span>
+      return `<li><b>${escapeHtml(d.designation)}</b><span class="w">${plural('base.archive.operations', k.operations)}</span>
         <p>${escapeHtml(d.classFraming)}</p>
         <p>${escapeHtml(d.operationalCost)}</p>
-        <p>${ins.filter((i) => i.unlocked).length} of ${ins.length} case notes filed.</p></li>`;
+        <p>${msg('base.archive.caseNotes', { filed: ins.filter((i) => i.unlocked).length, total: ins.length })}</p></li>`;
     }).join('');
 
     return `<div class="cols">
       <section>
-        <h2>Mission history</h2>
-        <ul class="evlist">${rows || '<li class="empty">No operation has closed yet.</li>'}</ul>
+        <h2>${msg('base.archive.historyHead')}</h2>
+        <ul class="evlist">${rows || `<li class="empty">${msg('base.archive.historyEmpty')}</li>`}</ul>
       </section>
       <section>
-        <h2>Case files</h2>
-        <ul class="dims">${files || '<li class="empty">Nothing filed.</li>'}</ul>
-        <h2>Attribution</h2>
-        <p class="small">Designations are provisional until a licensing record exists — GDD §25.3.
-           Nothing in this build prints a number it has not earned the right to print.</p>
+        <h2>${msg('base.archive.filesHead')}</h2>
+        <ul class="dims">${files || `<li class="empty">${msg('base.archive.filesEmpty')}</li>`}</ul>
+        <h2>${msg('base.archive.attributionHead')}</h2>
+        <p class="small">${msg('base.archive.attribution')}</p>
       </section>
     </div>${this._siteUpgrades(room)}`;
   }
@@ -441,38 +514,51 @@ export class BaseScreen {
     const knowledge = dossiers.map((d) => {
       const k = pr.knowledgeFor(d.anomalyId);
       const ins = pr.insightsFor(d.anomalyId);
+      /* ⚠ TWO COUNTS IN ONE SENTENCE IS A TRAP. `plural()` selects on one number, and
+       * "{rules} rules read correctly across {operations} operations" needs two selections
+       * at once — so it is three sentences, each with its own plural group, rather than one
+       * sentence with English's grammar frozen into it. */
       return `<h2>${escapeHtml(d.designation)}</h2>
-        <p class="small">${k.rulesRead} rule${k.rulesRead === 1 ? '' : 's'} read correctly across ${k.operations} operation${k.operations === 1 ? '' : 's'};
-           ${k.rulesMisread} misread, at no cost.</p>
+        <p class="small"><span>${plural('base.research.rulesRead', k.rulesRead)}</span>
+           <span>${plural('base.research.overOperations', k.operations)}</span>
+           <span>${plural('base.research.misread', k.rulesMisread)}</span></p>
         <ul class="dims">${ins.map((i) => `<li class="${i.unlocked ? '' : 'locked'}">
-          <b>${i.unlocked ? 'Filed' : 'Not yet'}</b><span class="w">${escapeHtml(this._insightNeed(i))}</span>
-          <p>${i.unlocked ? escapeHtml(i.text) : escapeHtml(i.grants || 'A case note the squad has not earned yet.')}</p></li>`).join('')}</ul>`;
+          <b>${i.unlocked ? msg('base.research.filed') : msg('base.research.notYet')}</b><span class="w">${escapeHtml(this._insightNeed(i))}</span>
+          <p>${i.unlocked ? escapeHtml(i.text) : escapeHtml(i.grants || msg('base.research.insightLocked'))}</p></li>`).join('')}</ul>`;
     }).join('');
 
     const bench = pr.fieldable().map((o) => {
       const c = pr.conditionOf(o.id);
-      if (!c) return `<li><b>${escapeHtml(o.name)}</b><span class="w">Fit</span><p>${o.operations} operation${o.operations === 1 ? '' : 's'} on file.</p></li>`;
-      const buttons = TREATMENTS.map((t) => {
-        const price = Math.round(t.costRequisition * (1 + pr.effects().treatmentCostPct / 100));
-        return `<button data-treat="${o.id}" data-treatment="${t.id}">${escapeHtml(t.name)}${price ? ` · ${price}` : ''}</button>`;
+      if (!c) {
+        return `<li><b>${escapeHtml(o.name)}</b><span class="w">${msg('base.bench.fit')}</span>
+          <p>${plural('base.bench.onFile', o.operations)}</p></li>`;
+      }
+      const buttons = TREATMENTS.map((tr) => {
+        const price = Math.round(tr.costRequisition * (1 + pr.effects().treatmentCostPct / 100));
+        const label = price
+          ? msg('base.bench.treat', { name: escapeHtml(tr.name), price })
+          : msg('base.bench.treatFree', { name: escapeHtml(tr.name) });
+        return `<button data-treat="${o.id}" data-treatment="${tr.id}">${label}</button>`;
       }).join(' ');
-      return `<li><b>${escapeHtml(o.name)}</b><span class="w">${escapeHtml(c.name)} · ${c.operationsRemaining} op${c.operationsRemaining === 1 ? '' : 's'} left</span>
+      return `<li><b>${escapeHtml(o.name)}</b><span class="w">${msg('base.bench.condition', {
+        condition: escapeHtml(c.name),
+        remaining: plural('base.bench.remaining', c.operationsRemaining),
+      })}</span>
         <p>${escapeHtml(c.note)}</p><p>${buttons}</p></li>`;
     }).join('');
 
     return `<div class="cols">
       <section>
-        <h2>Research data</h2>
-        <p class="small">${money(pr.profile.research)} available · ${money(pr.profile.researchTotalEarned)} earned in total.
-           Clearance reads the total earned, so spending never costs you a milestone.</p>
-        ${knowledge || '<p class="empty">No case file open.</p>'}
+        <h2>${msg('base.research.dataHead')}</h2>
+        <p class="small"><span>${msg('base.research.available', {
+    available: money(pr.profile.research), earned: money(pr.profile.researchTotalEarned),
+  })}</span> <span>${msg('base.research.clearanceNote')}</span></p>
+        ${knowledge || `<p class="empty">${msg('base.research.noFile')}</p>`}
       </section>
       <section>
-        <h2>Isolation bench</h2>
-        <p class="small">${pr.treatmentCapacity()} bed${pr.treatmentCapacity() === 1 ? '' : 's'}.
-           Treatment is never required: an untreated operative deploys with the effect and it
-           expires on its own after the stated number of operations. GDD §12.5 — you can always
-           field a character, and nothing here waits on a real clock.</p>
+        <h2>${msg('base.bench.head')}</h2>
+        <p class="small"><span>${plural('base.bench.beds', pr.treatmentCapacity())}</span>
+           <span>${msg('base.bench.note')}</span></p>
         <ul class="dims">${bench}</ul>
       </section>
     </div>${this._siteUpgrades(room)}`;
@@ -481,9 +567,9 @@ export class BaseScreen {
   _insightNeed(i) {
     const r = i.requires || {};
     const bits = [];
-    if (r.rules !== undefined) bits.push(`${r.rules} rules`);
-    if (r.operations !== undefined) bits.push(`${r.operations} operations`);
-    if (r.research !== undefined) bits.push(`${r.research} research`);
+    if (r.rules !== undefined) bits.push(plural('base.research.needRules', r.rules));
+    if (r.operations !== undefined) bits.push(plural('base.ledger.needOperations', r.operations));
+    if (r.research !== undefined) bits.push(plural('base.research.needResearch', r.research));
     return bits.join(' · ');
   }
 
@@ -496,14 +582,18 @@ export class BaseScreen {
 
     const cells = pr.cells().map((cell) => {
       const held = byCell.get(cell.id);
-      const rating = cell.capability ? ` · rated ${escapeHtml(cell.capability)}` : '';
+      const rating = cell.capability ? escapeHtml(cell.capability) : null;
+      const label = escapeHtml(cell.label || cell.id);
       if (!held) {
-        return `<li class="vacant"><b>${escapeHtml(cell.label || cell.id)}</b><span>vacant${rating}</span>
+        const where = rating ? msg('base.containment.vacantRated', { rating }) : msg('base.containment.vacant');
+        return `<li class="vacant"><b>${label}</b><span>${where}</span>
           <div class="hist">${escapeHtml(cell.holding)}</div></li>`;
       }
       const hist = held.history.map((h) => `<div>${escapeHtml(h)}</div>`).join('');
-      const flag = held.improvised ? ' — improvised' : '';
-      return `<li${held.improvised ? ' class="improvised"' : ''}><b>${escapeHtml(held.designation)}</b><span>${escapeHtml(cell.label || cell.id)}${rating}${flag}</span>
+      const where = held.improvised
+        ? (rating ? msg('base.containment.improvised', { cell: label, rating }) : msg('base.containment.improvisedUnrated', { cell: label }))
+        : (rating ? msg('base.containment.occupiedRated', { cell: label, rating }) : msg('base.containment.occupied', { cell: label }));
+      return `<li${held.improvised ? ' class="improvised"' : ''}><b>${escapeHtml(held.designation)}</b><span>${where}</span>
         <div class="hist">${escapeHtml(cell.holding)}${hist}</div></li>`;
     }).join('');
 
@@ -517,24 +607,28 @@ export class BaseScreen {
      */
     const unplaced = pr.profile.containment.filter((c) => !c.cellId).map((held) => {
       const hist = held.history.map((h) => `<div>${escapeHtml(h)}</div>`).join('');
-      return `<li class="unplaced"><b>${escapeHtml(held.designation)}</b><span>no holding position</span>
-        <div class="hist">Held on the vehicle bay bus. The corridor has nothing free${held.cellRequirement ? `, and nothing rated ${escapeHtml(held.cellRequirement)}` : ''}.${hist}</div></li>`;
+      const line = held.cellRequirement
+        ? msg('base.containment.onTheBusRated', { rating: escapeHtml(held.cellRequirement) })
+        : msg('base.containment.onTheBus');
+      return `<li class="unplaced"><b>${escapeHtml(held.designation)}</b><span>${msg('base.containment.unplaced')}</span>
+        <div class="hist">${line}${hist}</div></li>`;
     }).join('');
 
     const maint = pr.profile.containment.flatMap((c) => c.maintenance.map((m) => `<li>${escapeHtml(m)}</li>`)).join('');
+    const every = Math.max(1, (wing.maintenanceIntervalOperations || 3) + pr.effects().maintenanceIntervalOperations);
 
     return `<div class="cols">
       <section>
-        <h2>Holding positions</h2>
-        <ul class="cells">${cells + unplaced || `<li class="empty">The corridor has no cells on file.</li>`}</ul>
+        <h2>${msg('base.containment.head')}</h2>
+        <ul class="cells">${cells + unplaced || `<li class="empty">${msg('base.containment.empty')}</li>`}</ul>
       </section>
       <section>
-        <h2>How this corridor is written</h2>
+        <h2>${msg('base.containment.framingHead')}</h2>
         <p>${escapeHtml(wing.framing || '')}</p>
-        <h2>Maintenance record</h2>
-        <ul>${maint || '<li class="empty">Nothing is due. Nothing is held.</li>'}</ul>
-        <p class="small">Checks fall due every ${Math.max(1, (wing.maintenanceIntervalOperations || 3) + pr.effects().maintenanceIntervalOperations)} operations.
-           They are a record, not a chore: nothing here becomes mandatory and nothing here destroys progress.</p>
+        <h2>${msg('base.containment.maintenanceHead')}</h2>
+        <ul>${maint || `<li class="empty">${msg('base.containment.maintenanceEmpty')}</li>`}</ul>
+        <p class="small"><span>${plural('base.containment.interval', every)}</span>
+           <span>${msg('base.containment.intervalNote')}</span></p>
       </section>
     </div>${this._siteUpgrades(room)}`;
   }
@@ -555,21 +649,20 @@ export class BaseScreen {
       const gated = (u.clearanceRequired || 0) > pr.clearance;
       const blocked = u.requiresUpgrade && !pr.profile.siteUpgrades.includes(u.requiresUpgrade);
       const afford = pr.profile.requisition >= price && pr.profile.research >= (u.costResearch || 0);
-      const why = gated ? `Requires ${clearanceTier(u.clearanceRequired).name}`
-        : blocked ? 'Depends on work that has not been done'
-          : afford ? '' : 'Requisition short';
+      const why = gated ? msg('base.upgrades.requires', { tier: escapeHtml(clearanceTier(u.clearanceRequired).name) })
+        : blocked ? msg('base.upgrades.blocked')
+          : afford ? '' : msg('base.upgrades.short');
       return `<tr class="${owned ? 'taken' : afford && !gated && !blocked ? '' : 'gone'}">
         <td class="name"><b>${escapeHtml(u.name)}</b><span>${escapeHtml(u.blurb)}</span>
-          <span>${escapeHtml(owned ? u.visible : why)}</span></td>
-        <td class="vol">${price}${u.costResearch ? `<br>${u.costResearch}R` : ''}</td>
-        <td class="qty">${owned ? '<b>built</b>'
-          : `<button data-site-buy="${u.id}" ${afford && !gated && !blocked ? '' : 'disabled'}>Build</button>`}</td>
+          <span>${owned ? escapeHtml(u.visible) : why}</span></td>
+        <td class="vol">${price}${u.costResearch ? `<br>${msg('base.armory.researchCost', { count: u.costResearch })}` : ''}</td>
+        <td class="qty">${owned ? `<b>${msg('base.upgrades.built')}</b>`
+    : `<button data-site-buy="${u.id}" ${afford && !gated && !blocked ? '' : 'disabled'}>${msg('base.upgrades.build')}</button>`}</td>
       </tr>`;
     }).join('');
-    return `<div class="pad"><h2>What this room could be</h2>
+    return `<div class="pad"><h2>${msg('base.upgrades.head')}</h2>
       <table class="items"><tbody>${rows}</tbody></table>
-      <p class="small">The site began underfunded and every one of these is visible from the first
-         day — GDD §13.3. Growth changes what the room can do; it never moves where things are.</p></div>`;
+      <p class="small">${msg('base.upgrades.note')}</p></div>`;
   }
 
   /* ── binding ─────────────────────────────────────────────────────────────── */
@@ -593,15 +686,13 @@ export class BaseScreen {
    * lie the moment a second building arrived.
    */
   _boardLine(ops) {
-    if (ops.length < 2) return 'One operation. The board carries what exists and nothing else.';
+    if (ops.length < 2) return msg('base.ops.boardOne');
     const floors = new Set(ops.map((o) => o.mapId)).size;
     const things = new Set(ops.map((o) => o.anomalyId)).size;
-    if (floors < ops.length && things < ops.length) {
-      return 'Two of these share a floor and two share an anomaly. Neither the building nor the thing in it is the constant — you learn both, separately, and neither answer transfers whole.';
-    }
-    if (floors < ops.length) return 'The same floor twice. Everything you learned about the building still applies; nothing you learned about the anomaly does.';
-    if (things < ops.length) return 'The same anomaly twice. Everything you learned about the thing still applies; nothing you learned about the building does.';
-    return `${ops.length} operations, no two alike.`;
+    if (floors < ops.length && things < ops.length) return msg('base.ops.boardSharedBoth');
+    if (floors < ops.length) return msg('base.ops.boardSharedFloor');
+    if (things < ops.length) return msg('base.ops.boardSharedAnomaly');
+    return msg('base.ops.boardDistinct', { count: ops.length });
   }
 
   /** The one the player has selected, defaulting to the first authorised. */
@@ -623,13 +714,15 @@ export class BaseScreen {
       n.onclick = () => { this.selectedOp = n.dataset.op; this.refresh(); };
     });
     const dep = q('[data-deploy]');
-    if (dep) dep.onclick = () => {
-      const op = this._authorisedOperation();
-      if (!op) return;
-      this.open = null;
-      this.node.style.display = 'none';
-      this.onDeploy(op);
-    };
+    if (dep) {
+      dep.onclick = () => {
+        const op = this._authorisedOperation();
+        if (!op) return;
+        this.open = null;
+        this.node.style.display = 'none';
+        this.onDeploy(op);
+      };
+    }
 
     all('[data-buy]').forEach((b) => b.onclick = () => {
       this.notice = this.progression.buyUpgrade(b.dataset.buy);

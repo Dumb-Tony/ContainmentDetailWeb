@@ -77,7 +77,17 @@
       "noImager": "You did not bring the imager.",
       "imagerFlat": "The imager battery is flat.",
       "nothingToStabilise": "Nothing to stabilise.",
-      "noFrost": "No frost worth taking."
+      "noFrost": "No frost worth taking.",
+      "nothingToPickUp": "Nothing to pick up.",
+      "handsFull": "Both hands are already full.",
+      "nothingInHandToLog": "Nothing in hand to log.",
+      "tooFarFromCase": "Too far from the case.",
+      "noCustodyProcedure": "This anomaly has no custody procedure.",
+      "noCaseDeployed": "No transit case deployed.",
+      "notHeld": "It is not held. Close the fence first.",
+      "wrongVessel": "That is not the {name}.",
+      "caseNoPower": "The case heater is dead. It will not hold.",
+      "caseTooFar": "The case is {distance}m away. It must be within {radius}m."
     }
   },
 
@@ -135,19 +145,103 @@
       "researchDetail": "{documented} of {rules} rules documented; {logged} of {available} observations logged.",
       "minutes": "{minutes} min",
       "timeDetail": "Peak pressure {peak} ({stage}); {breach}s above Active."
+    },
+    "screen": {
+      "_note": "The debrief SCREEN's own chrome, as opposed to the nine dimensions above, which are the report. Everything the screen prints about what the anomaly did is read out of the transition log — the state names and the trigger ids are the content package's, and they are interpolated rather than keyed.",
+      "title": "Debrief — {grade}",
+      "closed": "Operation closed.",
+      "assessment": "Assessment",
+      "transitions": "What it did, and why",
+      "noTransitions": "It never changed state.",
+      "transition": "{from} → {to}",
+      "trigger": "({trigger})",
+      "rules": "Rules, marked against the site",
+      "markedTrue": "the site behaved this way",
+      "markedFalse": "the site never behaved this way",
+      "unmarked": "—",
+      "again": "Run it again"
     }
+  },
+
+  "grade": {
+    "_note": "§6.4's five overall words. AN ID AND A LABEL, exactly like `phase`: `grade()` returns one of these strings, ui/base.js maps it onto a CSS pill class, and a saved profile has an operation history written in them. Localising the value would break the pill and rewrite the archive; this is the label beside it.",
+    "Exemplary": "Exemplary",
+    "Controlled": "Controlled",
+    "Costly": "Costly",
+    "Compromised": "Compromised",
+    "Failed": "Failed"
   },
 
   "tablet": {
     "_note": "The field tablet's own chrome. The SUBSTANCE on these screens is content — the briefing comes from the incident package, the claims from the anomaly, the procedure options from its planner block — and only the headings and the framing sentences are here. That split is the whole design: a tablet whose prose lived in this file would be a tablet that said the same thing about every anomaly, which is exactly the defect three of its four tabs had.",
+    "tab": {
+      "_note": "⚠ THE TAB NAMES WERE `id[0].toUpperCase() + id.slice(1)`, which is English capitalisation performed on an identifier. It is also wrong in every language whose word for 'evidence' is not 'evidence'.",
+      "briefing": "Briefing",
+      "evidence": "Evidence",
+      "board": "Board",
+      "procedure": "Procedure"
+    },
+    "shell": {
+      "title": "Field tablet",
+      "sub": "{phase} · {time} · incident pressure {stage}",
+      "close": "Close",
+      "commit": "Commit procedure"
+    },
     "briefing": {
+      "_note": "⚠ THE KEYCAP MARKUP IS INSIDE THE MESSAGE. A translator moves the key and the word together or the line stops making sense in a language that puts the verb last; splitting it into a `<kbd>` plus a label is the fragment rule broken for the sake of tidy HTML.",
       "mandate": "Mandate",
       "site": "Site",
       "known": "What you know",
       "controls": "Controls",
       "circuitLive": "{name} — live",
       "circuitDead": "{name} — dead on arrival",
-      "ambient": "Ambient falls while the anomaly is loose. It is now {celsius}C."
+      "ambient": "Ambient falls while the anomaly is loose. It is now {celsius}C.",
+      "keysMove": "<kbd>W A S D</kbd> move · <kbd>Shift</kbd> sprint · <kbd>Ctrl</kbd> crouch",
+      "keysVerb": "<kbd>F</kbd> the context verb (it says what it will do)",
+      "keysUse": "<kbd>E</kbd> use or deploy what is in hand · <kbd>1</kbd>–<kbd>5</kbd> select a slot",
+      "keysScreens": "<kbd>Q</kbd> thermal imager on/off · <kbd>Tab</kbd> tablet · <kbd>Esc</kbd> release the mouse"
+    },
+    "evidence": {
+      "_note": "The rows are the LEDGER's, and the ledger records what the content authored: `type`, `dimension` and `reliability` are the evidence rule's own fields and are interpolated, never keyed.",
+      "intro": "Raw observations, in the order they were made. The ledger records what was seen; what it means is on the board.",
+      "empty": "Nothing logged yet.",
+      "head": "#{seq} {type}",
+      "when": "{time} · {room}",
+      "provenance": "recorded by {source} · integrity {integrity} · dimension: {dimension}"
+    },
+    "board": {
+      "intro": "Contradictions stay on the board. Nothing here is ticked for you, and the support word never becomes a percentage.",
+      "believe": "believe",
+      "exclude": "exclude",
+      "support": {
+        "_note": "§7.4's support words. Another id-and-label: `supportFor()` returns the word, the tablet turns it into a CSS class, and a suite compares against 'strong'. Keyed by the slug the class already uses.",
+        "no-support": "no support",
+        "strong": "strong",
+        "confirmed-observation": "confirmed observation",
+        "probable": "probable",
+        "disputed": "disputed",
+        "unreliable": "unreliable"
+      },
+      "supportOnly": "{word}",
+      "supportWithHits": {
+        "one": "{word} · {count} observation",
+        "other": "{word} · {count} observations"
+      }
+    },
+    "procedure": {
+      "_note": "The planner's HEADINGS. The OPTIONS are the anomaly's `containment.planner` block, or the draught's card as a documented fallback, and neither is here — an option list in the UI locale would be one anomaly's prose reviewed by the UI's reviewer.",
+      "intro": "Five fields. The planner does not know whether your plan is right — it produces the checklist you said you would follow.",
+      "unset": "—",
+      "field": {
+        "target": "Target",
+        "state": "Required state",
+        "trigger": "Trigger",
+        "transfer": "Transfer and verification"
+      },
+      "maintained": "Maintained conditions",
+      "abort": "Abort condition",
+      "committed": "Committed at {time}",
+      "abortLine": "Abort: {condition}"
     }
   },
 
@@ -155,6 +249,549 @@
     "_note": "GDD §18.6's first training layer. The COMPETENCY NAMES AND REASONS ARE CONTENT — they live in content/onboarding.json, because what a squad is expected to demonstrate is a design decision with a designer's reviewer, not a button label. Only the chrome is here.",
     "progress": "{earned} of {total} demonstrated",
     "complete": "Certified — all {total} demonstrated"
+  },
+
+  "panels": {
+    "_note": "The screens either side of the floor: the squad room, the operation card and its wager, and the cargo manifest in the field, plus the conditions block the first two share.\n\nEVERY NUMBER ON THESE SCREENS IS READ FROM THE WORLD. The conditions block carries no fact about any building — it names circuits the site declared, counts doors the map placed, and prints the ambient the heat field is actually running at. That is why there is a plural group for circuits and one for doors rather than a sentence about two circuits: the sentence was here, it read 'Two circuits, both dead on arrival', and it was true of exactly one floor of one of four buildings.",
+    "conditions": {
+      "circuitsAllDead": {
+        "one": "{count} circuit on this floor, all dead. {names}.",
+        "other": "{count} circuits on this floor, all dead. {names}."
+      },
+      "circuitsSomeDead": {
+        "one": "{count} circuit on this floor, {dead} dead. {names}.",
+        "other": "{count} circuits on this floor, {dead} dead. {names}."
+      },
+      "ambient": "Ambient {celsius}C.",
+      "ambientUp": "Ambient {celsius}C — {weather}, up {delta} on the forecast.",
+      "ambientDown": "Ambient {celsius}C — {weather}, down {delta} on the forecast.",
+      "doors": {
+        "one": "{count} door, {shut} shut on arrival.",
+        "other": "{count} doors, {shut} shut on arrival."
+      }
+    },
+    "squad": {
+      "_note": "GDD §11.4's friends-and-invite-code lobby. The code itself is not a message — it is five characters the broker minted — so it is interpolated and never keyed.",
+      "title": "Squad",
+      "sub": "Foundation regional response · 1–5 operatives",
+      "you": "you",
+      "ready": "ready",
+      "noRadio": "no radio",
+      "soloHead": "Deploy alone",
+      "soloBody": "The whole operation is possible solo. It is simply slower, and there is nobody to come and get you off the floor.",
+      "soloButton": "Deploy solo",
+      "hostHead": "Host an operation",
+      "hostBody": "Your machine runs the mission. Everyone else connects to you with the code.",
+      "hostButton": "Open a room",
+      "joinHead": "Join one",
+      "codePlaceholder": "CODE",
+      "joinButton": "Join",
+      "callsignLabel": "Callsign",
+      "defaultCallsign": "Operative",
+      "rosterHead": "On the roster",
+      "secondHead": "What a second operative changes",
+      "secondFence": "A fence goes up in a fraction of the time — a tripod is a long item, so each of you can only carry one at a time.",
+      "secondImager": "Somebody can watch the imager while somebody else has both hands on the case.",
+      "secondContact": "A contact that puts you on the floor is survivable. Alone it is not.",
+      "secondCase": "Two on the case move it at nearly full pace; one drags it at three quarters.",
+      "joiningOpen": "Joining is open until the squad commits to a procedure. After that the operation is running and the door is shut.",
+      "hostFooter": "Share the code, then brief the squad when everyone is on the roster.",
+      "briefButton": "Brief us",
+      "joinedFooter": "Waiting for the host to brief the squad…",
+      "idleFooter": "Deploy alone, open a room for friends, or join one with a code."
+    },
+    "card": {
+      "_note": "The operation card. The incident's headline, report and what-is-known are the INCIDENT PACKAGE's and are interpolated; the coverage warnings are the engine's, because they describe a gap in a manifest rather than a fact about a floor.\n\n⚠ `warnOneHeat` names 4.2m, which is the cold store's aisle width and not every floor's. It was hard-coded before this pass and it is hard-coded now — moving a sentence into the locale does not make it true. Flagged rather than fixed: the number belongs on the map.",
+      "title": "Operation card — {site}",
+      "sub": "Foundation regional response · {incident}",
+      "incidentHead": "Incident",
+      "conditionsHead": "Conditions",
+      "confidence": "confidence: {word}",
+      "mandateHead": "Mandate",
+      "mandatePrimary": "<b>Primary:</b> establish custody of the anomaly and transfer it to the stair head.",
+      "mandateOptional": "<b>Optional:</b> recover all issued equipment · avoid a second contact · preserve a sample.",
+      "reportsIncomplete": "Reports may be incomplete. They are not deliberately false.",
+      "otherHead": "Other open operations",
+      "otherBody": "The same floor, a different incident. Everything you learned about the building still applies; nothing you learned about the anomaly does.",
+      "otherButton": "Deploy to {name} instead",
+      "manifestHead": "Cargo manifest",
+      "budget": "{used} of {budget} volume",
+      "coverageHead": "Coverage",
+      "warnNoThermal": "No thermal instrument. You will be working from traces alone.",
+      "warnNoCase": "No custody container. Nothing on this manifest can take custody of anything.",
+      "warnNoHeat": "No heat-emitting equipment.",
+      "warnOneHeat": "One heat emitter. The storage aisles are 4.2m across.",
+      "warnNoMedical": "No medical capacity.",
+      "recommended": "Recommended manifest",
+      "deploy": "Deploy"
+    },
+    "cache": {
+      "title": "Cargo manifest",
+      "sub": "Mobile command point · everything you did not carry in is here",
+      "take": "Take",
+      "slots": "Slots: two belt (compact), two general, one long. Return anything you are not using — a mistake here is meant to be recoverable.",
+      "returnItem": "Return the {name}",
+      "close": "Close"
+    }
+  },
+
+  "base": {
+    "_note": "Regional Site 19 — GDD §13, as a screen rather than a building. NO RULE LIVES IN THE PANEL and none lives here either: every price, gate and refusal is the string sim/progression.js returned, interpolated. What is here is the furniture around it.\n\nDEPARTMENT NAMES, UPGRADE NAMES, CELL LABELS, ROOM NAMES and DOSSIER DESIGNATIONS are content — content/site.json and the progression tables — and every one of them is interpolated. A site that shipped with different rooms would need no line of this.",
+    "shell": {
+      "fallbackName": "Foundation site",
+      "sub": "{tier} · {operations} · {standing}",
+      "operationsClosed": {
+        "one": "{count} operation closed",
+        "other": "{count} operations closed"
+      },
+      "noRooms": "The site file names no rooms.",
+      "requiresTier": "Requires {tier}",
+      "underfunded": "Everything you take is everything you have.",
+      "close": "Close",
+      "takeOperation": "Take the operation",
+      "counter": "Counter"
+    },
+    "ledger": {
+      "requisition": "requisition",
+      "research": "research data",
+      "clearance": "clearance",
+      "clearanceNext": "clearance · next at {need}",
+      "inCustody": "in custody",
+      "needOperations": {
+        "one": "{count} operation",
+        "other": "{count} operations"
+      },
+      "needCustodies": {
+        "one": "{count} custody",
+        "other": "{count} custodies"
+      },
+      "needResearch": {
+        "one": "{count} research earned",
+        "other": "{count} research earned"
+      }
+    },
+    "ops": {
+      "boardHead": "Mission board",
+      "boardEmpty": "The board is empty. Regional has nothing for this squad.",
+      "difficultyDefault": "Field",
+      "opMeta": "{difficulty} · {distance}",
+      "optional": "Optional: {list}",
+      "locked": "Not authorised. Requires {tier} clearance.",
+      "archiveHead": "What the archive already knows",
+      "archiveEmpty": "Nothing yet. The first squad down works it out in the dark.",
+      "regionalHead": "Regional picture",
+      "unknown": "—",
+      "readinessHead": "Readiness",
+      "fit": "fit",
+      "unfit": "{condition} · {operations}",
+      "opsRemaining": {
+        "one": "{count} op",
+        "other": "{count} ops"
+      },
+      "cargoVolume": "{volume} cargo volume",
+      "standardManifest": "Standard manifest is {volume}.",
+      "bayAdds": "The vehicle bay adds {volume}.",
+      "injuriesCost": "Injuries cost {volume}.",
+      "beforeYouGo": "Before you go",
+      "warnCargo": "Injuries on the roster reduce what the squad can carry by {volume} volume.",
+      "warnStabilise": "Field stabilisation will take {percent}% longer with the current roster.",
+      "warnCorridorFull": "Every holding position in the corridor is occupied. A new capture has nowhere rated to go and will be held on the bay bus.",
+      "warnNoRating": "Nothing free in the corridor is rated {rating}, which is what this one needs. It can still be brought back; it will be logged in an improvised position.",
+      "standingHead": "Department standing",
+      "boardOne": "One operation. The board carries what exists and nothing else.",
+      "boardSharedBoth": "Two of these share a floor and two share an anomaly. Neither the building nor the thing in it is the constant — you learn both, separately, and neither answer transfers whole.",
+      "boardSharedFloor": "The same floor twice. Everything you learned about the building still applies; nothing you learned about the anomaly does.",
+      "boardSharedAnomaly": "The same anomaly twice. Everything you learned about the thing still applies; nothing you learned about the building does.",
+      "boardDistinct": "{count} operations, no two alike."
+    },
+    "standing": {
+      "value": "{tier} · {amount}",
+      "multiplier": "×{multiplier}",
+      "watches": "Values {values}. Watches {watches}.",
+      "note": "Standing changes what a department charges. It never closes a counter — GDD §12.3."
+    },
+    "armory": {
+      "fittedHead": "Fitted equipment",
+      "fittedNote": "One variant per family. The standard tool is always on the list, because GDD §10.1 does not allow a new tier to make the old one irrelevant.",
+      "standardVariant": "Standard {item}",
+      "noItems": "No equipment file loaded.",
+      "requisitionHead": "Requisition",
+      "priceNote": "Price is the department's rate at your current standing. Research-data costs do not move with standing — analysis is analysis.",
+      "rate": "{tier} rate",
+      "researchCost": "{count}R",
+      "held": "held",
+      "order": "Order",
+      "recoveryHead": "Recovery",
+      "nothingBack": "Nothing has come back yet, because nothing has gone out.",
+      "lastLoss": "Operation {operation}: equipment stewardship read <b>{word}</b>. Anything left on the floor was reordered out of that operation's requisition.",
+      "unrecorded": "unrecorded"
+    },
+    "issued": {
+      "_note": "What a fitted variant does to the issued item, in the ITEM's own units. The label is a whole message and the row is a whole message that carries it — a translator moves 'battery 20 min → 34 min' as one line rather than being handed 'battery' and left to guess where it goes.",
+      "asIssued": "as issued",
+      "change": "{label} {from} → {to}",
+      "missing": "—",
+      "label": {
+        "cargoVolume": "volume",
+        "bulk": "slot",
+        "batteryMinutes": "battery",
+        "heatOutputCelsius": "output",
+        "heatFalloffMetres": "falloff",
+        "feedRadiusMetres": "feed",
+        "barrierWidthMetres": "width"
+      },
+      "unit": {
+        "cargoVolume": "{value}",
+        "bulk": "{value}",
+        "batteryMinutes": "{value} min",
+        "heatOutputCelsius": "{value}C",
+        "heatFalloffMetres": "{value}m",
+        "feedRadiusMetres": "{value}m",
+        "barrierWidthMetres": "{value}m"
+      }
+    },
+    "archive": {
+      "historyHead": "Mission history",
+      "historyEmpty": "No operation has closed yet.",
+      "operation": "Operation {operation}",
+      "minutes": "{minutes} min",
+      "unmeasured": "—",
+      "when": "{minutes} · {map}",
+      "unrecorded": "unrecorded",
+      "closed": "Operation closed.",
+      "provenance": "requisition {requisition} · research {research} · {dims}",
+      "dim": "{name}: {word}",
+      "jammed": "{name} jammed",
+      "faulted": "{name} circuit faulted",
+      "filesHead": "Case files",
+      "filesEmpty": "Nothing filed.",
+      "operations": {
+        "one": "{count} operation",
+        "other": "{count} operations"
+      },
+      "caseNotes": "{filed} of {total} case notes filed.",
+      "attributionHead": "Attribution",
+      "attribution": "Designations are provisional until a licensing record exists — GDD §25.3. Nothing in this build prints a number it has not earned the right to print."
+    },
+    "research": {
+      "dataHead": "Research data",
+      "available": "{available} available · {earned} earned in total.",
+      "clearanceNote": "Clearance reads the total earned, so spending never costs you a milestone.",
+      "noFile": "No case file open.",
+      "rulesRead": {
+        "one": "{count} rule read correctly.",
+        "other": "{count} rules read correctly."
+      },
+      "overOperations": {
+        "one": "Across {count} operation.",
+        "other": "Across {count} operations."
+      },
+      "misread": {
+        "one": "{count} misread, at no cost.",
+        "other": "{count} misread, at no cost."
+      },
+      "filed": "Filed",
+      "notYet": "Not yet",
+      "insightLocked": "A case note the squad has not earned yet.",
+      "needRules": {
+        "one": "{count} rule",
+        "other": "{count} rules"
+      },
+      "needResearch": {
+        "one": "{count} research",
+        "other": "{count} research"
+      }
+    },
+    "bench": {
+      "head": "Isolation bench",
+      "beds": {
+        "one": "{count} bed.",
+        "other": "{count} beds."
+      },
+      "note": "Treatment is never required: an untreated operative deploys with the effect and it expires on its own after the stated number of operations. GDD §12.5 — you can always field a character, and nothing here waits on a real clock.",
+      "fit": "Fit",
+      "onFile": {
+        "one": "{count} operation on file.",
+        "other": "{count} operations on file."
+      },
+      "condition": "{condition} · {remaining} left",
+      "remaining": {
+        "one": "{count} op",
+        "other": "{count} ops"
+      },
+      "treat": "{name} · {price}",
+      "treatFree": "{name}"
+    },
+    "containment": {
+      "head": "Holding positions",
+      "empty": "The corridor has no cells on file.",
+      "vacant": "vacant",
+      "vacantRated": "vacant · rated {rating}",
+      "occupied": "{cell}",
+      "occupiedRated": "{cell} · rated {rating}",
+      "improvised": "{cell} · rated {rating} — improvised",
+      "improvisedUnrated": "{cell} — improvised",
+      "unplaced": "no holding position",
+      "onTheBus": "Held on the vehicle bay bus. The corridor has nothing free.",
+      "onTheBusRated": "Held on the vehicle bay bus. The corridor has nothing free, and nothing rated {rating}.",
+      "framingHead": "How this corridor is written",
+      "maintenanceHead": "Maintenance record",
+      "maintenanceEmpty": "Nothing is due. Nothing is held.",
+      "interval": {
+        "one": "Checks fall due every {count} operation.",
+        "other": "Checks fall due every {count} operations."
+      },
+      "intervalNote": "They are a record, not a chore: nothing here becomes mandatory and nothing here destroys progress."
+    },
+    "upgrades": {
+      "head": "What this room could be",
+      "note": "The site began underfunded and every one of these is visible from the first day — GDD §13.3. Growth changes what the room can do; it never moves where things are.",
+      "requires": "Requires {tier}",
+      "blocked": "Depends on work that has not been done",
+      "short": "Requisition short",
+      "built": "built",
+      "build": "Build"
+    }
+  },
+
+  "settings": {
+    "_note": "GDD §19's accessibility baseline. §19.1 makes this screen load-bearing rather than optional: an accessibility control a player cannot read is an accessibility feature they cannot reach, so this is the one screen where leaving a label in English would remove a promise the design makes.\n\nTHE SCHEMA IS THE SINGLE DESCRIPTION OF EVERY FIELD and it validates as well as renders, so a label here is keyed off the same dotted path the validator uses. The VALUES of a choice field are ids — 'hold', 'largest', 'minimap' — compared against and saved; their labels sit under `opt` beside them, which is the same id-and-label split `phase` and `grade` make.",
+    "title": "Settings",
+    "sub": "Accessibility baseline — GDD §19",
+    "savedHere": "Saved to this browser.",
+    "noStorage": "This browser refuses local storage — settings last until you close the tab.",
+    "reset": "Reset {group}",
+    "close": "Close",
+    "group": {
+      "controls": "Controls",
+      "captions": "Captions",
+      "vision": "Vision",
+      "camera": "Camera",
+      "audio": "Audio",
+      "assists": "Assists",
+      "safety": "Safety"
+    },
+    "blurb": {
+      "controls": "Every action can be moved. Keys the browser owns — Escape, F5, F12 — are refused, because a key that also reloads the page is not a binding.",
+      "captions": "Every audio cue in the build has a written line (GDD §17.3). Non-speech captions are bracketed; direction is shown where the sound has one.",
+      "vision": "Colour presets change the five signal colours only. Shape redundancy is on by default and should stay on — §18.5 requires every treatment to work without colour.",
+      "camera": "Field of view and five effect intensities. Photosensitivity-safe mode clamps shake, grain and distortion regardless of what is set here.",
+      "audio": "Five separate buses. Turning anomaly cues down never removes information — the caption channel carries the same content.",
+      "assists": "These widen the window to act and the size of what you read. None of them tells you what the anomaly is — that is the part the game is made of.",
+      "safety": "Photosensitivity-safe mode suppresses flashes and rapid contrast changes. The slice contains no gore; the setting is here so content added later has a switch that already exists rather than one bolted on afterwards."
+    },
+    "field": {
+      "input.holdModes.sprint": "Sprint",
+      "input.holdModes.crouch": "Crouch",
+      "input.holdModes.imager": "Thermal imager",
+      "captions.enabled": "Captions",
+      "captions.nonSpeech": "Non-speech captions",
+      "captions.speaker": "Show speaker",
+      "captions.direction": "Show direction",
+      "captions.size": "Size",
+      "captions.opacity": "Background opacity",
+      "captions.maxLines": "Lines on screen",
+      "captions.holdMs": "Hold time",
+      "vision.palette": "Colour vision",
+      "vision.highContrast": "High contrast",
+      "vision.shapes": "Shape and icon redundancy",
+      "vision.uiScale": "UI scale",
+      "camera.fov": "Field of view",
+      "camera.shake": "Camera shake",
+      "camera.headBob": "Head bob",
+      "camera.motionBlur": "Motion blur",
+      "camera.filmGrain": "Film grain",
+      "camera.distortion": "Lens distortion",
+      "volume.master": "Master",
+      "volume.voice": "Voice",
+      "volume.anomaly": "Anomaly cues",
+      "volume.instruments": "Instruments",
+      "volume.ambience": "Ambience",
+      "volume.music": "Music",
+      "assists.procedureTiming": "Procedure timing",
+      "assists.evidenceLegibility": "Evidence legibility",
+      "assists.navigationAids": "Navigation aid",
+      "safety.photosensitive": "Photosensitivity-safe mode",
+      "safety.contentWarnings": "Content warnings",
+      "safety.gore": "Gore"
+    },
+    "opt": {
+      "holdMode": { "hold": "Hold", "toggle": "Toggle" },
+      "legibility": { "standard": "Standard", "large": "Large", "largest": "Largest" },
+      "navigation": { "off": "Off", "compass": "Compass", "minimap": "Minimap" },
+      "gore": { "none": "None", "reduced": "Reduced", "standard": "Standard" }
+    },
+    "palette": {
+      "default": "Default",
+      "deuteranopia": "Deuteranopia (green-weak)",
+      "protanopia": "Protanopia (red-weak)",
+      "tritanopia": "Tritanopia (blue-weak)",
+      "highContrast": "High contrast"
+    },
+    "swatch": {
+      "_note": "§18.5's five signal roles, previewed with the glyph beside the colour so a player can check that a preset actually helps.",
+      "head": "Signal preview",
+      "ordinary": "Powered / nominal",
+      "instrument": "Instrument target",
+      "degraded": "Degraded or uncertain",
+      "hazard": "Immediate hazard",
+      "custody": "Custody-critical"
+    },
+    "bindings": {
+      "head": "Key bindings",
+      "note": "Binding a key that is already in use takes it off the other action and says so.",
+      "noInput": "No input device attached.",
+      "unbound": "unbound",
+      "awaiting": "press a key…",
+      "cancel": "Cancel",
+      "change": "Change"
+    },
+    "action": {
+      "moveUp": "Move forward",
+      "moveDown": "Move back",
+      "moveLeft": "Move left",
+      "moveRight": "Move right",
+      "sprint": "Sprint",
+      "crouch": "Crouch",
+      "interact": "Context verb",
+      "use": "Use or deploy held item",
+      "imager": "Thermal imager",
+      "tablet": "Field tablet",
+      "abort": "Abort procedure",
+      "settings": "Settings",
+      "comms": "Comms wheel",
+      "slot1": "Slot 1",
+      "slot2": "Slot 2",
+      "slot3": "Slot 3",
+      "slot4": "Slot 4",
+      "slot5": "Slot 5"
+    },
+    "key": {
+      "_note": "⚠ A KEYCAP LEGEND IS NOT A WORD AND A KEY'S NAME IS. The arrows and the punctuation keys print the glyph physically on the cap and are left alone in ui/settings.js, because ↑ and ; are the same mark on every keyboard. The NAMED keys are not: a German keyboard says Strg and Umschalt, and a rebinding list that insists on Ctrl and Shift is telling that player to look for a key that is not there.",
+      "none": "—",
+      "ShiftLeft": "L Shift",
+      "ShiftRight": "R Shift",
+      "ControlLeft": "L Ctrl",
+      "ControlRight": "R Ctrl",
+      "AltLeft": "L Alt",
+      "AltRight": "R Alt",
+      "Space": "Space",
+      "Tab": "Tab",
+      "Enter": "Enter",
+      "Backspace": "Backspace",
+      "CapsLock": "Caps",
+      "numpad": "Num {key}"
+    },
+    "flash": {
+      "groupReset": "{group} reset.",
+      "reserved": "{key} belongs to the browser and cannot be bound.",
+      "bound": "{key} bound to {action}.",
+      "displaced": "{key} bound. It was taken off {actions}.",
+      "refused": {
+        "_note": "Whole sentences keyed by the reason id core/input.js returned, rather than that id printed after a colon. `${key} refused: bad-code.` was a machine word shown to a person.",
+        "unknown-action": "{key} refused: nothing is bound to that action.",
+        "bad-code": "{key} refused: that is not a key this browser reports.",
+        "reserved": "{key} refused: the browser owns that key.",
+        "not-holdable": "{key} refused: that action is not one you hold.",
+        "bad-mode": "{key} refused: that is not a hold mode."
+      }
+    }
+  },
+
+  "comms": {
+    "_note": "GDD §11.3's ping wheel and its closed phrase vocabulary, and §19.2 is why it is the PRIMARY channel rather than a garnish: no required rule may depend on microphone use or on stereo hearing, so a squad with no voice at all runs a whole operation through this.\n\n⚠ THE PHRASE ID IS NOT HERE AND MUST NEVER BE. `contact`, `set-up-here`, `on-me` travel over the wire (src/net/protocol.js), are compared against in sim/comms.js, and are the keys of both PHRASES and COMMS_CAPTIONS. What is here is what the WHEEL PRINTS and what the FEED READS — one string for both, because a wheel that says one thing and sends another costs a callout the first time somebody notices.",
+    "phrase": {
+      "contact": "it is here",
+      "hold": "hold — leave that alone",
+      "evidence": "something to log here",
+      "set-up-here": "set up here",
+      "bring-kit": "bring kit here",
+      "on-it": "I have this one",
+      "ready": "in position",
+      "on-me": "on me",
+      "watch-this": "keep this in view",
+      "help": "I am in trouble"
+    },
+    "kind": {
+      "_note": "§11.3's six kinds. The GLYPH lives beside the kind in sim/comms.js and is not a message — §18.5 needs a silhouette that survives a dark floor, and a silhouette is not language.",
+      "danger": "Danger",
+      "evidence": "Evidence",
+      "objective": "Objective",
+      "move": "Move",
+      "watch": "Watch",
+      "help": "Help"
+    },
+    "wheel": {
+      "cancel": "release to cancel"
+    },
+    "marker": {
+      "distance": "{metres}m"
+    },
+    "unknownSpeaker": "Somebody",
+    "refuse": {
+      "_note": "Both the local pre-check in ui/commswheel.js and the host's own test in sim/comms.js answer with these, so an operative reads the same sentence whichever machine refused them.",
+      "notAPhrase": "That phrase is not on the wheel.",
+      "noCaller": "That call had nobody behind it.",
+      "tooSoon": "Give the last call a moment.",
+      "offTheNet": "You are off the net.",
+      "downed": "You are on the floor. Call for help.",
+      "tooFar": "That is too far away to mark.",
+      "noSight": "You cannot see that from here."
+    }
+  },
+
+  "caption": {
+    "_note": "GDD §17.3 — a written line for every audio cue — and §19.2 — no required rule may depend on hearing. Keyed by the SIMULATION EVENT NAME, which is also the key of CUES in src/audio/audio.js, so a cue with no caption is a hole `missingCaptions()` can see rather than a quiet omission.\n\nThe wording of the continuous voices is the anomaly document's own `audioCue` text, so what the player reads and what the package promises are the same sentence. The bracketing and the bearing are added by `formatCaption` and are not spelled here.",
+    "CONTACT": "a rush of cold, close",
+    "SEAL_ATTEMPT": "case latches strain",
+    "CUSTODY_VERIFIED": "case tone steadies — custody verified",
+    "CUSTODY_LOST": "the note falls away — custody lost",
+    "DEPLOYED": "unit sets down and powers up",
+    "RETRIEVED": "unit powers down and is lifted",
+    "CIRCUIT_CHANGED": "the floor takes power",
+    "DOOR_CHANGED": "a door drives on its motor",
+    "BATTERY_DEAD": "a cell dies",
+    "EVIDENCE_LOGGED": "logged",
+    "WHISTLE_SHARPENS": "the whistle sharpens",
+    "WHISTLE_DROPS": "the whistle drops",
+    "FLUTTER_BEGINS": "the note breaks into a flutter",
+    "NOTE_SUSTAINS": "the flutter returns to a sustained note",
+    "HEATER_CYCLE": "the case heater cycles",
+    "DRAUGHT_STILLS": "the draught stills",
+    "IMAGER_CONTACT": "the imager tone rises — contact held",
+    "BREATH_HARD": "you are breathing hard"
+  },
+
+  "direction": {
+    "_note": "Compass words, because a bearing in degrees is not a caption. §19.2 forbids a required rule depending on stereo hearing and the build synthesises in mono anyway, so direction is a WORD everywhere it appears. The simulation is planar and never produces above or below; they are here because formatCaption can be handed one.",
+    "ahead": "ahead",
+    "behind": "behind",
+    "left": "to your left",
+    "right": "to your right",
+    "above": "above",
+    "below": "below"
+  },
+
+  "weather": {
+    "_note": "§14.4's controlled variation, as words. THE AMBIENT DELTAS ARE RULES and stay in src/sim/variation.js — two degrees of weather is a real change in how much fence a floodlight buys, and the sound field's ambient decides how far a footstep carries. These are only the label the card prints and the sentence the briefing reads; a locale never changes what a seed does.\n\n`known` is the line variation.js adds to the incident's briefing, and it is a WHOLE MESSAGE rather than `label + '. ' + line` — a language that wants the condition after the consequence moves the pieces itself.",
+    "known": "{label}. {line}",
+    "still": { "label": "Still and dry", "line": "Still, dry, nothing moving outside." },
+    "cold": { "label": "Hard frost", "line": "Hard frost since midnight. The floor is colder than the forecast said and quieter with it." },
+    "wet": { "label": "Steady rain", "line": "Steady rain on the roof. Warmer than it should be, and you cannot hear yourself think." },
+    "wind": { "label": "Gusting", "line": "Gusting hard from the north-east. Everything loose is making a noise." }
+  },
+
+  "time": {
+    "_note": "Times of day (§14.4), which change what the mains are doing and who is still on site. Same shape as the weather above and for the same reason: the KEY is what a seed chooses and what a save records, the words are here.",
+    "known": "{label}. {line}",
+    "night": { "label": "Night", "line": "Small hours. Nobody on site but the person who called it in." },
+    "dawn": { "label": "First light", "line": "First light. The site wakes up in about two hours whatever happens." },
+    "day": { "label": "Daylight", "line": "Middle of the day. Two contractors are being kept off the floor for you." }
+  },
+
+  "site": {
+    "_note": "The one name the site model invents. §14.3 wants landmarks a player can say aloud, so `roomNameAt` must always answer — and the answer when the rects genuinely cover nothing is not an empty string.",
+    "unmarkedFloor": "Unmarked floor"
   },
 
   "phase": {

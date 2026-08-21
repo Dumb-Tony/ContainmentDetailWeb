@@ -15,6 +15,7 @@
  */
 
 import { rectContains, circleHitsRect, dist } from './geometry.js';
+import { t as msg } from '../core/i18n.js';
 
 export class Site {
   constructor(mapDoc) {
@@ -159,7 +160,7 @@ export class Site {
     return best;
   }
 
-  roomNameAt(x, z) { const r = this.roomNearest(x, z); return r ? r.name : 'Unmarked floor'; }
+  roomNameAt(x, z) { const r = this.roomNearest(x, z); return r ? r.name : msg('site.unmarkedFloor'); }
 
   inExtraction(x, z) {
     return dist(x, z, this.extraction.x, this.extraction.z) <= this.extraction.radius;

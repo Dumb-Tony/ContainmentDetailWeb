@@ -35,6 +35,7 @@
  */
 
 import { dist2 } from './geometry.js';
+import { t as msg } from '../core/i18n.js';
 
 /** Where an object can be in its life. Small, closed, and the state machine is linear. */
 export const INSTANCE_STATE = Object.freeze({
@@ -168,8 +169,8 @@ export class InstanceSet {
    * what makes a second operative worth having.
    */
   collect(playerId, instance) {
-    if (!instance || !instance.loose) return 'Nothing to pick up.';
-    if (this.carriedBy(playerId)) return 'Both hands are already full.';
+    if (!instance || !instance.loose) return msg('mission.refuse.nothingToPickUp');
+    if (this.carriedBy(playerId)) return msg('mission.refuse.handsFull');
     instance.state = INSTANCE_STATE.CARRIED;
     instance.carriedBy = playerId;
     return null;
@@ -195,10 +196,10 @@ export class InstanceSet {
    */
   deposit(playerId, caseX, caseZ) {
     const held = this.carriedBy(playerId);
-    if (!held) return { ok: false, ticked: false, contaminated: this.contaminated, why: 'Nothing in hand to log.' };
+    if (!held) return { ok: false, ticked: false, contaminated: this.contaminated, why: msg('mission.refuse.nothingInHandToLog') };
     if (dist2(held.x, held.z, caseX, caseZ) > this.depositRadiusM * this.depositRadiusM
       && dist2(caseX, caseZ, held.x, held.z) > this.depositRadiusM * this.depositRadiusM) {
-      return { ok: false, ticked: false, contaminated: this.contaminated, why: 'Too far from the case.' };
+      return { ok: false, ticked: false, contaminated: this.contaminated, why: msg('mission.refuse.tooFarFromCase') };
     }
     held.state = INSTANCE_STATE.DEPOSITED;
     held.carriedBy = null;
