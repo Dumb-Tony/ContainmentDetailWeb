@@ -18,7 +18,7 @@
 import { lines, counts, ok, eq, near, note, emit, run, heading } from './harness.js';
 import {
   t, plural, pseudo, flatten, setMessages, setFallback, loadLocale, locale,
-  missingKeys, usedKeys, knownKeys, resetUsage, LOCALES, DEFAULT_LOCALE, bootError,
+  missingKeys, usedKeys, knownKeys, ownKeys, resetUsage, LOCALES, DEFAULT_LOCALE, bootError, chooseLocale,
 } from '../src/core/i18n.js';
 import { loadContent } from '../src/sim/content.js';
 import { Game, RECOMMENDED_MANIFEST } from '../src/game.js';
@@ -35,9 +35,10 @@ async function sectionA() {
 
   ok('A1 the default locale loaded at module scope, so nothing has to remember to load it',
     bootError === null, bootError ? String(bootError) : '');
-  ok('A2 and it has messages in it', knownKeys().length > 20, `${knownKeys().length} keys`);
-  eq('A3 the running locale is the default', locale(), DEFAULT_LOCALE);
-  note(`${knownKeys().length} messages in ${DEFAULT_LOCALE}`);
+  ok('A2 and every message the game can say resolves, counting what a partial locale inherits',
+    knownKeys().length > 100, `${knownKeys().length} resolvable, ${ownKeys().length} carried by this locale`);
+  ok('A3 and the locale it booted in is one this build ships', LOCALES.includes(locale()), locale());
+  note(`booted in ${locale()}: ${knownKeys().length} messages resolvable, ${ownKeys().length} carried by the locale itself`);
 
   /* ⚠ A MISSING KEY RETURNS THE KEY, LOUDLY. An empty string is the tempting fallback and
    * it is the wrong one: §18.1 does not allow the UI to misrepresent, and a blank label
@@ -110,6 +111,68 @@ function sectionC() {
   setMessages({ demo: { x: 'Carry the case to the stair head.' } }, 'pseudo');
   const rendered = t('demo.x');
   ok('C5 and a locale set to pseudo renders every message through it', /[áéîöû]/.test(rendered), rendered);
+  emit();
+}
+
+/* ── CC. a second, partial locale ─────────────────────────────────────────── */
+async function sectionCC() {
+  heading('CC. a partial locale falls through to the default for what it does not say');
+
+  /**
+   * ⚠ THE FALLBACK PATH CANNOT BE TESTED WITH A COMPLETE FILE, because a complete file
+   * never exercises it — and a fallback that is never exercised is a fallback that is
+   * broken the first time somebody ships a translation that is 80% done, which is every
+   * translation that has ever shipped.
+   *
+   * `en-US` is deliberately partial: it carries only the messages where American English
+   * differs from British, which is eight of a hundred and sixty-four.
+   */
+  await loadLocale('en-US');
+  eq('CC1 the running locale is the one that was asked for', locale(), 'en-US');
+  eq('CC2 a message the partial locale overrides comes from the partial locale',
+    t('mission.refuse.nothingToStabilise'), 'Nothing to stabilize.');
+  eq('CC3 a message it does not carry falls through to the default',
+    t('mission.refuse.nothingInHand'), 'Nothing in hand.');
+  eq('CC4 and an overridden message keeps its placeholders',
+    t('mission.verb.stabilise', { name: 'Vasquez' }), 'Stabilize Vasquez');
+  eq('CC5 plurals fall through too, because the group is inherited whole',
+    plural('debrief.why.rescues', 1), '1 casualty recovered under pressure.');
+
+  const overridden = ['mission.refuse.nothingToStabilise', 'mission.verb.stabilise',
+    'mission.notice.stabilised', 'mission.notice.revived', 'hud.cond.exposureStabilised',
+    'hud.cond.mobilityStabilised', 'debrief.dim.time', 'debrief.why.careStabilised'];
+  const wrong = overridden.filter((k) => /stabilised/.test(t(k, { bars: '', name: 'x' })));
+  eq(`CC6 no message this locale claims to override still says the other spelling${wrong.length ? ` — ${wrong.join(', ')}` : ''}`,
+    wrong.length, 0);
+  note(`en-US carries ${knownKeys().length} messages of its own; everything else falls through to ${DEFAULT_LOCALE}`);
+
+  /* ⚠ AND IT DOES NOT CONVERT THE UNITS, which is a decision rather than an omission. The
+   * anomaly's threshold is 40C and the seal radius is 1.5m, and those are RULES: the imager
+   * bezel, the evidence board, the design document and the after-action report all print
+   * the same figures. A locale that rendered 4.9ft would be showing a different number from
+   * every other surface for the same rule. */
+  /* Checked over the MESSAGES rather than the raw file: the note in that file explains the
+   * decision by naming the thing it refuses to do, and a check that reads the explanation
+   * as a violation is a check that punishes writing the reason down. */
+  const usMessages = Object.values(flatten(await (await fetch('/content/locales/en-US.json')).json())).join(' ');
+  ok('CC7 and it does not convert a number a rule is stated in',
+    !/\bft\b|\binch|Fahrenheit|°F/.test(usMessages), usMessages.slice(0, 120));
+
+  await loadLocale(DEFAULT_LOCALE);
+  eq('CC8 and going back to the default restores it', t('mission.refuse.nothingToStabilise'), 'Nothing to stabilise.');
+
+  /**
+   * ⚠ AN UNKNOWN TAG IS NOT A GUESS. `de-AT` must not silently become `de-DE`: a half-matched
+   * language is worse than an honest English, because you get some of the game in a language
+   * you chose and the rest in one you did not, with no way to tell which is which.
+   */
+  eq('CC9 an explicit ?locale= wins, so a bug report has a reproduction step',
+    chooseLocale('?locale=en-US', 'pseudo', ['fr-FR']), 'en-US');
+  eq('CC10 then a stored preference', chooseLocale('', 'en-US', ['fr-FR']), 'en-US');
+  eq('CC11 then the browser\'s own ranked list', chooseLocale('', null, ['fr-FR', 'en-US']), 'en-US');
+  eq('CC12 a tag this build does not ship is the default rather than a near match',
+    chooseLocale('?locale=de-AT', null, ['de-DE']), DEFAULT_LOCALE);
+  eq('CC13 and no signal at all is the default', chooseLocale('', null, null), DEFAULT_LOCALE);
   emit();
 }
 
@@ -266,6 +329,7 @@ async function sectionF() {
     await run('A', () => sectionA());
     await run('B', () => sectionB());
     await run('C', () => sectionC());
+    await run('CC', () => sectionCC());
     await run('D', () => sectionD());
     const content = await loadContent();
     await run('E', () => sectionE(content));

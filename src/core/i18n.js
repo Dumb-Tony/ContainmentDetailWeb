@@ -34,7 +34,7 @@
  */
 
 /** Tags the build knows about. `pseudo` is generated, not authored. */
-export const LOCALES = Object.freeze(['en-GB', 'pseudo']);
+export const LOCALES = Object.freeze(['en-GB', 'en-US', 'pseudo']);
 export const DEFAULT_LOCALE = 'en-GB';
 
 /* ── the store ───────────────────────────────────────────────────────────────── */
@@ -96,7 +96,19 @@ export function setFallback(doc) { _fallback = flatten(doc || {}); }
 export function locale() { return _locale; }
 export function missingKeys() { return [..._missing]; }
 export function usedKeys() { return [..._used]; }
-export function knownKeys() { return Object.keys(_messages); }
+/**
+ * Every key that CAN resolve, which is the union of this locale and the fallback.
+ *
+ * ⚠ THIS RETURNED ONLY THE CURRENT LOCALE'S OWN KEYS, and under a partial locale that is a
+ * lie: `en-US` carries eight messages and the game has a hundred and sixty-four, because the
+ * rest fall through. A caller asking "what can I say" got "eight".
+ */
+export function knownKeys() {
+  return [...new Set([...Object.keys(_fallback), ...Object.keys(_messages)])];
+}
+
+/** Keys this locale carries ITSELF, which is what a translator's progress bar wants. */
+export function ownKeys() { return Object.keys(_messages); }
 export function resetUsage() { _used.clear(); _missing.clear(); }
 
 /**
@@ -144,7 +156,7 @@ export async function loadLocale(tag = DEFAULT_LOCALE, path = '../../content/loc
   return _load(tag, path);
 }
 
-async function _load(tag, path) {
+async function _load(tag = DEFAULT_LOCALE, path = '../../content/locales') {
   /* `pseudo` is generated from the default rather than authored: a pseudolocale file
    * checked into the repo would go stale the first time anybody added a message. */
   const want = tag === 'pseudo' ? DEFAULT_LOCALE : tag;
@@ -152,9 +164,18 @@ async function _load(tag, path) {
   const res = await fetch(url, { cache: 'no-store' });
   if (!res.ok) throw new Error(`locale ${want}: HTTP ${res.status}`);
   const doc = await res.json();
+  /* ⚠ THE FALLBACK IS SET BEFORE THE MESSAGES, because `setMessages` overwrites the
+   * fallback when the tag IS the default — so doing it the other way round installs the
+   * default as fallback and then immediately replaces it with the partial locale, and every
+   * message the partial file does not carry resolves to its own key. */
   if (want !== DEFAULT_LOCALE) {
     const base = await fetch(new URL(`${path}/${DEFAULT_LOCALE}.json`, import.meta.url).href, { cache: 'no-store' });
-    if (base.ok) setFallback(await base.json());
+    if (!base.ok) throw new Error(`fallback ${DEFAULT_LOCALE}: HTTP ${base.status}`);
+    const baseDoc = await base.json();
+    setMessages(doc, tag);
+    setFallback(baseDoc);
+    if (tag === 'pseudo') _locale = 'pseudo';
+    return doc;
   }
   setMessages(doc, tag);
   if (tag === 'pseudo') _locale = 'pseudo';
@@ -174,9 +195,34 @@ async function _load(tag, path) {
  * returns keys, which looks broken because it IS broken; a silent empty string would look
  * like a design decision. The suite asserts the table loaded, so this cannot ship missing.
  */
+/**
+ * Which locale to boot in.
+ *
+ * `?locale=` wins, because a bug report needs to be reproducible and "set your browser to
+ * German" is not a reproduction step. Then a stored preference. Then the browser's own
+ * languages, in the order it lists them — `navigator.languages` is already a ranked list of
+ * what the person reads and there is no reason to ask them again.
+ *
+ * ⚠ AN UNKNOWN TAG IS NOT AN ERROR AND IS NOT A GUESS. `de-AT` does not silently become
+ * `de-DE`: a locale this build does not ship is the default, because a half-matched
+ * language is worse than an honest English — you get some of the game in a language you
+ * chose and the rest in one you did not, with no way to tell which is which.
+ */
+export function chooseLocale(search = (typeof location !== 'undefined' ? location.search : ''),
+  stored = null,
+  languages = (typeof navigator !== 'undefined' ? navigator.languages : null)) {
+  const asked = new URLSearchParams(search || '').get('locale');
+  if (asked && LOCALES.includes(asked)) return asked;
+  if (stored && LOCALES.includes(stored)) return stored;
+  for (const l of languages || []) if (LOCALES.includes(l)) return l;
+  return DEFAULT_LOCALE;
+}
+
 export let bootError = null;
 try {
-  await _load(DEFAULT_LOCALE, '../../content/locales');
+  let stored = null;
+  try { stored = localStorage.getItem('cd.locale'); } catch { /* private mode, or no storage */ }
+  await _load(chooseLocale(undefined, stored), '../../content/locales');
 } catch (e) {
   bootError = e;
   /* eslint-disable-next-line no-console */
