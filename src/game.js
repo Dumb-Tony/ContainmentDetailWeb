@@ -25,8 +25,7 @@ import { DeployableSet } from './sim/deployables.js';
 import { Anomaly, ANOMALY_STATE } from './sim/anomaly.js';
 import { Player } from './sim/player.js';
 import {
-  EvidenceLedger, CLAIMS, sourceInReach, thermalVoidObserved,
-  frostBoundaryObserved, batteryDrainObserved,
+  EvidenceLedger, CLAIMS, sourceInReach, EARNED_OBSERVATIONS,
 } from './sim/evidence.js';
 import { Mission, PHASE } from './sim/mission.js';
 import { observedBy, operativeViewer, cameraViewer } from './sim/perception.js';
@@ -217,7 +216,10 @@ export class Game {
     /** Batteries follow the ITEM, not the carrier — hand the imager over and its charge
      *  goes with it, which is the only behaviour a squad can reason about. */
     this.itemBattery = new Map();
-    this.imagerHold = new Map();   // playerId -> ms the mass has been held in view
+    /** `${playerId}|${evidenceId}` -> ms that observation has been held unbroken. One clock
+     *  per operative per earned observation, because two rules may want two radii and a
+     *  single per-player clock would have made the shorter one decide both. */
+    this.observationHold = new Map();
     this.imagerOnIds = new Set();
     /** playerId -> the custody state of the case in their hands, so putting it down (or
      *  dropping it because they went down) restores exactly what they picked up. */
@@ -297,7 +299,7 @@ export class Game {
     this.commands.delete(id);
     this.comms.retire(id);
     this.imagerOnIds.delete(id);
-    this.imagerHold.delete(id);
+    for (const k of this.observationHold.keys()) if (k.startsWith(`${id}|`)) this.observationHold.delete(k);
     this.bus.emit(EVENTS.SQUAD_CHANGED, { id, joined: false }, this.clock.simTimeMs);
     return true;
   }
@@ -835,32 +837,74 @@ export class Game {
    * Evidence is squad-wide, and the entry names WHO saw it. GDD §7.2 wants provenance on
    * every observation — with five operatives, "who was holding the imager" is exactly the
    * sort of thing the debrief and the board have to be able to answer.
+   *
+   * ⚠ THIS LOOP USED TO NAME THREE EVIDENCE IDS. `thermal-void`, `frost-boundary` and
+   * `battery-drain` were written here, in code, so those were the only three observations
+   * in the game a squad could EARN — everything else had to be walked to and picked up.
+   * A designer who wanted an observation earned had to spell it as one of those three or
+   * it did not exist, which is why the pinfold lodger's telemetry entry is called
+   * `battery-drain`, and why the draught's board then attached itself to it.
+   *
+   * Now the content says what earns what. The evidence id is the designer's; the operator
+   * that decides it comes from the closed vocabulary in sim/evidence.js and the numbers
+   * come from the file. Same rule as senses.js: a JSON key may name a quantity, never an
+   * operator.
    */
   _stepEvidence(stepMs, simTimeMs) {
-    for (const p of this.players) {
-      if (!p.alive) continue;
-      const prov = (source = p.name) => ({
-        simTimeMs, x: p.x, z: p.z, room: this.site.roomNameAt(p.x, p.z),
-        source, integrity: 'clean',
-      });
+    for (const rule of this.content.anomaly.evidenceRules) {
+      const w = rule.earnedBy;
+      if (!w) continue;                                   // this one is walked to and picked up
+      const obs = EARNED_OBSERVATIONS[w.observation];
+      if (!obs) continue;                                 // the loader refuses these; belt and braces
 
-      const on = this.imagerOnIds.has(p.id);
-      const held = (on && this.anomaly.isLoose && dist(p.x, p.z, this.anomaly.x, this.anomaly.z) <= 16)
-        ? (this.imagerHold.get(p.id) || 0) + stepMs : 0;
-      this.imagerHold.set(p.id, held);
-
-      if (thermalVoidObserved(on, this.anomaly, p, held)) {
-        this._log('thermal-void', prov(`${p.name} · thermal imager`));
+      if (obs.scope === 'squad') {
+        if (obs.poll(w, { anomaly: this.anomaly, deployables: this.deployables })) {
+          const p = this.player;
+          this._log(rule.id, {
+            simTimeMs, x: p.x, z: p.z, room: this.site.roomNameAt(p.x, p.z),
+            source: obs.recordedBy, integrity: 'clean',
+          });
+        }
+        continue;
       }
-      if (frostBoundaryObserved(this.anomaly, p)) this._log('frost-boundary', prov());
+
+      for (const p of this.players) {
+        if (!p.alive) continue;
+        const ctx = {
+          x: p.x, z: p.z, anomaly: this.anomaly, deployables: this.deployables,
+          itemLive: w.item ? this._instrumentLive(p, w.item) : false, holdMs: 0,
+        };
+        /* ⚠ THE HOLD CLOCK KEEPS RUNNING AFTER THE ENTRY IS LOGGED. It is what the HUD
+         * draws the imager lock from, and `_log` is already a no-op on a second sighting,
+         * so skipping the whole rule once it is in the ledger would freeze the ring on
+         * screen at whatever it read the instant the observation landed. */
+        if (obs.holds) {
+          const key = `${p.id}|${rule.id}`;
+          const run = obs.holds(w, ctx) ? (this.observationHold.get(key) || 0) + stepMs : 0;
+          this.observationHold.set(key, run);
+          ctx.holdMs = run;
+        }
+        if (!obs.poll(w, ctx)) continue;
+        const item = w.item && this.itemsById.get(w.item);
+        this._log(rule.id, {
+          simTimeMs, x: p.x, z: p.z, room: this.site.roomNameAt(p.x, p.z),
+          source: item ? `${p.name} · ${item.displayName}` : p.name, integrity: 'clean',
+        });
+      }
     }
-    if (batteryDrainObserved(this.deployables, this.anomaly)) {
-      const p = this.player;
-      this._log('battery-drain', {
-        simTimeMs, x: p.x, z: p.z, room: this.site.roomNameAt(p.x, p.z),
-        source: 'equipment telemetry', integrity: 'clean',
-      });
-    }
+  }
+
+  /**
+   * Is that instrument live in this operative's hands?
+   *
+   * The imager is the only thing on the manifest with a switch, and `imagerOnIds` is that
+   * switch — so it is named here rather than pretended away. Anything else is live when it
+   * is carried, which is what "requires the directional microphone" already means
+   * everywhere else in the build.
+   */
+  _instrumentLive(p, itemId) {
+    if (itemId === 'thermal-imager') return this.imagerOnIds.has(p.id);
+    return p.carrying(itemId);
   }
 
   /** The imager's remaining charge, in ms. Follows the item across a handover. */
@@ -1268,7 +1312,14 @@ export class Game {
   /** Back-compatible reader: is operative one looking at the thermal screen? */
   get imagerOn() { return this.imagerOnIds.has('p1'); }
   set imagerOn(v) { if (v) this.imagerOnIds.add('p1'); else this.imagerOnIds.delete('p1'); }
-  get imagerHoldMs() { return this.imagerHold.get('p1') || 0; }
+  /** What the HUD draws the imager lock ring from: the longest unbroken hold operative one
+   *  currently has on any observation the imager earns. Zero on an anomaly whose content
+   *  asks nothing of the imager, which is the honest reading — there is no lock to draw. */
+  get imagerHoldMs() {
+    let best = 0;
+    for (const [k, v] of this.observationHold) if (k.startsWith('p1|')) best = Math.max(best, v);
+    return best;
+  }
   get imagerBatteryMs() { return this.batteryFor('thermal-imager'); }
 
   useHeld(playerId = 'p1') {

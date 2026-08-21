@@ -321,6 +321,60 @@
     }
   ],
 
+  "_claimsNote": "The board for a thing that does not travel, is dislodged by being looked at, and has no signature in any band. The old shared board offered this floor the draught's opinions, which on this incident are four separate ways to get somebody burnt.\n\nFour required rules, four claims, each carrying its own pair. The fifth true claim is the clock, and it is the one the operation is actually lost to: the case is a cell within five metres of the thing, and the case is what runs out. Its own pair is two probables, so the claim also names the fault printer — the luminaire two metres over the heater tripped thermal at 06:19 and did not clear until 10:52, which is a powered fitting held in fault for four and a half hours.\n\nThe two false claims are the two things a squad three incidents into this building already believes. The heater failing is a date, not a cause. And the chiller return is three degrees under the room because it is a drained line in a cold building, which is exactly what a cold mass would look like to somebody sweeping for one.",
+
+  "claims": [
+    {
+      "id": "claim-it-does-not-travel",
+      "dimension": "trigger",
+      "text": "It has never crossed a room on its own. It is on this floor because a man carried it here.",
+      "truth": true,
+      "supportedBy": ["fault-printer", "the-contractor"]
+    },
+    {
+      "id": "claim-attention-dislodges",
+      "dimension": "constraint",
+      "text": "Two seconds of anyone looking at it and it lets go of whatever it is resting on.",
+      "truth": true,
+      "supportedBy": ["helmet-footage", "search-party"]
+    },
+    {
+      "id": "claim-it-leaves-a-mark",
+      "dimension": "capability",
+      "text": "Nothing reads it. What it has been on holds heat for hours, and floor it has stood on has thawed and set again.",
+      "truth": true,
+      "supportedBy": ["thaw-rings", "residual-heat"]
+    },
+    {
+      "id": "claim-it-takes-what-comes-in",
+      "dimension": "capability",
+      "text": "It takes whatever warm thing comes inside a metre and a half. It does not follow and it does not choose.",
+      "truth": true,
+      "supportedBy": ["scorched-glove", "work-light"]
+    },
+    {
+      "id": "claim-it-bleeds-charge",
+      "dimension": "capability",
+      "text": "Cells within five metres flatten about four times faster than rated while it is on nothing. The case is a cell.",
+      "truth": true,
+      "supportedBy": ["work-light", "residual-heat", "fault-printer"]
+    },
+    {
+      "id": "claim-the-heater-anchor",
+      "dimension": "anchor",
+      "text": "The heater failing is what let it in. Put heat back on the floor and it goes.",
+      "truth": false,
+      "supportedBy": ["mothball-notice"]
+    },
+    {
+      "id": "claim-a-cold-mass",
+      "dimension": "presence",
+      "text": "It is a cold mass like the last one. Sweep the level and it will be the coldest thing on it.",
+      "truth": false,
+      "supportedBy": ["chiller-return"]
+    }
+  ],
+
   "containment": {
     "goal": "It lodged onto a powered transit case that was standing inside its reach when it let go, and the case sealed on it, verified by thirty seconds of continuous custody with the heater holding its cycle. Custody is not the lid — it is that the case is still the warmest thing within a metre and a half of it and that nothing else is ever going to be.",
 

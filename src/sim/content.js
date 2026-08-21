@@ -13,6 +13,7 @@
  */
 
 import { SENSES, EFFECT_VERBS, FIELD_KINDS, HUNT_KINDS, BLOCK_KINDS, isSense, isPerformed } from './senses.js';
+import { EARNED_OBSERVATIONS, isEarnedObservation } from './evidence.js';
 import { varyContent } from './variation.js';
 
 const url = (p) => new URL(p, import.meta.url).href;
@@ -117,7 +118,7 @@ function validateMap(doc, itemIds, evidenceIds) {
 
 function validateAnomaly(doc, itemIds) {
   const p = [];
-  for (const k of ['id', 'states', 'triggers', 'capabilities', 'constraints', 'evidenceRules', 'containment']) {
+  for (const k of ['id', 'states', 'triggers', 'capabilities', 'constraints', 'evidenceRules', 'claims', 'containment']) {
     if (doc[k] === undefined) p.push(`missing ${k}`);
   }
   const stateIds = new Set((doc.states || []).map((s) => s.id));
@@ -206,10 +207,66 @@ function validateAnomaly(doc, itemIds) {
       if (!itemIds.has(req)) p.push(`constraint ${c.id}: requires item ${req}, which does not exist`);
     }
   }
+  const evidenceIds = new Set((doc.evidenceRules || []).map((e) => e.id));
   for (const e of doc.evidenceRules || []) {
     if (!e.rawObservation) p.push(`evidence ${e.id}: no rawObservation. GDD §7.2 — the ledger records the raw fact, never the interpretation`);
     for (const req of e.requiredEquipment || []) {
       if (!itemIds.has(req)) p.push(`evidence ${e.id}: requires item ${req}, which does not exist`);
+    }
+    /* ⚠ AN EARNED OBSERVATION NAMES AN OPERATOR THE ENGINE OWNS, and the same closed-
+     * vocabulary rule applies to it as to a sense: content supplies the quantities and
+     * cannot invent the way they are measured. An unknown observation name would be an
+     * evidence rule that silently never fires — a rule with no way to learn it, dressed
+     * as one that has two. */
+    const w = e.earnedBy;
+    if (!w) continue;
+    if (!isEarnedObservation(w.observation)) {
+      p.push(`evidence ${e.id}: earnedBy.observation "${w.observation}" is not in the closed vocabulary (${Object.keys(EARNED_OBSERVATIONS).join(', ')})`);
+      continue;
+    }
+    for (const [key, kind] of Object.entries(EARNED_OBSERVATIONS[w.observation].params)) {
+      const optional = key.endsWith('?');
+      const name = optional ? key.slice(0, -1) : key;
+      const v = w[name];
+      if (v === undefined) { if (!optional) p.push(`evidence ${e.id}: earnedBy is missing ${name}`); continue; }
+      if (kind === 'item' && !itemIds.has(v)) p.push(`evidence ${e.id}: earnedBy names item ${v}, which does not exist`);
+      if (kind === 'metres' && !(typeof v === 'number' && v > 0)) p.push(`evidence ${e.id}: earnedBy.${name} must be a positive number of metres`);
+      if (kind === 'seconds' && !(typeof v === 'number' && v >= 0)) p.push(`evidence ${e.id}: earnedBy.${name} must be a number of seconds, zero or more`);
+      if (kind === 'count' && !(Number.isInteger(v) && v >= 1)) p.push(`evidence ${e.id}: earnedBy.${name} must be a whole number of one or more`);
+    }
+  }
+
+  /* ⚠ THE BOARD BELONGS TO THE ANOMALY, AND THIS IS WHERE THAT IS ENFORCED.
+   *
+   * The hypothesis board was a frozen array of seven claims in src/sim/evidence.js written
+   * for the graybox draught, and every incident got it. Twelve of the fourteen evidence
+   * ids in `pinfold-lodger` were on no claim at all; the two that were on one were there
+   * because they happened to be spelled the same as the draught's, which attached four of
+   * the DRAUGHT's claims to observations about something else. A board that says nothing
+   * is a gap. A board that says something false about the floor under your feet is worse,
+   * and neither the loader nor the tablet had any way to notice.
+   *
+   * So a claim naming an evidence id this anomaly does not define is a refusal, exactly as
+   * a trigger naming a state that does not exist already is. It is the same defect: a
+   * reference to something that is not there. */
+  const claimIds = new Set();
+  if (doc.claims !== undefined && !Array.isArray(doc.claims)) p.push('claims must be an array');
+  else if (Array.isArray(doc.claims) && doc.claims.length === 0) {
+    p.push('claims[] is empty — there is nothing for the squad to be right or wrong about');
+  }
+  for (const c of doc.claims || []) {
+    const at = `claim ${c.id || '(no id)'}`;
+    if (!c.id) p.push(`${at}: no id`);
+    if (claimIds.has(c.id)) p.push(`${at}: duplicate id`);
+    claimIds.add(c.id);
+    if (!c.text) p.push(`${at}: no text — the board shows this to the player`);
+    if (!c.dimension) p.push(`${at}: no dimension`);
+    if (typeof c.truth !== 'boolean') p.push(`${at}: truth must be true or false. It is what the site did, and the debrief marks the squad against it`);
+    if (!Array.isArray(c.supportedBy) || c.supportedBy.length === 0) {
+      p.push(`${at}: supportedBy is empty — a claim no observation bears on can never move off "no support"`);
+    }
+    for (const id of c.supportedBy || []) {
+      if (!evidenceIds.has(id)) p.push(`${at}: names evidence ${id}, which this anomaly does not define`);
     }
   }
   for (const proc of (doc.containment && doc.containment.procedures) || []) {

@@ -24,7 +24,7 @@ import { Site } from '../src/sim/site.js';
 import { DeployableSet } from '../src/sim/deployables.js';
 import { Anomaly, ANOMALY_STATE } from '../src/sim/anomaly.js';
 import { SENSES, EFFECT_VERBS, FIELD_KINDS, HUNT_KINDS, BLOCK_KINDS } from '../src/sim/senses.js';
-import { EvidenceLedger, CLAIMS } from '../src/sim/evidence.js';
+import { EvidenceLedger, CLAIMS, EARNED_OBSERVATIONS } from '../src/sim/evidence.js';
 import { Game, RECOMMENDED_MANIFEST, EMPTY_COMMAND, recommendedManifest, EVENTS } from '../src/game.js';
 import { PHASE } from '../src/sim/mission.js';
 import { NetSession, loopbackPair, ROLE } from '../src/net/net.js';
@@ -5488,6 +5488,253 @@ async function sectionAO() {
     strayVerbs.length, 0);
   emit();
 }
+/* ══ AP. the hypothesis board belongs to the anomaly ══════════════════════════
+ *
+ * ⚠ THERE WAS ONE BOARD AND IT WAS THE DRAUGHT'S. `CLAIMS` was a frozen array of seven
+ * claims in src/sim/evidence.js, written for graybox-draught, and every incident got it
+ * whatever it had loaded. MEASURED against pinfold-lodger before the fix: 12 of its 14
+ * evidence ids appeared on no claim at all, and the 2 that did — `thermal-void` and
+ * `battery-drain`, which are simply spelled the same in both files — hung four of the
+ * DRAUGHT's claims off observations about something else. The tablet offered a squad in
+ * Flat 5 "a sustained heat gradient above 40C stops it dead", with support behind it,
+ * about a thing whose every state has speedMps 0. An empty board is a gap. That one was a
+ * false statement with a citation attached, which is worse, and nothing in the build could
+ * have noticed either: a claim and an evidence rule lived in different files and no code
+ * ever compared them.
+ *
+ * AP4 is the assertion that matters. The rest exist so that AP4 cannot be satisfied by
+ * writing seven claims per file and never checking they are about anything.
+ */
+async function sectionAP(content) {
+  lines.push('--- AP. every anomaly answers for its own board ---');
+
+  /* One pack per ANOMALY rather than per incident: two packages share the draught and the
+   * board is a property of the thing, not of the night. */
+  const byAnomaly = new Map();
+  for (const id of INCIDENTS) {
+    const pack = await loadContent({ incident: id });
+    if (!byAnomaly.has(pack.anomaly.id)) byAnomaly.set(pack.anomaly.id, pack.anomaly);
+  }
+  note(`${byAnomaly.size} anomalies across ${INCIDENTS.length} incident packages`);
+
+  /** The real ledger's own answer, with exactly this claim's sources logged. */
+  const wordFor = (anomaly, claim) => {
+    const led = new EvidenceLedger(anomaly);
+    for (const id of claim.supportedBy) led.record(id, { simTimeMs: 0, x: 0, z: 0, room: 'test', source: 'test' });
+    return led.supportFor(claim).word;
+  };
+
+  const boardless = [];
+  for (const [aid, a] of byAnomaly) {
+    if (!Array.isArray(a.claims) || !a.claims.length) boardless.push(aid);
+    else note(`  ${aid}: ${a.claims.length} claims over ${a.evidenceRules.length} evidence rules`);
+  }
+  eq(`AP1 every shipped anomaly carries its own board${boardless.length ? ` — ${boardless.join(', ')} do not` : ''}`,
+    boardless.length, 0);
+
+  /* ⚠ AND THE LEDGER READS IT, not the module-level default. A board that exists in the
+   * file and is never reached is the same defect wearing a content file. */
+  const wrongBoard = [];
+  for (const [aid, a] of byAnomaly) {
+    const led = new EvidenceLedger(a);
+    if (led.claims !== a.claims) wrongBoard.push(aid);
+    for (const c of a.claims) if (!led.claimState.has(c.id)) wrongBoard.push(`${aid}/${c.id} not markable`);
+  }
+  eq(`AP2 and the ledger the game builds is holding that board${wrongBoard.length ? ` — ${wrongBoard.join(', ')}` : ''}`,
+    wrongBoard.length, 0);
+
+  /* THE ORIGINAL DEFECT, stated as a number. Every id a claim names must be one of this
+   * anomaly's own — and where it is not, say whose it is, because "spelled the same as the
+   * draught's" is the exact shape of the bug. */
+  const foreign = [];
+  for (const [aid, a] of byAnomaly) {
+    const own = new Set(a.evidenceRules.map((e) => e.id));
+    const elsewhere = new Map();
+    for (const [bid, b] of byAnomaly) if (bid !== aid) for (const e of b.evidenceRules) elsewhere.set(e.id, bid);
+    for (const c of a.claims || []) {
+      for (const id of c.supportedBy || []) {
+        if (own.has(id)) continue;
+        foreign.push(`${aid}/${c.id} → ${id}${elsewhere.has(id) ? ` (which is ${elsewhere.get(id)}'s)` : ''}`);
+      }
+    }
+  }
+  eq(`AP3 no claim names an evidence id from a different anomaly${foreign.length ? ` — ${foreign.join(', ')}` : ''}`,
+    foreign.length, 0);
+
+  /* ⚠ AP4 IS THE ONE. A rule is REQUIRED when at least one evidence entry says it reveals
+   * it — that is the only definition available that content actually carries, and it is
+   * the one §27.2 is written against. Reachable means: a TRUE claim exists that names
+   * EVERY entry revealing that rule, and that claim goes to "strong" once they are logged.
+   *
+   * Not "names one of them". A claim that cites one source of a pair and reaches strong on
+   * three unrelated ones is a claim that goes green while the rule it is about is still
+   * half unlearned, which is how a board quietly disagrees with the ledger. */
+  const unreachable = [];
+  for (const [aid, a] of byAnomaly) {
+    const revealed = new Map();
+    for (const e of a.evidenceRules) {
+      if (!e.revealsRule) continue;
+      if (!revealed.has(e.revealsRule)) revealed.set(e.revealsRule, []);
+      revealed.get(e.revealsRule).push(e.id);
+    }
+    for (const [rule, need] of revealed) {
+      const claim = (a.claims || []).find((c) => c.truth
+        && need.every((n) => c.supportedBy.includes(n)) && wordFor(a, c) === 'strong');
+      if (claim) note(`  ${aid}: ${rule} (${need.join(' + ')}) → ${claim.id}`);
+      else unreachable.push(`${aid}/${rule} (${need.join(' + ')})`);
+    }
+  }
+  eq(`AP4 every required rule is reachable from its own anomaly's board${unreachable.length ? ` — ${unreachable.join(', ')}` : ''}`,
+    unreachable.length, 0);
+
+  /* ⚠ AND THE FALSE ONES STILL CANNOT, with the WHOLE ledger logged rather than just their
+   * own sources. AH4 asserts this for the draught; a board per anomaly is six chances to
+   * ship a wrong answer that also goes green. */
+  const falseStrong = [];
+  for (const [aid, a] of byAnomaly) {
+    const led = new EvidenceLedger(a);
+    for (const e of a.evidenceRules) led.record(e.id, { simTimeMs: 0, x: 0, z: 0, room: 'test', source: 'test' });
+    for (const c of (a.claims || []).filter((x) => !x.truth)) {
+      if (led.supportFor(c).word === 'strong') falseStrong.push(`${aid}/${c.id}`);
+    }
+  }
+  eq(`AP5 and no false claim on any board can reach "strong"${falseStrong.length ? ` — ${falseStrong.join(', ')}` : ''}`,
+    falseStrong.length, 0);
+
+  /* Nothing may be shipped that bears on nothing. An evidence rule no claim cites is an
+   * observation a squad can spend a walk on and never be able to do anything with. */
+  const orphans = [];
+  for (const [aid, a] of byAnomaly) {
+    const cited = new Set((a.claims || []).flatMap((c) => c.supportedBy || []));
+    for (const e of a.evidenceRules) if (!cited.has(e.id)) orphans.push(`${aid}/${e.id}`);
+  }
+  eq(`AP6 no anomaly ships evidence that bears on nothing${orphans.length ? ` — ${orphans.join(', ')}` : ''}`,
+    orphans.length, 0);
+
+  /* The original measurement, taken again against the array that used to be the only
+   * board. Reported, not asserted: it is a fact about what was, and it stops being
+   * reproducible the day `CLAIMS` is deleted. */
+  const lodger = byAnomaly.get('pinfold-lodger');
+  if (lodger) {
+    const shared = lodger.evidenceRules.filter((e) => CLAIMS.some((c) => c.supportedBy.includes(e.id)));
+    note(`the shared board cited ${shared.length} of the lodger's ${lodger.evidenceRules.length} evidence ids: ${shared.map((e) => e.id).join(', ')}`);
+    note(`  and hung ${CLAIMS.filter((c) => c.supportedBy.some((i) => shared.some((e) => e.id === i))).length} of the draught's 7 claims on them`);
+  }
+
+  /* The draught's board moved OUT of code and into content, so the two must still agree —
+   * `CLAIMS` is the fallback for a definition that ships no board and a stale fallback is
+   * a board that appears when a content file is malformed and disagrees with everything. */
+  const draught = byAnomaly.get('graybox-draught');
+  const drift = [];
+  if (draught) {
+    if (draught.claims.length !== CLAIMS.length) drift.push(`${draught.claims.length} claims vs ${CLAIMS.length}`);
+    for (let i = 0; i < Math.min(draught.claims.length, CLAIMS.length); i++) {
+      const a = draught.claims[i], b = CLAIMS[i];
+      if (a.id !== b.id || a.text !== b.text || a.truth !== b.truth || a.dimension !== b.dimension
+        || a.supportedBy.join() !== b.supportedBy.join()) drift.push(`${b.id}`);
+    }
+  }
+  eq(`AP7 the exported default board has not drifted from the draught's shipped one${drift.length ? ` — ${drift.join(', ')}` : ''}`,
+    drift.length, 0);
+
+  /* GDD §7.4's board is only useful if the loader stands behind it the way it stands
+   * behind a trigger naming a state that does not exist. Same idiom as B3. */
+  const broken = JSON.parse(JSON.stringify(content.anomaly));
+  broken.claims[0].supportedBy = ['a-note-nobody-wrote'];
+  let refused = false;
+  const orig = window.fetch;
+  window.fetch = async (u) => {
+    const s = String(u);
+    const body = s.includes('incidents') ? content.incident
+      : s.includes('anomalies') ? broken
+        : s.includes('maps') ? content.map : content.items;
+    return { ok: true, status: 200, json: async () => body };
+  };
+  try { await loadContent(); } catch (e) { refused = e instanceof ContentError && /a-note-nobody-wrote/.test(e.message); }
+  window.fetch = orig;
+  ok('AP8 a claim naming an evidence id the anomaly does not define is REFUSED at load', refused);
+
+  /* ⚠ AND THE ARCHIVE HAS TO BE ABLE TO OPEN. `Progression.recordClaims` carries
+   * `rulesRead = max(rulesRead, claims.correct)`, and a dossier insight gated on
+   * `requires.rules: 5` is unreachable forever on a board of four claims — silently, with
+   * no error anywhere, because nothing connects the two files. */
+  const site = await loadSite();
+  const shallow = [];
+  for (const dos of site.dossiers || []) {
+    const a = byAnomaly.get(dos.anomalyId);
+    const deepest = Math.max(0, ...dos.insights.map((i) => (i.requires && i.requires.rules) || 0));
+    if (!a) { shallow.push(`${dos.anomalyId} has a dossier and no shipped anomaly`); continue; }
+    note(`  ${dos.anomalyId}: board of ${a.claims.length}, deepest insight wants ${deepest} rules read`);
+    if (a.claims.length < deepest) shallow.push(`${dos.anomalyId} (${a.claims.length} < ${deepest})`);
+  }
+  eq(`AP9 every board carries enough claims to reach every insight its dossier gates${shallow.length ? ` — ${shallow.join(', ')}` : ''}`,
+    shallow.length, 0);
+
+  /* ── evidence that is EARNED rather than found ──────────────────────────── */
+  lines.push('--- AP. any id can be earned by doing, not three of them ---');
+
+  /* ⚠ `_stepEvidence` USED TO NAME THREE EVIDENCE IDS IN CODE. Anything a designer wanted
+   * a squad to EARN had to be called `thermal-void`, `frost-boundary` or `battery-drain`,
+   * which is why the lodger's telemetry entry is spelled the same as the draught's — and
+   * that spelling is exactly what put the draught's claims on the lodger's board. The two
+   * defects were one defect. So: the engine must no longer know any of those names. */
+  const engine = await (await fetch('/src/game.js')).text();
+  const hardCoded = ['thermal-void', 'frost-boundary', 'battery-drain']
+    .filter((id) => engine.includes(`'${id}'`) || engine.includes(`"${id}"`));
+  eq(`AP10 the engine names no evidence id of its own${hardCoded.length ? ` — ${hardCoded.join(', ')}` : ''}`,
+    hardCoded.length, 0);
+
+  const strayObs = [], earned = [];
+  for (const [aid, a] of byAnomaly) {
+    for (const e of a.evidenceRules) {
+      if (!e.earnedBy) continue;
+      earned.push(`${aid}/${e.id} by ${e.earnedBy.observation}`);
+      if (!Object.prototype.hasOwnProperty.call(EARNED_OBSERVATIONS, e.earnedBy.observation)) {
+        strayObs.push(`${aid}/${e.id} → ${e.earnedBy.observation}`);
+      }
+    }
+  }
+  note(`${earned.length} evidence rules are earned rather than found: ${earned.join(' · ')}`);
+  eq(`AP11 every earned observation names an operator the engine owns${strayObs.length ? ` — ${strayObs.join(', ')}` : ''}`,
+    strayObs.length, 0);
+
+  ok('AP12 and every operator in the vocabulary carries a poll and a parameter contract',
+    Object.values(EARNED_OBSERVATIONS).every((o) => typeof o.poll === 'function' && o.params
+      && Object.keys(o.params).length > 0));
+
+  /* Same fetch-stub, the other closed vocabulary. A content file may name a quantity and
+   * may not invent an operator, and the loader is what makes that true rather than
+   * aspirational (src/sim/senses.js, stated once for the whole build). */
+  const madeUp = JSON.parse(JSON.stringify(content.anomaly));
+  madeUp.evidenceRules[0].earnedBy = { observation: 'when-it-feels-right', withinMetres: 4 };
+  let refusedObs = false;
+  window.fetch = async (u) => {
+    const s = String(u);
+    const body = s.includes('incidents') ? content.incident
+      : s.includes('anomalies') ? madeUp
+        : s.includes('maps') ? content.map : content.items;
+    return { ok: true, status: 200, json: async () => body };
+  };
+  try { await loadContent(); } catch (e) { refusedObs = e instanceof ContentError && /when-it-feels-right/.test(e.message); }
+  window.fetch = orig;
+  ok('AP13 an invented observation operator is REFUSED at load, like an invented sense', refusedObs);
+
+  /* Reported, not asserted: an evidence rule that is neither placed on a floor nor earned
+   * by doing cannot be reached at all in that incident. It is a gap in the CONTENT rather
+   * than a fault in the engine, and two of them predate this section. */
+  const stranded = [];
+  for (const id of INCIDENTS) {
+    const pack = await loadContent({ incident: id });
+    const placed = new Set((pack.map.evidenceSources || []).map((s) => s.evidenceId));
+    for (const e of pack.anomaly.evidenceRules) {
+      if (!placed.has(e.id) && !e.earnedBy) stranded.push(`${id}/${e.id}`);
+    }
+  }
+  note(`${stranded.length} evidence rules are neither placed nor earned in the package that ships them`);
+  if (stranded.length) note(`    ${stranded.join(', ')}`);
+  emit();
+}
+
 /**
  * ⚠ ONE SECTION THROWING MUST NOT DELETE EVERY SECTION AFTER IT.
  *
@@ -5552,6 +5799,7 @@ async function run(name, fn) {
     await run('AM', () => sectionAM(content));
     await run('AN', () => sectionAN(content));
     await run('AO', () => sectionAO());
+    await run('AP', () => sectionAP(content));
     await run('K', () => sectionK());
     await run('L', () => sectionL());
     await run('V', () => sectionV());

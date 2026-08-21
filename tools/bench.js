@@ -315,7 +315,7 @@ function pose(w) {
   });
   g.imagerOnIds.clear();
   g.imagerOnIds.add(g.players[0].id);
-  g.imagerHold.clear();
+  g.observationHold.clear();
 
   const a = g.anomaly;
   a.x = w.anom.x; a.z = w.anom.z;

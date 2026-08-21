@@ -274,6 +274,60 @@
     }
   ],
 
+  "_claimsNote": "The board for THIS floor. It used to be the draught's board — seven claims about heat gradients and closed-cell insulation, offered to a squad standing in front of a thing that reads at ambient and does not care about temperature at all.\n\nThe four required rules take one claim each and each claim is that rule's own pair, so a squad that finds both sources has a claim that can go strong. The fifth true claim is the one the procedure actually turns on: a camera counts as a viewer. It is not a rule of its own — it is the second half of `continuous-observation` — and it is worth a line on the board because it is the difference between owning enough cameras and standing in the right place.\n\nThe two false claims are the two habits this building teaches. Sweeping a lane with the imager and reading it clean is the draught's reflex applied to a thing at ambient, and it will get somebody walked down aisle B. The missing roster name is the story everyone reaches for and it is not a rule about anything.",
+
+  "claims": [
+    {
+      "id": "claim-still-while-watched",
+      "dimension": "constraint",
+      "text": "It cannot move while it is being looked at. One unobstructed viewer is enough.",
+      "truth": true,
+      "supportedBy": ["scuff-runs", "supervisor-statement"]
+    },
+    {
+      "id": "claim-moves-in-the-gap",
+      "dimension": "capability",
+      "text": "Every metre it covers, it covers in the moment nobody is holding it.",
+      "truth": true,
+      "supportedBy": ["camera-still", "switchboard-log"]
+    },
+    {
+      "id": "claim-warmth-starts-it",
+      "dimension": "trigger",
+      "text": "A warm body inside nine metres starts it, if nothing is watching.",
+      "truth": true,
+      "supportedBy": ["dust-ring", "driver-statement"]
+    },
+    {
+      "id": "claim-browns-out-kit",
+      "dimension": "capability",
+      "text": "It browns out powered kit near it while it is moving. A camera that dies is a camera that has stopped holding it.",
+      "truth": true,
+      "supportedBy": ["fault-counters", "brownout-log"]
+    },
+    {
+      "id": "claim-a-camera-counts",
+      "dimension": "constraint",
+      "text": "A deployed camera holds it exactly as well as a person does. It does not distinguish between them.",
+      "truth": true,
+      "supportedBy": ["camera-still", "scuff-runs", "supervisor-statement"]
+    },
+    {
+      "id": "claim-imager-clears-a-lane",
+      "dimension": "form",
+      "text": "It has no heat signature, so an imager sweep that reads clean means the lane is clear.",
+      "truth": false,
+      "supportedBy": ["thermal-null"]
+    },
+    {
+      "id": "claim-the-missing-man",
+      "dimension": "anchor",
+      "text": "The night-shift man who stopped signing in is what it is. Find him and it ends.",
+      "truth": false,
+      "supportedBy": ["night-shift-roster"]
+    }
+  ],
+
   "containment": {
     "goal": "The figure sealed inside a transit case with its interior camera live and recording, verified by thirty seconds of continuous interior coverage. Custody is the camera. A case with a dead recorder is a box with something in it.",
 

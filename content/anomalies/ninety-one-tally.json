@@ -219,6 +219,60 @@
     }
   ],
 
+  "_claimsNote": "The board for a SET, which is the part the old shared board could not have said at all: it offered a squad counting objects into a box the opinion that a sustained gradient above 40C stops it dead.\n\nThe three rules the evidence names — first-logged, account-closed, adulterated — each take a claim. `adulterated` is the awkward one and it is worth saying why: both of its own entries are graded disputed, and two disputed sources can never carry a claim past 'disputed' however carefully a squad works. So the claim about the case also names the imager reading, which is the observation that actually tells a real one from a mundane one, and that is the claim's honest content anyway — the case counts what answers, and the way you know what answers is that it is cold.\n\nTwo false claims, and both are the draught's habits worn into this floor. One cold source somewhere in the building is what a squad three incidents into this site sweeps for. The shelf is the other: the torches say something happened on the shelf, and a squad that clears the shelf has cleared furniture.",
+
+  "claims": [
+    {
+      "id": "claim-each-reads-cold",
+      "dimension": "form",
+      "text": "Each one reads a few degrees under the room. Three of them together read like one large one.",
+      "truth": true,
+      "supportedBy": ["thermal-void", "frost-bloom"]
+    },
+    {
+      "id": "claim-ninety-one",
+      "dimension": "anchor",
+      "text": "There are ninety-one of them. The number is on the shelf paperwork and nowhere else.",
+      "truth": true,
+      "supportedBy": ["maintenance-log", "survivor-account", "frost-boundary"]
+    },
+    {
+      "id": "claim-case-counts-what-answers",
+      "dimension": "constraint",
+      "text": "The case counts what answers. A mundane object goes in silently and the number does not move.",
+      "truth": true,
+      "supportedBy": ["thermal-void", "battery-drain", "stairwell-draught"]
+    },
+    {
+      "id": "claim-they-leave-a-ring",
+      "dimension": "presence",
+      "text": "Where one has stood there is a ring of frost with a clean patch in the middle of it. An empty place reads as an empty place.",
+      "truth": true,
+      "supportedBy": ["frost-bloom", "frost-boundary"]
+    },
+    {
+      "id": "claim-cold-to-carry",
+      "dimension": "capability",
+      "text": "They are cold to hold and it adds up. Whoever walks the whole set over one at a time will feel it by the end.",
+      "truth": true,
+      "supportedBy": ["thermal-void", "survivor-account"]
+    },
+    {
+      "id": "claim-one-cold-source",
+      "dimension": "presence",
+      "text": "There is one cold source in this building and the objects are only near it.",
+      "truth": false,
+      "supportedBy": ["stairwell-draught", "frost-boundary"]
+    },
+    {
+      "id": "claim-the-shelf",
+      "dimension": "anchor",
+      "text": "The shelf is the anchor. Anything left on it goes cold and flat. Clear the shelf and the floor is safe.",
+      "truth": false,
+      "supportedBy": ["battery-drain"]
+    }
+  ],
+
   "containment": {
     "procedures": [
       {

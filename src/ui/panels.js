@@ -13,7 +13,6 @@
  */
 
 import { CONFIG } from '../config.js';
-import { CLAIMS } from '../sim/evidence.js';
 import { recommendedManifest } from '../game.js';
 import { INCIDENTS } from '../sim/content.js';
 import { GameClock } from '../core/clock.js';
@@ -363,7 +362,13 @@ export class Panels {
     }
 
     if (this.tab === 'board') {
-      const rows = CLAIMS.map((c) => {
+      /* ⚠ THE BOARD IS THE LOADED ANOMALY'S BOARD. This read a frozen array in src/ that
+       * held seven claims about the graybox draught, so every other incident put the
+       * draught's opinions on the tablet — the lodger's board offered "a sustained heat
+       * gradient above 40C stops it dead" about a thing that has never been recorded
+       * moving, and offered it with support, because two evidence ids happened to be
+       * spelled the same in both files. */
+      const rows = g.ledger.claims.map((c) => {
         const sup = g.ledger.supportFor(c);
         const st = g.ledger.claimState.get(c.id);
         return `<li class="claim">
@@ -464,7 +469,7 @@ export class Panels {
     this.open = 'debrief';
     const g = this.game;
     const dims = result.dims.map((d) => `<li><b>${d.name}</b><span class="w">${d.word}</span><p>${escapeHtml(d.why)}</p></li>`).join('');
-    const rules = CLAIMS.map((c) => {
+    const rules = g.ledger.claims.map((c) => {
       const s = g.ledger.claimState.get(c.id);
       const mark = s === null ? '—' : (s === 'believed') === c.truth ? '✓' : '✕';
       return `<li class="${mark === '✓' ? 'ok' : mark === '✕' ? 'bad' : 'un'}"><span>${mark}</span>${escapeHtml(c.text)}

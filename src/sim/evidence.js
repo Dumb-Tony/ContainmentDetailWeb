@@ -17,9 +17,27 @@
 
 import { dist } from './geometry.js';
 
-/** The claims the board can hold. Each names the rule it is about, so the debrief can say
- *  which rules the squad actually worked out. `truth` is what the simulation does; it is
- *  never shown before the debrief and never used to auto-resolve a claim. */
+/**
+ * The DEFAULT board, and nothing more than that.
+ *
+ * ⚠ THIS ARRAY USED TO BE THE ONLY BOARD IN THE GAME, and it is seven claims written for
+ * the graybox draught. Six anomalies ship now. Twelve of the fourteen evidence ids in
+ * `pinfold-lodger` appeared on no claim at all, and the two it shared with the draught
+ * — `thermal-void` and `battery-drain` — hung four of the DRAUGHT's claims off
+ * observations about something else entirely: the lodger's board told a squad that a
+ * sustained gradient above 40C stops a thing that has never been recorded moving. Silence
+ * would have been better. A board that asserts something false about the floor you are
+ * standing on is worse than an empty one.
+ *
+ * So the board is content now. Each anomaly file carries its own `claims` array and the
+ * loader refuses one that names evidence the anomaly does not define. This stays exported
+ * as the fallback for a ledger built from a definition with no claim set — hand-built defs
+ * in tools and tests — and section AP asserts it has not drifted from the shipped draught.
+ *
+ * Each claim names the rule it is about, so the debrief can say which rules the squad
+ * actually worked out. `truth` is what the simulation does; it is never shown before the
+ * debrief and never used to auto-resolve a claim.
+ */
 export const CLAIMS = Object.freeze([
   /* ⚠ THE BOARD HAS TO KNOW ABOUT THE EVIDENCE THAT EXISTS. `supportFor` returns "strong"
    * only on two hits with a confirmed one among them, so a claim listing a single source
@@ -53,6 +71,12 @@ export const CLAIMS = Object.freeze([
 export class EvidenceLedger {
   constructor(anomalyDef) {
     this.rules = new Map(anomalyDef.evidenceRules.map((e) => [e.id, e]));
+    /**
+     * The board this ledger is for. It comes from the anomaly that was loaded, so the
+     * claims a squad can mark are claims about the thing in front of them. `CLAIMS` is
+     * only reached by a definition that ships no board, which no shipped anomaly does.
+     */
+    this.claims = anomalyDef.claims && anomalyDef.claims.length ? anomalyDef.claims : CLAIMS;
     this.reset();
   }
 
@@ -61,7 +85,7 @@ export class EvidenceLedger {
     this.entries = [];
     this._seen = new Set();
     /** claimId -> 'believed' | 'excluded' | null. The player's own reading. */
-    this.claimState = new Map(CLAIMS.map((c) => [c.id, null]));
+    this.claimState = new Map(this.claims.map((c) => [c.id, null]));
   }
 
   has(evidenceId) { return this._seen.has(evidenceId); }
@@ -125,13 +149,13 @@ export class EvidenceLedger {
    *  Debrief only (§6.4 evidence quality). */
   scoreClaims() {
     let correct = 0, wrong = 0, unmarked = 0;
-    for (const c of CLAIMS) {
+    for (const c of this.claims) {
       const s = this.claimState.get(c.id);
       if (s === null) { unmarked++; continue; }
       const believed = s === 'believed';
       if (believed === c.truth) correct++; else wrong++;
     }
-    return { correct, wrong, unmarked, total: CLAIMS.length };
+    return { correct, wrong, unmarked, total: this.claims.length };
   }
 }
 
@@ -165,30 +189,80 @@ export function sourceInReach(site, x, z, reach, skip = null) {
   return best;
 }
 
-/** `thermal-void`: the imager held on the mass long enough to see it hold its shape. */
-export function thermalVoidObserved(imagerActive, anomaly, player, holdMs) {
-  if (!imagerActive || !anomaly.isLoose) return false;
-  if (dist(player.x, player.z, anomaly.x, anomaly.z) > 16) return false;
-  return holdMs >= 2000;
-}
-
-/**
- * `frost-boundary`: the frost edge stopping dead at a gradient. Only observable when the
- * draught is actually being held by heat — which is why it is the one piece of evidence a
- * team cannot collect by walking around, and why it usually arrives on the first attempt
- * that half-works.
+/* ── evidence that is EARNED rather than found ────────────────────────────────
+ *
+ * ⚠ THREE EVIDENCE IDS USED TO BE HARD-CODED HERE AND CALLED BY NAME FROM `_stepEvidence`:
+ * `thermal-void`, `frost-boundary`, `battery-drain`. Everything else in the game had to be
+ * walked to and picked up. So an observation a designer wanted a squad to EARN — by
+ * holding an instrument on the thing, by fencing it, by leaving powered kit near it — had
+ * to borrow one of those three names or it could not exist. The pinfold lodger did exactly
+ * that: its `battery-drain` entry works, and it works because it is spelled the same as
+ * the draught's, which is also why it collided with the draught's board.
+ *
+ * THE RULE IS THE ONE senses.js STATES: a JSON key may name a QUANTITY, never an OPERATOR.
+ * The operators live here, closed and under test. A content file writes
+ *
+ *     "earnedBy": { "observation": "instrument-held-on-it",
+ *                   "item": "thermal-imager", "withinMetres": 16, "holdSeconds": 2 }
+ *
+ * on any evidence rule it likes, and the id it hangs that on is the designer's to choose.
+ * Adding a fourth observation is deliberately a code change with a test, for the same
+ * reason adding a sense is: a new observation is a new thing the squad can be said to have
+ * seen, and §8.2 requires every rule to be observable, consistent and fair.
+ *
+ * `params` is the whole of the validation contract, read by `validateAnomaly`:
+ *   item    — must be an id in the equipment manifest
+ *   metres  — a positive number
+ *   seconds — a non-negative number
+ *   count   — a positive integer
+ * A key marked with a `?` suffix is optional; everything else is required.
+ *
+ * `scope` decides who the entry is recorded against. `operative` polls each living
+ * operative and names them in the provenance, because §7.2 wants "who was holding the
+ * imager" answerable. `squad` polls once and is recorded against `recordedBy` — telemetry
+ * has no operative standing behind it and pretending otherwise is a false provenance.
  */
-export function frostBoundaryObserved(anomaly, player, sightRange = 9) {
-  if (!anomaly.isLoose) return false;
-  if (!(anomaly.fenced || anomaly.blockedThisStep)) return false;
-  return dist(player.x, player.z, anomaly.x, anomaly.z) <= sightRange;
-}
+export const EARNED_OBSERVATIONS = Object.freeze({
+  /**
+   * The named instrument held on the mass long enough to see it hold its shape. The hold
+   * clock is the operator's, not the content's: the content says how near and how long.
+   */
+  'instrument-held-on-it': {
+    scope: 'operative',
+    params: { item: 'item', withinMetres: 'metres', holdSeconds: 'seconds' },
+    holds: (w, c) => c.itemLive && c.anomaly.isLoose
+      && dist(c.x, c.z, c.anomaly.x, c.anomaly.z) <= w.withinMetres,
+    poll: (w, c) => c.holdMs >= w.holdSeconds * 1000,
+  },
 
-/** `battery-drain`: two powered items in the same room shedding charge far above rated. */
-export function batteryDrainObserved(deployables, anomaly) {
-  if (!anomaly.isAwake) return false;
-  const inRange = deployables.list.filter(
-    (d) => d.batteryMaxMs > 0 && d.on && dist(d.x, d.z, anomaly.x, anomaly.z) <= 5,
-  );
-  return inRange.length >= 2;
+  /**
+   * The thing stopped by something, seen stopping. Only observable while the anomaly is
+   * actually being held — which is why it is the one class of evidence a team cannot
+   * collect by walking around, and why it usually arrives on the first attempt that
+   * half-works.
+   */
+  'held-at-a-barrier': {
+    scope: 'operative',
+    params: { withinMetres: 'metres' },
+    poll: (w, c) => c.anomaly.isLoose && (c.anomaly.fenced || c.anomaly.blockedThisStep)
+      && dist(c.x, c.z, c.anomaly.x, c.anomaly.z) <= w.withinMetres,
+  },
+
+  /**
+   * Powered kit in the same room shedding charge far above rated. `count` is authored
+   * rather than defaulted: one flat cell is an anecdote and the content has to say how
+   * many make an observation.
+   */
+  'powered-kit-draining': {
+    scope: 'squad',
+    recordedBy: 'equipment telemetry',
+    params: { withinMetres: 'metres', count: 'count' },
+    poll: (w, c) => c.anomaly.isAwake && c.deployables.list.filter(
+      (d) => d.batteryMaxMs > 0 && d.on && dist(d.x, d.z, c.anomaly.x, c.anomaly.z) <= w.withinMetres,
+    ).length >= w.count,
+  },
+});
+
+export function isEarnedObservation(name) {
+  return Object.prototype.hasOwnProperty.call(EARNED_OBSERVATIONS, name);
 }

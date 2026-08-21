@@ -250,6 +250,60 @@
     }
   ],
 
+  "_claimsNote": "The board for a thing that hunts sound. The old shared board had a squad on a plantation at night marking claims about closed-cell insulation and a failed chiller.\n\nFour required rules, four claims, each carrying its own pair. `crouch-is-quiet` is the pair with no confirmed source in it — a probable and a disputed, which cannot carry a claim past 'probable' on their own — so its claim also names the hollow, and that is not a patch: the twelve-metre circle with no birds in it is what says the quiet has a boundary you can be inside or outside of, which is the whole of why crouching works at four metres and walking does not.\n\nThe fifth true claim is masking, and it earns a line because it is the rule that costs a squad the operation without ever warning them. Two lures of a size and it hears neither, and it stills where it is standing rather than where the case is.\n\nBoth false claims are the same mistake in two sizes: that the noise is a PLACE rather than a level. Shut the generator down and it stays in the hollow; the hollow is the anomaly and nothing crosses the boundary. Neither can go strong — the generator pair is two probables, and the hollow is one source on its own.",
+
+  "claims": [
+    {
+      "id": "claim-silence-holds-it",
+      "dimension": "constraint",
+      "text": "Six seconds in which nothing beats the room tone and it stops where it is standing.",
+      "truth": true,
+      "supportedBy": ["quiet-hollow", "survivor-account"]
+    },
+    {
+      "id": "claim-your-own-kit-is-the-lure",
+      "dimension": "trigger",
+      "text": "It runs at whatever is loudest. On this reserve that is the squad's own kit.",
+      "truth": true,
+      "supportedBy": ["flat-cells", "generator-log"]
+    },
+    {
+      "id": "claim-sound-only",
+      "dimension": "form",
+      "text": "Sound is the only channel that finds it. Thermal reads the hollow at ambient, edge to edge.",
+      "truth": true,
+      "supportedBy": ["audio-trace", "thermal-null"]
+    },
+    {
+      "id": "claim-crouching-is-quiet-enough",
+      "dimension": "constraint",
+      "text": "A crouching operative stays under the threshold. A walking one does not.",
+      "truth": true,
+      "supportedBy": ["trail-scuff", "contractor-account", "quiet-hollow"]
+    },
+    {
+      "id": "claim-it-hears-one-thing",
+      "dimension": "capability",
+      "text": "It hears one source at a time, and only the one that beats everything else where it stands. Two lures of a size and it hears neither.",
+      "truth": true,
+      "supportedBy": ["audio-trace", "quiet-hollow"]
+    },
+    {
+      "id": "claim-generator-anchor",
+      "dimension": "anchor",
+      "text": "The compound generator is what it comes for. Shut the generator down and it stays in the hollow.",
+      "truth": false,
+      "supportedBy": ["generator-log", "trail-scuff"]
+    },
+    {
+      "id": "claim-the-hollow-holds-it",
+      "dimension": "presence",
+      "text": "The hollow is the anomaly. It has a boundary twelve metres across and nothing crosses it.",
+      "truth": false,
+      "supportedBy": ["quiet-hollow"]
+    }
+  ],
+
   "containment": {
     "procedures": [
       {

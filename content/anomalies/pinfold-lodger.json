@@ -325,9 +325,10 @@
       "reliability": "probable",
       "revealsRule": "pull-charge",
       "requiredEquipment": [],
+      "earnedBy": { "observation": "powered-kit-draining", "withinMetres": 5, "count": 2 },
       "channel": "instrument",
       "isFalseLead": false,
-      "_note": "NO LOCATION, ON PURPOSE. This is the one entry in the file that is earned rather than found — game.js `_stepEvidence` logs it when two powered deployables are inside five metres of an awake anomaly, so it is the squad's own telemetry and it arrives while they are working rather than while they are walking. The incident file therefore places no source for it."
+      "_note": "NO LOCATION, ON PURPOSE. This is the one entry in the file that is earned rather than found: the squad's own telemetry, arriving while they are working rather than while they are walking, so the incident file places no source for it.\n\n⚠ AND IT USED TO BE CALLED `battery-drain` BECAUSE IT HAD TO BE. `_stepEvidence` logged exactly three ids by name — thermal-void, frost-boundary, battery-drain — so anything a designer wanted earned rather than picked up had to borrow one of those three spellings or it could not exist. This entry works because it is spelled the same as the draught's, which is the same coincidence that put four of the draught's claims on this anomaly's board. `earnedBy` is the fix: the observation is named from a closed vocabulary in src/sim/evidence.js, the numbers are here, and the id above is the designer's to choose."
     },
     {
       "id": "decant-file",
@@ -350,6 +351,60 @@
       "requiredEquipment": [],
       "channel": "sensory",
       "isFalseLead": true
+    }
+  ],
+
+  "_claimsNote": "This is the file the shared board was measured against, and the measurement is the reason the board is content now. Twelve of these fourteen evidence ids appeared on no claim at all. The two that did — `thermal-void` and `battery-drain` — were on the DRAUGHT's claims, because they are spelled the same in both files: a squad in Flat 5 was shown 'a sustained heat gradient above 40C stops it dead' with support behind it, about a thing that has never been recorded moving. Silence about twelve observations was the lesser half of that defect.\n\nFive required rules, five claims, each carrying every one of its own entries. `noticed` and `let-be` are two faces of one coin and their claims are split the same way the evidence is: one is about what went hard at a known moment, the other about what came back.\n\n`pull-charge`'s own pair is a disputed note and a telemetry reading, which cannot carry a claim past 'probable', so its claim also names the glazed ring — the ring is the reach drawn on the floor, and the battery lamp lying just inside it is a cell that stood in the reach.\n\nThe two false claims are the two the flat itself offers. The tenant is the story anyone would reach for, and the riser is a real cold column with a real blower on it that has nothing to do with the sixth flat.",
+
+  "claims": [
+    {
+      "id": "claim-attention-sets-it",
+      "dimension": "trigger",
+      "text": "Being looked at is what sets it. A head coming up off the work is enough.",
+      "truth": true,
+      "supportedBy": ["frost-band", "mate-statement", "helmet-footage"]
+    },
+    {
+      "id": "claim-inattention-slackens-it",
+      "dimension": "constraint",
+      "text": "Five seconds in which nothing at all is holding it and it goes slack. That is when the case will close on it.",
+      "truth": true,
+      "supportedBy": ["thermal-void", "damp-logger", "watchman-statement"]
+    },
+    {
+      "id": "claim-walking-in-is-enough",
+      "dimension": "trigger",
+      "text": "A warm body inside five metres wakes it whether or not anyone is looking at it.",
+      "truth": true,
+      "supportedBy": ["dropped-tiles", "day-book"]
+    },
+    {
+      "id": "claim-the-ring-is-its-reach",
+      "dimension": "capability",
+      "text": "The polished ring is exactly the ground it can reach. Stand outside the line and it cannot get hold of you.",
+      "truth": true,
+      "supportedBy": ["glazed-ring", "ambulance-sheet"]
+    },
+    {
+      "id": "claim-it-pulls-charge",
+      "dimension": "capability",
+      "text": "Cells inside the ring shed charge about four times faster than rated. The case's heater is a cell.",
+      "truth": true,
+      "supportedBy": ["battery-drain", "charger-note", "glazed-ring"]
+    },
+    {
+      "id": "claim-the-tenant",
+      "dimension": "anchor",
+      "text": "The tenant who died is what it is. The strip-out was booked for the anniversary.",
+      "truth": false,
+      "supportedBy": ["decant-file"]
+    },
+    {
+      "id": "claim-the-riser",
+      "dimension": "anchor",
+      "text": "It is coming off the lift riser. The blower has run since the decant and the whole riser is two degrees under the floor.",
+      "truth": false,
+      "supportedBy": ["lift-blower"]
     }
   ],
 
