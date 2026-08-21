@@ -42,7 +42,7 @@ power puzzle matters — the office breaker is out on the bay wall, the storage 
 The mission ends when the case is sealed, has held for thirty seconds, and is carried up
 the stairs. It can be lost at any point in that sentence.
 
-## Seven incidents, three buildings, six things
+## Nine incidents, four buildings, eight things
 
 The content unit is an **Incident Package**, not a map — an anomaly file holds rules and
 nothing about where; a map holds geometry and nothing about what happened;
@@ -151,9 +151,42 @@ battery with no seal verb available at all.
 Same sense as the figure in aisle B, opposite sign. That is the argument the closed
 vocabulary exists to make: a key names a quantity, and the content decides what it means.
 
+**The ballast.** A three-man gang lifting the earth mat out of a decommissioned 33 kV
+switching compound stopped after two days: stone they had barrowed out to the skip was back
+in the yard by the morning. This is a **fourth environment family** — outdoors and
+industrial, which is neither the cold store nor the reserve — and a seventh procedure family:
+containment by **deprivation**, performed while the thing is walking at you.
+
+Every family before it is about the squad's own state — a gradient you hold, a cone of
+attention you keep pointed, an account you keep, a silence you maintain. This one is about
+the *site's*. The thing has hold of a set of objects lying about the yard, and until those
+objects are somewhere else it cannot be lifted at all. The work is not building anything and
+not stopping anything: it is stripping the floor, while something that does not stop is
+crossing it.
+
+It is not the stocktake with a hunter bolted on. The tally is an accounting problem in which
+nothing hunts you and the count is the unknown; here the count is on the ground in front of
+you and the scarce thing is the minutes you have to move it.
+
+**The toll.** A night attendant on level 2 was found sitting on the floor beside a drainage
+gully with cold burns to both hands and no memory of the previous twenty minutes. He was not
+trapped and nothing was holding him. He says he crouched down to look at something, that it
+was not unpleasant, and that he did not think of getting up. The man who found him pulled
+him back three feet and it stopped the moment he was clear.
+
+An eighth family, and the one with no equipment in it: containment **paid for**, in the
+operatives' own bodies, on a clock, and then taken back at the last moment. Every other
+family spends cargo, position, attention or noise. This one has no currency but warmth, and
+the squad brings only three sources of it onto the floor.
+
+It is the fifth incident on cold storage level 2, which is §15.2's whole argument in one
+column: by the fifth trip down the same stair you arrive with four operations' worth of
+correct knowledge about that floor and the job is working out which of it still applies.
+
 That is GDD §26.2's three procedure families — perception, auditory, distributed-object —
-plus the heat fence the build started with, over three buildings — and then two more that
-use the same words for the opposite purpose.
+plus the heat fence the build started with, and then four more: attention as a poison,
+sequence, deprivation under pressure, and a toll paid in warmth. Eight anomalies over four
+buildings, and the worst verb-set overlap between any pair involving the newest two is 50%.
 
 **The engine does not know what either of them is called.** States, triggers, capabilities
 and field disturbance are all read from content, through a closed vocabulary of senses and
@@ -328,6 +361,38 @@ overwritten on the next snapshot.
 required rule may depend on a microphone or on stereo hearing. Those two are only
 compatible if the *primary* channel is the one that needs neither, so what exists is a
 ping-and-phrase wheel on `Z`: ten phrases the loop actually requires — *it is here*, *hold,
+## The lobby, and what it is honest about
+
+Host a room and share a five-character code, a **room name** your squad already agreed on, or
+put it on a **shared list** so a stranger can find you. There is no game server — the
+transport is the public PeerJS broker — so each of the three ships with its own limits
+printed beside it. A room name is deterministic on every machine, which is what makes it work
+and also means the namespace is the whole broker: the field tells you whether the word you
+typed is *guessable*, *shared* or *unlikely*. The shared list is a **volunteer directory**
+held by whichever browser claimed it first; it lives in a player's tab, dies with it, and
+every row is an unverified claim carrying its own age. No callsign ever goes on it.
+
+One thing on that screen is a fact rather than a report: **probing a room** is a real connect
+and hang-up, and the CSS gives it the only bright colour in the block.
+
+The host can **remove a seat**, authoritatively — the seat leaves the machine that runs the
+mission, so a client ignoring the message is talking to nobody. Their kit goes back to the
+vehicle and a sealed transit case is put down where they stood, the same rule a dropped
+connection already obeyed. The block is keyed on the **resume token** and checked *before*
+the resume path, because a removed griefer holds a perfectly valid token for the seat they
+were thrown out of. A removal can be undone; readmission is a fresh seat and not a rewind,
+and the removal stays on the record.
+
+Moderation needs a callsign and §21.2 forbids free text on the analytics bus, so those are
+**two different logs** and the mistake would be one: the moderation record lives on the
+host's machine, in memory, bounded, and never in storage.
+
+Measured: 155 bytes per operative on the wire and 85 per deployable, flat rather than
+quadratic; **454 kbit/s of host uplink with a full squad** at twelve snapshots a second. At
+512 kbit/s it is usable and already noticeable; at 192 kbit/s the backlog is unbounded and
+the worst message is 11.6 seconds late. The limit on squad size is a household uplink, not a
+constant.
+
 leave that alone*, *something to log here*, *set up here*, *bring kit here*, *I have this
 one*, *in position*, *on me*, *keep this in view*, *I am in trouble*. No greetings, no
 emotes. A squad with no microphones between them can run a whole operation on it, and a
@@ -404,7 +469,7 @@ the next, a suite that hangs cannot take the others with it, and a suite that pr
 result block at all counts as a **failure** rather than as zero assertions and no problem.
 A crashed page reporting green is the failure mode the whole harness exists to avoid.
 
-**1,366 assertions across seven suites, all headless.** Section I is the one that matters: it plays a complete
+**1,517 assertions across seven suites, all headless.** Section I is the one that matters: it plays a complete
 solo containment through the same interfaces a keyboard reaches — walks to the vehicle,
 takes kit, throws breakers, opens doors, baits, fences, seals, waits out custody and
 carries the case to the stairs. No teleports and no direct state writes, because testing
@@ -417,6 +482,22 @@ drop, a reconnect, the join gate, custody being put down rather than carried off
 somebody whose radio died — with no WebRTC in sight. What a loopback *cannot* prove was
 checked in two real browsers on the real broker, and that is where the notice-feed bug
 was found: a refusal the host sent and the client's next snapshot destroyed.
+
+`tools/soak.ps1` is the third instrument: nine incidents, thirty simulated minutes, five
+operatives, and **124 counters discovered by walking the Game rather than listed**, plus wire,
+GPU and DOM probes. It found the one list in the build with no cap — `anomaly.transitions`,
+which the debrief renders in full — and then found two more that were bounded and one that
+was a number gaining a digit. It corrected itself against measurement four times: a
+four-minute run called the 256-entry event ring unbounded, a per-frame gauge is not a
+counter, a step is not a slope, and a byte count of a single number is too small for any
+fraction to mean anything. **It passes now: nothing was still growing at the end, on any of
+nine incidents.**
+
+`tools/licence-audit.ps1` answers §25 from the repo rather than from memory — third-party
+files against what `NOTICE.md` claims, every file that reaches the network, every content
+file's licensing position, and anything with no provenance at all. It found two anomaly files
+carrying a bare `licensingRecordId: null` where the other six carry a sentence saying what
+the null *means*, which is the difference between a decision and a forgotten field.
 
 Section K is the hygiene pass, and one of its rules earns its keep more than the others:
 **a CONFIG value that nothing reads fails the build.** It found ten dead constants in a
