@@ -317,6 +317,13 @@ export class Game {
     this.commands.delete(id);
     this.comms.retire(id);
     this.imagerOnIds.delete(id);
+    /* ⚠ EVERY PER-SEAT COLLECTION HAS TO BE ON THIS LIST, and `_downLogged` was not. It is
+     * pruned in the downed sweep by walking `this.players`, so an id whose operative has
+     * LEFT the roster is never reached and never removed — the sweep can only forget people
+     * who are still there. Small (one string per operative who was downed and then left)
+     * and real: `tools/soak.ps1` measured it climbing at 0.29 a minute through seat churn,
+     * which is the only reason anybody looked. */
+    this._downLogged.delete(id);
     for (const k of this.observationHold.keys()) if (k.startsWith(`${id}|`)) this.observationHold.delete(k);
     this.bus.emit(EVENTS.SQUAD_CHANGED, { id, joined: false }, this.clock.simTimeMs);
     return true;
