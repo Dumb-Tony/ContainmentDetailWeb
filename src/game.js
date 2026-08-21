@@ -33,6 +33,7 @@ import { PingBoard, requestPing } from './sim/comms.js';
 import { InstanceSet } from './sim/instances.js';
 import { SoundField, operativeSource, deployableSource, operativeMic, micOptionsFromItem, micReading } from './sim/sound.js';
 import { dist } from './sim/geometry.js';
+import { t as msg } from './core/i18n.js';
 
 /** A command is what one operative is asking for this step, whoever is asking. */
 export const EMPTY_COMMAND = Object.freeze({
@@ -205,7 +206,7 @@ export class Game {
 
     this.players.length = 0;
     this.commands.clear();
-    this.players.push(new Player(this.site, 'p1', 'Operative 1'));
+    this.players.push(new Player(this.site, 'p1', msg('mission.roster.operativeOne')));
     this.localId = this.localId || 'p1';
     this.player = this.players[0];
     this._nextPlayerN = 2;
@@ -531,7 +532,7 @@ export class Game {
   commitLoadout(manifest) {
     const budget = this.content.items.cargoVolumeBudget;
     const vol = this.manifestVolume(manifest);
-    if (vol > budget) return `Cargo over budget: ${vol} of ${budget}.`;
+    if (vol > budget) return msg('mission.refuse.cargoOverBudget', { volume: vol, budget });
     this.cache.clear();
     this.cargoIssued = 0;
     for (const { itemId, qty } of manifest) {
@@ -623,7 +624,7 @@ export class Game {
       const lost = p.stepDowned(stepMs, CONFIG.player.bleedOutMs);
       if (lost) {
         this.comms.retire(p.id);
-        this.notice(`${p.name} stopped answering.`);
+        this.notice(msg('mission.notice.stoppedAnswering', { name: p.name }));
         this.bus.emit(EVENTS.OPERATIVE_LOST, { id: p.id }, simTimeMs);
       }
 
@@ -647,7 +648,7 @@ export class Game {
       });
     }
     if (this.players.every((p) => !p.alive)) {
-      this.endMission('The squad was lost on the floor.', simTimeMs);
+      this.endMission(msg('mission.end.squadLost'), simTimeMs);
       return;
     }
 
@@ -663,7 +664,7 @@ export class Game {
       const near = this.anomaly.isAwake && dist(p.x, p.z, this.anomaly.x, this.anomaly.z) <= CONFIG.anomaly.batteryDrainRadiusM;
       const left = Math.max(0, this.batteryFor('thermal-imager') - stepMs * (near ? CONFIG.anomaly.batteryDrainMultiplier : 1));
       this.itemBattery.set('thermal-imager', left);
-      if (left === 0) { this.imagerOnIds.delete(id); this.notice('The imager screen goes dark. Battery flat.'); }
+      if (left === 0) { this.imagerOnIds.delete(id); this.notice(msg('mission.notice.imagerFlat')); }
     }
 
     /* ⚠ AND THE MICROPHONE SPENDS ITS CELL THE SAME WAY. It authors twelve minutes of
@@ -680,7 +681,7 @@ export class Game {
       this.itemBattery.set('directional-microphone', left);
       if (left === 0) {
         this.bus.emit(EVENTS.BATTERY_DEAD, { itemId: 'directional-microphone' }, simTimeMs);
-        this.notice('The microphone hisses and stops. Cell flat.');
+        this.notice(msg('mission.notice.micFlat'));
       }
     }
 
@@ -753,7 +754,7 @@ export class Game {
       const victim = c.operative;
       for (const a of c.applies) victim.applyCondition(a.condition, a.severity);
       this.bus.emit(EVENTS.CONTACT, { count: c.count, id: victim.id }, simTimeMs);
-      this.notice(`${victim.name}: contact. The cold goes through you and your leg stops answering.`);
+      this.notice(msg('mission.notice.contact', { name: victim.name }));
     }
 
     /**
@@ -773,8 +774,8 @@ export class Game {
       if (this._downLogged.has(p.id)) continue;
       this._downLogged.add(p.id);
       this.notice(this.players.length > 1
-        ? `${p.name} is down. Somebody get to them.`
-        : `${p.name} is down, and there is nobody else on this floor.`);
+        ? msg('mission.notice.downSquad', { name: p.name })
+        : msg('mission.notice.downAlone', { name: p.name }));
       this.bus.emit(EVENTS.OPERATIVE_DOWNED, { id: p.id }, simTimeMs);
       if (p.hands) this._putDownCase(p);
     }
@@ -785,12 +786,12 @@ export class Game {
       this.custody = 'none';
       m.tally.custodyLosses++;
       this.bus.emit(EVENTS.CUSTODY_LOST, {}, simTimeMs);
-      this.notice('The heater cycle lengthens, then stops. Frost walks out of the seams.');
+      this.notice(msg('mission.notice.custodyLost'));
     } else if (cust.verified && this.custody !== 'verified') {
       this.custody = 'verified';
       m.setPhase(PHASE.CUSTODY_ESTABLISHED, simTimeMs);
       this.bus.emit(EVENTS.CUSTODY_VERIFIED, {}, simTimeMs);
-      this.notice('Case interior stable for thirty seconds. Custody verified — get it to the stairs.');
+      this.notice(msg('mission.notice.custodyVerified'));
     }
 
     this._stepEvidence(stepMs, simTimeMs);
@@ -947,7 +948,7 @@ export class Game {
     const e = this.ledger.record(evidenceId, provenance);
     if (e) {
       this.bus.emit(EVENTS.EVIDENCE_LOGGED, { entry: e }, provenance.simTimeMs);
-      this.notice(`Logged: ${e.raw}`);
+      this.notice(msg('mission.notice.logged', { what: e.raw }));
     }
     return e;
   }
@@ -983,20 +984,20 @@ export class Game {
     if (held) {
       const box = this.deployables.byItem('reinforced-transit-case')
         .find((d) => !d.sealed && dist(p.x, p.z, d.x, d.z) <= this.instances.depositRadiusM);
-      if (box) return { kind: 'deposit', text: `Log the ${held.label.toLowerCase()} into the case`, target: box };
-      return { kind: 'drop-instance', text: `Set the ${held.label.toLowerCase()} down` };
+      if (box) return { kind: 'deposit', text: msg('mission.verb.depositInstance', { what: held.label.toLowerCase() }), target: box };
+      return { kind: 'drop-instance', text: msg('mission.verb.dropInstance', { what: held.label.toLowerCase() }) };
     }
 
-    if (p.hands) return { kind: 'put-down', text: `Put down the ${this.itemsById.get(p.hands).displayName}` };
+    if (p.hands) return { kind: 'put-down', text: msg('mission.verb.putDown', { name: this.itemsById.get(p.hands).displayName }) };
 
     /* A teammate on the floor outranks everything except a seal. GDD §9.5 — the rescue
      * decision is the point, so it must never be buried under "retrieve the tripod". */
     const casualty = this.players.find((q) => q !== p && q.alive && q.downed
       && dist(p.x, p.z, q.x, q.z) <= reach + 0.6);
     if (casualty) {
-      if (p.carrying('trauma-kit')) return { kind: 'revive', text: `Stabilise ${casualty.name}`, target: casualty };
-      if (casualty.draggedBy === p.id) return { kind: 'release', text: `Let go of ${casualty.name}`, target: casualty };
-      return { kind: 'drag', text: `Drag ${casualty.name} clear`, target: casualty };
+      if (p.carrying('trauma-kit')) return { kind: 'revive', text: msg('mission.verb.stabilise', { name: casualty.name }), target: casualty };
+      if (casualty.draggedBy === p.id) return { kind: 'release', text: msg('mission.verb.release', { name: casualty.name }), target: casualty };
+      return { kind: 'drag', text: msg('mission.verb.drag', { name: casualty.name }), target: casualty };
     }
 
     /* The seal comes first: when it is available it is the only thing that matters. */
@@ -1041,7 +1042,7 @@ export class Game {
      * decides, with the tie-break preferring the smaller object.
      */
     if (sealable && !this.anomaly.isDistributed) {
-      return { kind: 'seal', text: 'SEAL THE CASE', target: caseDep };
+      return { kind: 'seal', text: msg('mission.verb.seal'), target: caseDep };
     }
 
     /* A contaminated case outranks everything except the seal and a casualty, the same way
@@ -1056,21 +1057,21 @@ export class Game {
       if (spoiled) {
         return {
           kind: 'purge', target: spoiled,
-          text: `Open the case and turn it out (${this.instances.inCase.length} inside)`,
+          text: msg('mission.verb.purge', { count: this.instances.inCase.length }),
         };
       }
     }
 
     const cands = [];
     if (sealable) {
-      cands.push({ d: dist(p.x, p.z, caseDep.x, caseDep.z), kind: 'seal', text: 'SEAL THE CASE', target: caseDep });
+      cands.push({ d: dist(p.x, p.z, caseDep.x, caseDep.z), kind: 'seal', text: msg('mission.verb.seal'), target: caseDep });
     }
     const dep = this.deployables.nearest(p.x, p.z, reach);
     if (dep) {
       const d = dist(p.x, p.z, dep.x, dep.z);
-      if (dep.sealed && this.custody === 'verified') cands.push({ d, kind: 'carry-case', text: 'Lift the transit case', target: dep });
-      else if (dep.sealed) cands.push({ d, kind: 'blocked', text: 'Custody unverified — the case must hold thirty seconds', target: dep });
-      else cands.push({ d, kind: 'retrieve', text: `Retrieve the ${dep.item.displayName}`, target: dep });
+      if (dep.sealed && this.custody === 'verified') cands.push({ d, kind: 'carry-case', text: msg('mission.verb.carryCase'), target: dep });
+      else if (dep.sealed) cands.push({ d, kind: 'blocked', text: msg('mission.verb.custodyUnverified'), target: dep });
+      else cands.push({ d, kind: 'retrieve', text: msg('mission.verb.retrieve', { name: dep.item.displayName }), target: dep });
     }
 
     const loose = this.instances.nearestLoose(p.x, p.z, reach);
@@ -1080,18 +1081,18 @@ export class Game {
         /* The prompt says what it LOOKS like, never what it is. An object the imager has
          * confirmed says so; one nobody has read is just an object, and the whole incident
          * is the difference between those two sentences. */
-        text: loose.verified ? `Take the ${loose.label.toLowerCase()} — reads cold` : `Take the ${loose.mundaneLabel.toLowerCase()}`,
+        text: loose.verified ? msg('mission.verb.takeVerified', { what: loose.label.toLowerCase() }) : msg('mission.verb.takeMundane', { what: loose.mundaneLabel.toLowerCase() }),
       });
     }
 
     const sw = this.site.circuitSwitchNear(p.x, p.z, reach);
-    if (sw) cands.push({ d: dist(p.x, p.z, sw.switchX, sw.switchZ), kind: 'circuit', text: `${sw.on ? 'Kill' : 'Throw'} the ${sw.displayName.toLowerCase()}`, target: sw });
+    if (sw) cands.push({ d: dist(p.x, p.z, sw.switchX, sw.switchZ), kind: 'circuit', text: msg(sw.on ? 'mission.verb.circuitKill' : 'mission.verb.circuitThrow', { name: sw.displayName.toLowerCase() }), target: sw });
 
     const door = this.site.doorNear(p.x, p.z, reach + 0.4);
     if (door) {
       const d = dist(p.x, p.z, (door.rect[0] + door.rect[2]) / 2, (door.rect[1] + door.rect[3]) / 2);
-      if (!this.site.canOperateDoor(door)) cands.push({ d, kind: 'blocked', text: `${door.displayName} — no power on this circuit`, target: door });
-      else cands.push({ d, kind: 'door', text: `${door.open ? 'Close' : 'Open'} the ${door.displayName.toLowerCase()}`, target: door });
+      if (!this.site.canOperateDoor(door)) cands.push({ d, kind: 'blocked', text: msg('mission.verb.doorNoPower', { name: door.displayName }), target: door });
+      else cands.push({ d, kind: 'door', text: msg(door.open ? 'mission.verb.doorClose' : 'mission.verb.doorOpen', { name: door.displayName.toLowerCase() }), target: door });
     }
 
     /* Nearest UNLOGGED source, not nearest source. Asking for the nearest and then throwing
@@ -1113,14 +1114,14 @@ export class Game {
       const d = dist(p.x, p.z, src.at[0], src.at[1]);
       if (missing.length) {
         const names = missing.map((id) => this.itemsById.get(id).displayName.toLowerCase()).join(' and ');
-        cands.push({ d, kind: 'blocked', text: `${src.prompt} — needs the ${names}`, target: src });
+        cands.push({ d, kind: 'blocked', text: msg('mission.verb.evidenceBlocked', { prompt: src.prompt, items: names }), target: src });
       } else {
         cands.push({ d, kind: 'evidence', text: src.prompt, target: src });
       }
     }
 
     const dCache = dist(p.x, p.z, this.site.cache.x, this.site.cache.z);
-    if (dCache <= reach + 1.0) cands.push({ d: dCache, kind: 'cache', text: 'Open the cargo manifest', target: null });
+    if (dCache <= reach + 1.0) cands.push({ d: dCache, kind: 'cache', text: msg('mission.verb.cache'), target: null });
 
     if (!cands.length) return null;
     /**
@@ -1160,9 +1161,9 @@ export class Game {
 
   doInteract(playerId = 'p1') {
     const p = this.playerById(playerId);
-    if (!p) return 'No such operative.';
+    if (!p) return msg('mission.refuse.noSuchOperative');
     const a = this.contextAction(playerId);
-    if (!a) return 'Nothing in reach.';
+    if (!a) return msg('mission.refuse.nothingInReach');
     const t = this.clock.simTimeMs;
     switch (a.kind) {
       case 'seal': {
@@ -1172,14 +1173,14 @@ export class Game {
         if (err) { this.notice(err); return err; }
         this.custody = 'sealed';
         this.mission.setPhase(PHASE.CONTAINMENT_ACTIVE, t);
-        this.notice('Latches over. The case seams frost as the load transfers. Hold it.');
+        this.notice(msg('mission.notice.sealed'));
         return null;
       }
       case 'carry-case':
         p.hands = a.target.itemId;
         this._carried.set(p.id, { sealed: a.target.sealed, custodyHeldMs: a.target.custodyHeldMs, batteryMs: a.target.batteryMs });
         this.deployables.remove(a.target);
-        this.notice(`${p.name} has it. It is heavier than it looks and it is still cold.`);
+        this.notice(msg('mission.notice.lifted', { name: p.name }));
         return null;
       case 'put-down':
         this._putDownCase(p);
@@ -1201,20 +1202,20 @@ export class Game {
          * about noticing that the count did not move, and a game that tells you would be
          * asking you to read a label rather than to keep an account. */
         this.notice(r.ticked
-          ? `The case answers. ${this.instances.counted} logged.`
-          : `The case takes it. ${this.instances.counted} logged.`);
+          ? msg('mission.notice.instanceCounted', { count: this.instances.counted })
+          : msg('mission.notice.instanceSilent', { count: this.instances.counted }));
         this.bus.emit(EVENTS.INSTANCE_LOGGED, { id: r.instance.id, counted: this.instances.counted, by: p.id }, t);
         return null;
       }
       case 'purge': {
         const out = this.instances.purge(a.target.x, a.target.z);
-        this.notice(`The case is turned out. ${out.length} back on the floor, and none of them will say which.`);
+        this.notice(msg('mission.notice.purged', { count: out.length }));
         this.bus.emit(EVENTS.SET_PURGED, { n: out.length, by: p.id }, t);
         return null;
       }
       case 'retrieve': {
         const item = a.target.item;
-        if (!p.take(item)) { this.notice('No slot free for that.'); return 'No slot free.'; }
+        if (!p.take(item)) { this.notice(msg('mission.notice.noSlotFree')); return msg('mission.refuse.noSlotFree'); }
         this.deployables.remove(a.target);
         this.bus.emit(EVENTS.RETRIEVED, { itemId: item.id, id: p.id }, t);
         return null;
@@ -1222,28 +1223,28 @@ export class Game {
       case 'drag': {
         /* One carrier at a time — contention as a property, not a rule. The field simply
          * cannot hold two draggers (the SmallTownEmergencyServices pattern). */
-        if (a.target.draggedBy) return `${a.target.name} is already being moved.`;
+        if (a.target.draggedBy) return msg('mission.refuse.alreadyMoving', { name: a.target.name });
         a.target.draggedBy = p.id;
-        this.notice(`${p.name} has hold of ${a.target.name}.`);
+        this.notice(msg('mission.notice.dragging', { name: p.name, target: a.target.name }));
         return null;
       }
       case 'release':
         a.target.draggedBy = null;
         return null;
       case 'revive': {
-        if (!a.target.revive()) return 'Nothing to do for them.';
+        if (!a.target.revive()) return msg('mission.refuse.nothingToDo');
         for (const s of SLOTS) if (p.slots.get(s.id) === 'trauma-kit') { p.slots.set(s.id, null); break; }
         this.mission.tally.treatments++;
         this.mission.tally.rescues++;
         this.bus.emit(EVENTS.OPERATIVE_REVIVED, { id: a.target.id, by: p.id }, t);
-        this.notice(`${a.target.name} is back on their feet. Stabilised, not fixed.`);
+        this.notice(msg('mission.notice.revived', { name: a.target.name }));
         return null;
       }
       case 'circuit': {
         this.site.setCircuit(a.target.id, !a.target.on);
         if (a.target.on) this.mission.tally.circuitsRestored++;
         this.bus.emit(EVENTS.CIRCUIT_CHANGED, { id: a.target.id, on: a.target.on }, t);
-        this.notice(a.target.on ? `${a.target.displayName} live.` : `${a.target.displayName} dead.`);
+        this.notice(msg(a.target.on ? 'mission.notice.circuitLive' : 'mission.notice.circuitDead', { name: a.target.displayName }));
         return null;
       }
       case 'door': {
@@ -1270,14 +1271,14 @@ export class Game {
   /** Take one unit of an item from the cargo cache into a slot. */
   takeFromCache(itemId, playerId = 'p1') {
     const p = this.playerById(playerId);
-    if (!p || p.incapacitated) return 'Not right now.';
+    if (!p || p.incapacitated) return msg('mission.refuse.notRightNow');
     const n = this.cache.get(itemId) || 0;
-    if (n <= 0) return 'None left in cargo.';
+    if (n <= 0) return msg('mission.refuse.noneInCargo');
     if (dist(p.x, p.z, this.site.cache.x, this.site.cache.z) > CONFIG.player.reachMetres + 1.2) {
-      return 'Too far from the cargo point.';
+      return msg('mission.refuse.tooFarFromCargo');
     }
     const item = this.itemsById.get(itemId);
-    if (!p.take(item)) return `No free slot takes a ${item.bulk} item.`;
+    if (!p.take(item)) return msg('mission.refuse.noFreeSlotForBulk', { bulk: item.bulk });
     this.cache.set(itemId, n - 1);
     return null;
   }
@@ -1285,11 +1286,11 @@ export class Game {
   /** Put the held item back into cargo. Recoverable mistakes, GDD Pillar 4. */
   returnToCache(playerId = 'p1') {
     const p = this.playerById(playerId);
-    if (!p) return 'No such operative.';
+    if (!p) return msg('mission.refuse.noSuchOperative');
     const id = p.heldItemId;
-    if (!id) return 'Nothing in hand.';
+    if (!id) return msg('mission.refuse.nothingInHand');
     if (dist(p.x, p.z, this.site.cache.x, this.site.cache.z) > CONFIG.player.reachMetres + 1.2) {
-      return 'Too far from the cargo point.';
+      return msg('mission.refuse.tooFarFromCargo');
     }
     p.drop(p.heldSlot);
     this.cache.set(id, (this.cache.get(id) || 0) + 1);
@@ -1299,16 +1300,16 @@ export class Game {
   /** Deploy the held item where the operative is standing. */
   deployHeld(playerId = 'p1') {
     const p = this.playerById(playerId);
-    if (!p || p.incapacitated) return 'Not right now.';
+    if (!p || p.incapacitated) return msg('mission.refuse.notRightNow');
     const id = p.heldItemId;
-    if (!id) return 'Nothing in hand.';
+    if (!id) return msg('mission.refuse.nothingInHand');
     const item = this.itemsById.get(id);
-    if (!item.deployable) return `The ${item.displayName.toLowerCase()} is not something you set down.`;
+    if (!item.deployable) return msg('mission.refuse.notDeployable', { name: item.displayName.toLowerCase() });
     /* Refuse a placement inside geometry rather than letting it clip — a fence post inside
      * a wall is a fence post the player thinks they have. */
     const fx = p.x - Math.sin(p.yaw) * 0.9, fz = p.z - Math.cos(p.yaw) * 0.9;
     for (const r of this.site.blockingRects()) {
-      if (fx > r[0] - 0.2 && fx < r[2] + 0.2 && fz > r[1] - 0.2 && fz < r[3] + 0.2) return 'No room to set that down here.';
+      if (fx > r[0] - 0.2 && fx < r[2] + 0.2 && fz > r[1] - 0.2 && fz < r[3] + 0.2) return msg('mission.refuse.noRoomToDeploy');
     }
     p.drop(p.heldSlot);
     const d = this.deployables.place(item, fx, fz, p.yaw);
@@ -1320,8 +1321,8 @@ export class Game {
   /** The imager is a held instrument, not a mode: it costs a hand and a battery. */
   toggleImager(playerId = 'p1') {
     const p = this.playerById(playerId);
-    if (!p || !p.carrying('thermal-imager')) return 'You did not bring the imager.';
-    if (this.batteryFor('thermal-imager') <= 0) return 'The imager battery is flat.';
+    if (!p || !p.carrying('thermal-imager')) return msg('mission.refuse.noImager');
+    if (this.batteryFor('thermal-imager') <= 0) return msg('mission.refuse.imagerFlat');
     if (this.imagerOnIds.has(p.id)) this.imagerOnIds.delete(p.id);
     else this.imagerOnIds.add(p.id);
     return null;
@@ -1366,19 +1367,19 @@ export class Game {
 
   useHeld(playerId = 'p1') {
     const p = this.playerById(playerId);
-    if (!p || p.incapacitated) return 'Not right now.';
+    if (!p || p.incapacitated) return msg('mission.refuse.notRightNow');
     const id = p.heldItemId;
     if (id === 'thermal-imager') return this.toggleImager(playerId);
     if (id === 'trauma-kit') {
-      if (!p.treat()) return 'Nothing to stabilise.';
+      if (!p.treat()) return msg('mission.refuse.nothingToStabilise');
       p.drop(p.heldSlot);
       this.mission.tally.treatments++;
-      this.notice('Stabilised. It will not get worse; it is not going to get better here either.');
+      this.notice(msg('mission.notice.stabilised'));
       return null;
     }
     if (id === 'sample-kit') {
-      if (!this.anomaly.icePatches.length && !this.anomaly.isHeld) return 'No frost worth taking.';
-      this.notice('Frost sample sealed. Research will want this.');
+      if (!this.anomaly.icePatches.length && !this.anomaly.isHeld) return msg('mission.refuse.noFrost');
+      this.notice(msg('mission.notice.frostTaken'));
       p.drop(p.heldSlot);
       return null;
     }
@@ -1399,11 +1400,11 @@ export class Game {
     if (item && item.pressureOnUse) {
       this.mission.applyPressureDelta(item.pressureOnUse);
       this.bus.emit(EVENTS.NOISE_MADE, { itemId: id, pressure: item.pressureOnUse, by: p.id }, this.clock.simTimeMs);
-      this.notice(`${item.displayName} used. Everything on this floor heard that.`);
+      this.notice(msg('mission.notice.usedLoudly', { name: item.displayName }));
       return null;
     }
     if (id) return this.deployHeld(playerId);
-    return 'Nothing in hand.';
+    return msg('mission.refuse.nothingInHand');
   }
 
   /* ── the procedure card ──────────────────────────────────────────────────── */
@@ -1431,7 +1432,7 @@ export class Game {
   abortProcedure() {
     this.mission.abortCount++;
     this.mission.setPhase(PHASE.INVESTIGATION, this.clock.simTimeMs, 'aborted');
-    this.notice('Procedure aborted. Back off and re-plan.');
+    this.notice(msg('mission.notice.procedureAborted'));
   }
 
   /* ── odds and ends ───────────────────────────────────────────────────────── */

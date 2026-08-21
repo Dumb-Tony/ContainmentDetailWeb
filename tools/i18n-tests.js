@@ -27,7 +27,7 @@ import { CONFIG, SLOTS } from '../src/config.js';
 
 /* Files whose user-facing strings have been extracted. A file joins this list when it is
  * converted, and section D below fails the build if a literal creeps back into one. */
-const CONVERTED = ['src/ui/hud.js'];
+const CONVERTED = ['src/ui/hud.js', 'src/game.js', 'src/sim/mission.js'];
 
 /* ── A. the table itself ──────────────────────────────────────────────────── */
 async function sectionA() {

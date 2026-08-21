@@ -2,6 +2,142 @@
   "_locale": "en-GB",
   "_note": "EVERY SENTENCE THE GAME SAYS TO A PLAYER. GDD §23 Milestone 5 asks for a localization pass; this is the half of it that is engineering rather than translation.\n\nTHE RULE: a key names a MESSAGE, never a fragment. There is no key here whose value is ' · stabilised' or ' of ' or 'lane' — because a sentence assembled at runtime from pieces is a sentence that cannot be translated. Word order moves, adjectives agree, plurals are not two-valued. Interpolation is allowed and concatenation is not: a message carries {placeholders} and decides for itself where they go.\n\nPLURALS are sibling keys under a `one`/`other` object and are selected by Intl.PluralRules, not by `n === 1 ? a : b`. English has two forms and that is not a law — Polish has three and Arabic six. The naive ternary is written into this codebase in fourteen places and every one of them is a bug in the second language.\n\nWHAT IS NOT HERE: anything an anomaly or an incident says. Content prose lives in content/anomalies and content/incidents and is localised with the package, not with the engine — a briefing is authored writing, not a UI string, and the two have different reviewers.",
 
+  "mission": {
+    "_note": "The notice feed and every refusal. These are the sentences a player reads most, and the refusals are load-bearing: a refusal that does not say WHY is a bug report waiting to be filed. GDD §8.2 asks every rule to be actionable, and 'Not right now.' is only actionable because the thing it refuses is obvious from context.\n\nNOTHING HERE NAMES AN ANOMALY OR AN ITEM. A telegraph is authored on the trigger that fires it and travels with the content package; an item's displayName is in the equipment manifest. Both are interpolated, so this file stays the same size when a ninth anomaly ships.",
+    "notice": {
+      "stoppedAnswering": "{name} stopped answering.",
+      "imagerFlat": "The imager screen goes dark. Battery flat.",
+      "micFlat": "The microphone hisses and stops. Cell flat.",
+      "contact": "{name}: contact. The cold goes through you and your leg stops answering.",
+      "downSquad": "{name} is down. Somebody get to them.",
+      "downAlone": "{name} is down, and there is nobody else on this floor.",
+      "custodyLost": "The heater cycle lengthens, then stops. Frost walks out of the seams.",
+      "custodyVerified": "Case interior stable for thirty seconds. Custody verified — get it to the stairs.",
+      "logged": "Logged: {what}",
+      "sealed": "Latches over. The case seams frost as the load transfers. Hold it.",
+      "lifted": "{name} has it. It is heavier than it looks and it is still cold.",
+      "instanceCounted": "The case answers. {count} logged.",
+      "instanceSilent": "The case takes it. {count} logged.",
+      "purged": "The case is turned out. {count} back on the floor, and none of them will say which.",
+      "noSlotFree": "No slot free for that.",
+      "dragging": "{name} has hold of {target}.",
+      "revived": "{name} is back on their feet. Stabilised, not fixed.",
+      "circuitLive": "{name} live.",
+      "circuitDead": "{name} dead.",
+      "stabilised": "Stabilised. It will not get worse; it is not going to get better here either.",
+      "frostTaken": "Frost sample sealed. Research will want this.",
+      "usedLoudly": "{name} used. Everything on this floor heard that.",
+      "procedureAborted": "Procedure aborted. Back off and re-plan."
+    },
+    "verb": {
+      "_note": "The context verb — the single line under the crosshair that says what F will do. It is the most-read text in the game and the one place §18.1's 'the UI states what the simulation says' is tested every second: there is exactly one resolver (game.contextAction), so the prompt and the key cannot disagree.\n\n⚠ `${on ? 'Kill' : 'Throw'} the ${name}` WAS A VERB CONCATENATED ONTO A NOUN, and that is the fragment rule broken in the place it matters most. English puts the verb first; Japanese puts it last; German splits it. Two whole messages, and the code picks.",
+      "depositInstance": "Log the {what} into the case",
+      "dropInstance": "Set the {what} down",
+      "putDown": "Put down the {name}",
+      "stabilise": "Stabilise {name}",
+      "release": "Let go of {name}",
+      "drag": "Drag {name} clear",
+      "seal": "SEAL THE CASE",
+      "purge": "Open the case and turn it out ({count} inside)",
+      "carryCase": "Lift the transit case",
+      "custodyUnverified": "Custody unverified — the case must hold thirty seconds",
+      "retrieve": "Retrieve the {name}",
+      "takeVerified": "Take the {what} — reads cold",
+      "takeMundane": "Take the {what}",
+      "circuitKill": "Kill the {name}",
+      "circuitThrow": "Throw the {name}",
+      "doorNoPower": "{name} — no power on this circuit",
+      "doorOpen": "Open the {name}",
+      "doorClose": "Close the {name}",
+      "evidenceBlocked": "{prompt} — needs the {items}",
+      "cache": "Open the cargo manifest"
+    },
+    "end": {
+      "squadLost": "The squad was lost on the floor."
+    },
+    "roster": {
+      "_note": "The default callsign for operative one. It is the only name the game invents; every other operative is named by the person playing them.",
+      "operativeOne": "Operative 1"
+    },
+    "refuse": {
+      "_note": "Every one of these is returned to the caller AND shown, so the wording has to work as an answer to a keypress rather than as a description of a state.",
+      "cargoOverBudget": "Cargo over budget: {volume} of {budget}.",
+      "noSuchOperative": "No such operative.",
+      "nothingInReach": "Nothing in reach.",
+      "noSlotFree": "No slot free.",
+      "alreadyMoving": "{name} is already being moved.",
+      "nothingToDo": "Nothing to do for them.",
+      "notRightNow": "Not right now.",
+      "noneInCargo": "None left in cargo.",
+      "tooFarFromCargo": "Too far from the cargo point.",
+      "noFreeSlotForBulk": "No free slot takes a {bulk} item.",
+      "nothingInHand": "Nothing in hand.",
+      "notDeployable": "The {name} is not something you set down.",
+      "noRoomToDeploy": "No room to set that down here.",
+      "noImager": "You did not bring the imager.",
+      "imagerFlat": "The imager battery is flat.",
+      "nothingToStabilise": "Nothing to stabilise.",
+      "noFrost": "No frost worth taking."
+    }
+  },
+
+  "debrief": {
+    "_note": "The nine dimensions of the after-action report (§6.4). This is the one screen that tells a squad what the operation was worth, so its wording is the most carefully reviewed prose in the build — and it was also the densest concentration of English grammar written into JavaScript: four `n === 1 ? a : b` plurals in fifty lines.\n\nThe DIMENSION NAMES and the GRADE WORDS are separate namespaces on purpose. A grade word is a closed vocabulary the code compares against; a dimension name is a label. Translating one must not be able to break the other, and `dimWord(result, 'Time to stabilisation')` reads the English name because that is the key, not the display.",
+    "dim": {
+      "containment": "Containment integrity",
+      "personnel": "Personnel survival",
+      "conduct": "Squad conduct",
+      "civilian": "Civilian outcome",
+      "evidence": "Evidence quality",
+      "secrecy": "Secrecy and exposure",
+      "equipment": "Equipment stewardship",
+      "infrastructure": "Infrastructure damage",
+      "research": "Research completion",
+      "time": "Time to stabilisation"
+    },
+    "word": {
+      "partial": "Partial", "established": "Established", "unverified": "Unverified", "none": "None",
+      "lost": "Lost", "critical": "Critical", "injured": "Injured", "intact": "Intact",
+      "incomplete": "Incomplete", "sound": "Sound", "notApplicable": "Not applicable",
+      "high": "High", "serviceable": "Serviceable", "thin": "Thin",
+      "held": "Held", "complete": "Complete", "poor": "Poor",
+      "substantial": "Substantial", "damageNone": "None", "unmeasured": "—"
+    },
+    "why": {
+      "setRecovered": " {counted} of {total} recovered.",
+      "sealedIncomplete": "The case was sealed on an incomplete set.{set} What was left on the floor is still there.",
+      "custodyHeld": "Custody held {seconds}s and the case left the floor.{set}",
+      "sealedUnverified": "The case was sealed but custody was never verified.",
+      "stillLoose": "The anomaly was still loose when the operation ended.",
+      "peopleLost": "{names} did not come back. {out} of {total} extracted.",
+      "peopleStretcher": "{names} came out on a stretcher.",
+      "peopleInjured": "{detail}",
+      "injuredOne": "{name} (exposure {exposure}, mobility {mobility}, {care})",
+      "careStabilised": "stabilised",
+      "careUntreated": "untreated",
+      "allClear": "All {count} clear. Nobody took a contact.",
+      "leftBehind": "{names} was still on the floor when the case went up the stairs.",
+      "rescues": {
+        "one": "{count} casualty recovered under pressure.",
+        "other": "{count} casualties recovered under pressure."
+      },
+      "civilianCleared": "The floor was already cleared before deployment.",
+      "evidenceDetail": {
+        "one": "{observations} observations logged, {correct} rules read correctly, {wrong} misread, {count} false lead recorded.",
+        "other": "{observations} observations logged, {correct} rules read correctly, {wrong} misread, {count} false leads recorded."
+      },
+      "secrecyDetail": "Sub-level operation; no surface exposure.",
+      "equipmentDetail": "{recovered} of {issued} issued items recovered; {lost} left on the floor.",
+      "infrastructureDetail": {
+        "one": "{count} circuit restored, no structural damage.",
+        "other": "{count} circuits restored, no structural damage."
+      },
+      "researchDetail": "{documented} of {rules} rules documented; {logged} of {available} observations logged.",
+      "minutes": "{minutes} min",
+      "timeDetail": "Peak pressure {peak} ({stage}); {breach}s above Active."
+    }
+  },
+
   "hud": {
     "_note": "The head-up display. Everything here is read at a glance while something is walking toward you, so it is short by design and the short forms are the ones that must survive translation.",
     "pressure": "Incident pressure: {stage}",

@@ -11,6 +11,7 @@
  */
 
 import { CONFIG } from '../config.js';
+import { t as msg, plural } from '../core/i18n.js';
 
 export const PHASE = Object.freeze({
   BRIEFING: 'Briefing',
@@ -114,7 +115,33 @@ export class Mission {
     const leftBehind = extracted ? squad.filter((p) => p.alive && !p.extracted) : [];
     const claims = ledger.scoreClaims();
     const dims = [];
-    const add = (name, word, why) => dims.push({ name, word, why });
+    /**
+     * ⚠ A DIMENSION IS DATA AND A LABEL, AND THEY ARE NOT THE SAME STRING.
+     *
+     * `progression.js` reads this result back with `dimWord(result, 'Containment integrity')`
+     * and compares the answer against the literal `'Established'`. That worked while the
+     * name and the word WERE the display text — and the moment a second locale renders
+     * "Eindämmungsintegrität" the site stops recording captures, silently, with every test
+     * still green because the suite runs in English.
+     *
+     * So each row now carries a stable `id` and `wordId` that are never translated, beside
+     * the `name` and `word` that always are. The ids are the contract; the strings are the
+     * rendering. `dimWord` prefers the id and falls back to the name, so nothing had to
+     * change on the reading end at the same moment as this.
+     */
+    const add = (id, wordId, why, wordParams, value) => dims.push({
+      id,
+      wordId,
+      name: msg(`debrief.dim.${id}`),
+      word: wordParams ? msg(`debrief.why.${wordId}`, wordParams) : msg(`debrief.word.${wordId}`),
+      /* ⚠ AND A NUMBER IS A NUMBER. The time dimension's "word" was `${mins.toFixed(1)} min`
+       * and `minutesFrom` in progression.js parsed the digits back out of it with a regex —
+       * so the site's own record of how long an operation took was recovered by stripping
+       * non-digits from a display string. In a locale that writes 12,4 rather than 12.4
+       * that reads 124. The value travels beside the word now. */
+      ...(value === undefined ? {} : { value }),
+      why,
+    });
 
     /**
      * ⚠ A DISTRIBUTED SET CAN BE SEALED INCOMPLETE, and this is the only place that says
@@ -127,53 +154,73 @@ export class Mission {
     const partial = instances && instances.candidates
       && instances.counted > 0 && instances.counted < instances.total;
     const setDetail = instances && instances.candidates
-      ? ` ${instances.counted} of ${instances.total} recovered.` : '';
-    add('Containment integrity',
-      partial ? 'Partial'
-        : custody === 'verified' ? 'Established' : custody === 'sealed' ? 'Unverified' : 'None',
+      ? msg('debrief.why.setRecovered', { counted: instances.counted, total: instances.total }) : '';
+    add('containment',
+      partial ? 'partial'
+        : custody === 'verified' ? 'established'
+          : custody === 'sealed' ? 'unverified' : 'none',
       partial
-        ? `The case was sealed on an incomplete set.${setDetail} What was left on the floor is still there.`
+        ? msg('debrief.why.sealedIncomplete', { set: setDetail })
         : custody === 'verified'
-          ? `Custody held ${(CONFIG.anomaly.custodyVerifySeconds)}s and the case left the floor.${setDetail}`
+          ? msg('debrief.why.custodyHeld', { seconds: CONFIG.anomaly.custodyVerifySeconds, set: setDetail })
           : custody === 'sealed'
-            ? 'The case was sealed but custody was never verified.'
-            : 'The anomaly was still loose when the operation ended.');
+            ? msg('debrief.why.sealedUnverified')
+            : msg('debrief.why.stillLoose'));
 
     /* Reported for the SQUAD, and it names who — a debrief that says "Injured" when one
      * of four is on a stretcher and three walked out is not a debrief. */
-    add('Personnel survival',
-      lostPeople.length ? 'Lost' : downed.length ? 'Critical' : injured.length ? 'Injured' : 'Intact',
+    const injuredLine = injured.map((p) => msg('debrief.why.injuredOne', {
+      name: p.name,
+      exposure: p.conditions.exposure.severity,
+      mobility: p.conditions.mobility.severity,
+      care: msg(p.conditions.exposure.stabilised || p.conditions.mobility.stabilised
+        ? 'debrief.why.careStabilised' : 'debrief.why.careUntreated'),
+    })).join(' · ');
+    add('personnel',
+      lostPeople.length ? 'lost' : downed.length ? 'critical'
+        : injured.length ? 'injured' : 'intact',
       lostPeople.length
-        ? `${lostPeople.map((p) => p.name).join(', ')} did not come back. ${squad.length - lostPeople.length} of ${squad.length} extracted.`
+        ? msg('debrief.why.peopleLost', {
+          names: lostPeople.map((p) => p.name).join(', '),
+          out: squad.length - lostPeople.length,
+          total: squad.length,
+        })
         : downed.length
-          ? `${downed.map((p) => p.name).join(', ')} came out on a stretcher.`
+          ? msg('debrief.why.peopleStretcher', { names: downed.map((p) => p.name).join(', ') })
           : injured.length
-            ? `${injured.map((p) => `${p.name} (exposure ${p.conditions.exposure.severity}, mobility ${p.conditions.mobility.severity}${p.conditions.exposure.stabilised || p.conditions.mobility.stabilised ? ', stabilised' : ', untreated'})`).join(' · ')}`
-            : `All ${squad.length} clear. Nobody took a contact.`);
+            ? msg('debrief.why.peopleInjured', { detail: injuredLine })
+            : msg('debrief.why.allClear', { count: squad.length }));
 
     if (this.tally.rescues || leftBehind.length) {
-      add('Squad conduct',
-        leftBehind.length ? 'Incomplete' : 'Sound',
+      add('conduct',
+        leftBehind.length ? 'incomplete' : 'sound',
         leftBehind.length
-          ? `${leftBehind.map((p) => p.name).join(', ')} was still on the floor when the case went up the stairs.`
-          : `${this.tally.rescues} casualt${this.tally.rescues === 1 ? 'y' : 'ies'} recovered under pressure.`);
+          ? msg('debrief.why.leftBehind', { names: leftBehind.map((p) => p.name).join(', ') })
+          /* ⚠ `casualt${n === 1 ? 'y' : 'ies'}` WAS ENGLISH GRAMMAR WRITTEN IN JAVASCRIPT.
+           * There were four of these in fifty lines. Intl.PluralRules already knows which
+           * form the locale wants; the table authors the categories. */
+          : plural('debrief.why.rescues', this.tally.rescues));
     }
 
-    add('Civilian outcome', 'Not applicable', 'The floor was already cleared before deployment.');
+    add('civilian', 'notApplicable', msg('debrief.why.civilianCleared'));
 
     const falseLeads = ledger.entries.filter((e) => e.isFalseLead).length;
-    add('Evidence quality',
-      claims.correct >= 4 && claims.wrong === 0 ? 'High' : claims.correct >= 2 ? 'Serviceable' : 'Thin',
-      `${ledger.entries.length} observations logged, ${claims.correct} rules read correctly, ${claims.wrong} misread, ${falseLeads} false lead${falseLeads === 1 ? '' : 's'} recorded.`);
+    add('evidence',
+      claims.correct >= 4 && claims.wrong === 0 ? 'high'
+        : claims.correct >= 2 ? 'serviceable' : 'thin',
+      plural('debrief.why.evidenceDetail', falseLeads, {
+        observations: ledger.entries.length, correct: claims.correct, wrong: claims.wrong,
+      }));
 
-    add('Secrecy and exposure', 'Held', 'Sub-level operation; no surface exposure.');
+    add('secrecy', 'held', msg('debrief.why.secrecyDetail'));
 
     const lost = this.tally.deployablesLost;
-    add('Equipment stewardship',
-      lost === 0 ? 'Complete' : lost <= 2 ? 'Partial' : 'Poor',
-      `${cargoRecovered} of ${cargoIssued} issued items recovered; ${lost} left on the floor.`);
+    add('equipment',
+      lost === 0 ? 'complete' : lost <= 2 ? 'partial' : 'poor',
+      msg('debrief.why.equipmentDetail', { recovered: cargoRecovered, issued: cargoIssued, lost }));
 
-    add('Infrastructure damage', 'None', `${this.tally.circuitsRestored} circuit${this.tally.circuitsRestored === 1 ? '' : 's'} restored, no structural damage.`);
+    add('infrastructure', 'damageNone',
+      plural('debrief.why.infrastructureDetail', this.tally.circuitsRestored));
 
     /**
      * ⚠ THIS GRADED THE DRAUGHT AND CALLED IT THE MISSION.
@@ -197,14 +244,23 @@ export class Mission {
       if (ledger.has(r.id)) documented.add(r.revealsRule);
     }
     const share = ruleIds.size ? documented.size / ruleIds.size : 0;
-    add('Research completion',
-      share >= 0.75 ? 'Substantial' : share >= 0.4 ? 'Partial' : 'Thin',
-      `${documented.size} of ${ruleIds.size} rules documented; ${ledger.entries.length} of ${ledger.rules.size} observations logged.`);
+    add('research',
+      share >= 0.75 ? 'substantial' : share >= 0.4 ? 'partial' : 'thin',
+      msg('debrief.why.researchDetail', {
+        documented: documented.size, rules: ruleIds.size,
+        logged: ledger.entries.length, available: ledger.rules.size,
+      }));
 
     const mins = simTimeMs / 60000;
-    add('Time to stabilisation',
-      custody === 'verified' ? `${mins.toFixed(1)} min` : '—',
-      `Peak pressure ${this.tally.peakPressure.toFixed(0)} (${CONFIG.pressure.stageNames[this.stage]}); ${(this.tally.timeInBreachMs / 1000).toFixed(0)}s above Active.`);
+    const timed = custody === 'verified';
+    add('time', timed ? 'minutes' : 'unmeasured',
+      msg('debrief.why.timeDetail', {
+        peak: this.tally.peakPressure.toFixed(0),
+        stage: CONFIG.pressure.stageNames[this.stage],
+        breach: (this.tally.timeInBreachMs / 1000).toFixed(0),
+      }),
+      timed ? { minutes: mins.toFixed(1) } : null,
+      timed ? mins : null);
 
     /* The overall word. Custody is necessary but not sufficient for the top grade — GDD
      * §6.4: "a Costly success remains progress but generates consequences". */
