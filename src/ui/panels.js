@@ -17,6 +17,7 @@ import { recommendedManifest } from '../game.js';
 import { INCIDENTS } from '../sim/content.js';
 import { GameClock } from '../core/clock.js';
 import { escapeHtml } from './hud.js';
+import { t as msg } from '../core/i18n.js';
 
 /**
  * The procedure card — GDD §18.4. Five fields the squad fills in and commits to, never
@@ -378,14 +379,43 @@ export class Panels {
     let body = '';
 
     if (this.tab === 'briefing') {
+      /**
+       * ⚠ THIS PRINTED THE COLD STORE'S BRIEFING FOR EVERY INCIDENT.
+       *
+       * "Establish custody of the anomaly on level 2 and transfer it to the stair head" was
+       * spelled into this file, and level 2 is one floor of one of four buildings. A squad
+       * deploying to Blackthorn Reserve — a forest, reached by a track, with no level 2 and
+       * no stair head — opened the tablet and read that as their mandate. So did a squad on
+       * Ashlar's ninth floor, whose case leaves by the east landing.
+       *
+       * "Two circuits, both dead on arrival" was the same mistake with a number in it. Every
+       * map has two circuits and they are called different things on each: office and
+       * storage, gallery and landing, yard and ridge. The tablet named none of them and
+       * asserted the count.
+       *
+       * This is the third surface with this defect — the hypothesis board and the procedure
+       * planner were the other two — and it is the one a squad reads FIRST. Every incident
+       * package already authors a `briefing` with a headline, a report and what is known
+       * with a confidence on each; the site knows its own circuits and whether they are
+       * live. Nothing here needed to be invented, only read.
+       */
+      const inc = g.content.incident || {};
+      const brief = inc.briefing || {};
+      const known = (brief.known || []).map((k) => `<li>${escapeHtml(k.text)}
+        <span class="dim">${escapeHtml(k.confidence || '')}</span></li>`).join('');
+      const circuits = [...g.site.circuits.values()]
+        .map((c) => msg(c.on ? 'tablet.briefing.circuitLive' : 'tablet.briefing.circuitDead',
+          { name: escapeHtml(c.displayName) })).join(' · ');
       body = `<div class="pad">
-        <h2>Mandate</h2>
-        <p>Establish custody of the anomaly on level 2 and transfer it to the stair head.</p>
-        <h2>Site</h2>
+        <h2>${msg('tablet.briefing.mandate')}</h2>
+        <p>${escapeHtml(brief.headline || inc.displayName || '')}</p>
+        <p class="small">${escapeHtml(brief.report || '')}</p>
+        <h2>${msg('tablet.briefing.site')}</h2>
         <p>${escapeHtml(g.site.displayName)} — ${g.site.rooms.map((r) => r.name).join(' · ')}</p>
-        <h2>What you know</h2>
-        <ul><li>Two circuits, both dead on arrival.</li><li>Ambient falls while the anomaly is loose. It is now ${g.heat.ambientC.toFixed(1)}C.</li></ul>
-        <h2>Controls</h2>
+        <p class="small">${circuits}</p>
+        <h2>${msg('tablet.briefing.known')}</h2>
+        <ul>${known}<li>${msg('tablet.briefing.ambient', { celsius: g.heat.ambientC.toFixed(1) })}</li></ul>
+        <h2>${msg('tablet.briefing.controls')}</h2>
         <div class="keys">
           <div><kbd>W A S D</kbd> move · <kbd>Shift</kbd> sprint · <kbd>Ctrl</kbd> crouch</div>
           <div><kbd>F</kbd> the context verb (it says what it will do)</div>

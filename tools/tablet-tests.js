@@ -118,12 +118,48 @@ async function sectionC() {
   emit();
 }
 
+/* ── D. the briefing tab ──────────────────────────────────────────────────── */
+async function sectionD() {
+  heading('D. the briefing tab is the loaded incident\'s briefing');
+
+  /**
+   * ⚠ THE TABLET PRINTED THE COLD STORE'S MANDATE FOR EVERY INCIDENT, and this is the tab a
+   * squad reads FIRST. "Establish custody of the anomaly on level 2 and transfer it to the
+   * stair head" is one floor of one of four buildings; a squad deploying to a forest reserve
+   * read it as their mandate. "Two circuits, both dead on arrival" was the same mistake with
+   * a number in it — every map has two circuits, called different things on each, and the
+   * tablet named none of them while asserting the count.
+   *
+   * Third surface with this defect. The board and the planner were the other two.
+   */
+  const briefs = new Map();
+  for (const id of INCIDENTS) {
+    const pack = await loadContent({ incident: id });
+    const b = (pack.incident && pack.incident.briefing) || {};
+    briefs.set(id, `${b.headline || ''}|${(b.known || []).length}`);
+    ok(`D-${id} authors a briefing with a headline and something known`,
+      !!b.headline && (b.known || []).length > 0, JSON.stringify(b).slice(0, 80));
+  }
+  const distinct = new Set(briefs.values());
+  eq('D1 no two incidents share a briefing, which is what reading the package means',
+    distinct.size, briefs.size);
+  note(`${briefs.size} incidents, ${distinct.size} distinct briefings`);
+
+  /* And the sentence that was hard-coded is gone from the file that hard-coded it. */
+  const src = await (await fetch('/src/ui/panels.js')).text();
+  const code = src.replace(/\/\*[\s\S]*?\*\//g, '');
+  ok('D2 the panel no longer names one incident\'s floor or asserts a circuit count',
+    !/level 2/i.test(code) && !/Two circuits/.test(code));
+  emit();
+}
+
 /* ── run ──────────────────────────────────────────────────────────────────── */
 (async () => {
   try {
     await run('A', () => sectionA());
     await run('B', () => sectionB());
     await run('C', () => sectionC());
+    await run('D', () => sectionD());
     emit();
   } catch (e) {
     lines.push(`FAIL  the tablet suite itself threw: ${e && e.stack ? e.stack : e}`);

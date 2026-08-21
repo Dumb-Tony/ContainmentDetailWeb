@@ -138,6 +138,19 @@
     }
   },
 
+  "tablet": {
+    "_note": "The field tablet's own chrome. The SUBSTANCE on these screens is content — the briefing comes from the incident package, the claims from the anomaly, the procedure options from its planner block — and only the headings and the framing sentences are here. That split is the whole design: a tablet whose prose lived in this file would be a tablet that said the same thing about every anomaly, which is exactly the defect three of its four tabs had.",
+    "briefing": {
+      "mandate": "Mandate",
+      "site": "Site",
+      "known": "What you know",
+      "controls": "Controls",
+      "circuitLive": "{name} — live",
+      "circuitDead": "{name} — dead on arrival",
+      "ambient": "Ambient falls while the anomaly is loose. It is now {celsius}C."
+    }
+  },
+
   "hud": {
     "_note": "The head-up display. Everything here is read at a glance while something is walking toward you, so it is short by design and the short forms are the ones that must survive translation.",
     "pressure": "Incident pressure: {stage}",
