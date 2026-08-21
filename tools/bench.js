@@ -121,19 +121,34 @@ function timerQuantumMs() {
  * it is also the honest bound on how much of any remaining spread is the machine.
  */
 function instrumentCheck() {
+  /**
+   * ⚠ THIS USED TO TIME A SPIN LOOP, AND THE OPTIMISER ATE IT.
+   *
+   * It ran 4×10⁷ iterations of `Math.sqrt(i + acc * 1e-12)` ten times, breaking when two
+   * consecutive runs agreed to 3%, and returned the LAST one. That measured 277 ms in the
+   * morning and **0.0 ms in the afternoon**, on the same machine, with the same Chrome: once
+   * V8 tiers the loop up it can see `acc * 1e-12` underflow to nothing and folds the body
+   * away. The break condition never fires on a 200 → 0 → 0 sequence, so all ten ran and the
+   * zero was returned — and the guard below correctly refused to report timings.
+   *
+   * The guard was right and the instrument was asking the wrong question. "Is the clock
+   * working" is not answered by timing arithmetic; a loop that takes no time tells you
+   * nothing about a clock, and any loop can be made to take no time.
+   *
+   * SO SPIN ON THE CLOCK ITSELF. Busy-wait until `Date.now()` has advanced by a target, and
+   * measure the same span with `performance.now()`. The optimiser cannot elide a loop whose
+   * condition reads the wall clock, and the thing being compared is the thing in question.
+   */
+  const TARGET_MS = 40;
+  const d0 = Date.now();
+  const p0 = performance.now();
+  let spins = 0;
   let acc = 0;
-  for (let i = 0; i < 2e6; i++) acc += Math.sqrt(i + acc * 1e-12);   // warm the code
-  const runs = [];
-  let d0 = 0, p0 = 0, perfMs = 0, dateMs = 0;
-  for (let r = 0; r < 10; r++) {
-    d0 = Date.now(); p0 = performance.now();
-    for (let i = 0; i < 4e7; i++) acc += Math.sqrt(i + acc * 1e-12);
-    perfMs = performance.now() - p0; dateMs = Date.now() - d0;
-    runs.push(perfMs);
-    if (r > 0 && runs[r - 1] - perfMs < 0.03 * runs[r - 1]) break;
-  }
+  while (Date.now() - d0 < TARGET_MS) { spins++; acc += Math.sqrt(spins); }
+  const dateMs = Date.now() - d0;
+  const perfMs = performance.now() - p0;
   SINK += acc;
-  return { perfMs, dateMs, first: runs[0], best: Math.min(...runs), spins: runs.length };
+  return { perfMs, dateMs, first: perfMs, best: perfMs, spins };
 }
 
 /* ── B. the measurement primitive ────────────────────────────────────────────── */
@@ -552,10 +567,8 @@ async function run() {
   const chk = instrumentCheck();
   say('--- A. the instrument ---');
   say(`  performance.now() quantum      ${fmt(q * 1000, 9)} us   (${q >= 0.05 ? 'CLAMPED — batching is mandatory' : 'fine grained'})`);
-  say(`  reference loop, performance    ${fmt(chk.perfMs, 9, 1)} ms`);
-  say(`  reference loop, Date.now       ${fmt(chk.dateMs, 9, 1)} ms`);
-  say(`  spin-up: ${chk.spins} runs, first ${chk.first.toFixed(1)} ms, best ${chk.best.toFixed(1)} ms `
-    + `(${(100 * (chk.first - chk.best) / chk.best).toFixed(0)}% of clock ramp burned before measuring)`);
+  say(`  clock cross-check: ${chk.spins.toLocaleString()} spins over ${chk.dateMs} ms of wall clock, `
+    + `${chk.perfMs.toFixed(1)} ms of performance.now() — ${(100 * Math.abs(chk.perfMs - chk.dateMs) / chk.dateMs).toFixed(1)}% apart`);
   data.push(`machine|reference-loop|${chk.best.toFixed(3)}|${chk.best.toFixed(3)}`);
   say(`  hardwareConcurrency ${navigator.hardwareConcurrency}   devicePixelRatio ${window.devicePixelRatio}   viewport ${window.innerWidth}x${window.innerHeight}`);
   const frozen = chk.perfMs <= 0 || chk.dateMs <= 0 || Math.abs(chk.perfMs - chk.dateMs) > 0.25 * chk.dateMs + 5;
