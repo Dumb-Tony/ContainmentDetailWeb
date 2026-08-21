@@ -32,7 +32,15 @@ if (-not (Test-Path $testPath)) { Write-Host "Tests not found: $testPath" -Foreg
 # Scratch copy in the served root, so every relative module path still resolves.
 # -Encoding UTF8 is REQUIRED: PS 5.1's Get-Content defaults to ANSI, so a UTF-8 source
 # file round-trips into double-encoded mojibake and the test runs against a corrupt copy.
-$scratchName = "_smoketest.html"
+# ⚠ ONE SCRATCH FILE PER PORT, not one for the whole machine.
+#
+# This was a fixed `_smoketest.html` in the served root. That is safe for one run and unsafe
+# the moment two exist: three agents ran suites concurrently in this repo and each rewrote
+# the other's page between the write and the fetch, so a run could execute a DIFFERENT
+# SUITE and report its assertion count as its own — green, plausible, and about code the
+# agent had never touched. Keying it to the port makes concurrent runs disjoint, and the
+# stamp below still catches the case where something else answered on the port.
+$scratchName = "_smoketest-$Port.html"
 $scratch = Join-Path $root $scratchName
 $html = Get-Content $gamePath -Raw -Encoding UTF8
 if ($html -notmatch '</body>') { Write-Host "No </body> in $Game." -ForegroundColor Red; exit 2 }

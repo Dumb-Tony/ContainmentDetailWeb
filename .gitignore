@@ -1,5 +1,5 @@
 # Scratch from the headless test harness
-_smoketest.html
+_smoketest*.html
 _shot*.html
 # Agent scratch served from the root — smoketest.ps1 resolves -Tests relative to the
 # project root, so a scratchpad path cannot be served and scratch suites land here.

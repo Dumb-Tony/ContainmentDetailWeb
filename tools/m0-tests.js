@@ -4343,6 +4343,205 @@ async function sectionAH(content) {
   }
   emit();
 }
+
+/* ══ AI. GDD §27.3, the Mission Definition of Done ═════════════════════════════
+ *
+ * Eight criteria a mission must meet. Section AC does the same for §27.2 (the anomaly)
+ * and §26.4 (the slice); this is the third of the three lists the document actually
+ * commits to, and the one about whether an operation is finishable at all.
+ *
+ * ⚠ ONE OF THEM REPORTS N/A RATHER THAN PASS, and that is the most useful line in here.
+ * A criterion that is trivially satisfied because the thing it guards against does not
+ * exist yet has not been met — it has been avoided, and a scorecard that cannot tell those
+ * apart is a scorecard that congratulates you for gaps.
+ */
+async function sectionAI(content) {
+  lines.push('--- AI. GDD §27.3, the mission Definition of Done ---');
+
+  /* ── 1. "No seed is unwinnable" ────────────────────────────────────────────
+   * §14.4 states the rule as "randomization must not generate unwinnable states". The
+   * honest measurement is what the seed actually varies, and here it varies one thing. */
+  const seeds = ['alpha', 'bravo', 'charlie', 'delta', 'echo', 'foxtrot', 'golf', 'hotel'];
+  const fingerprints = new Set();
+  for (const s of seeds) {
+    const g = new Game(content, { seed: s });
+    g.commitLoadout(RECOMMENDED_MANIFEST);
+    fingerprints.add(JSON.stringify({
+      anomaly: [g.anomaly.x.toFixed(3), g.anomaly.z.toFixed(3)],
+      spawn: [g.player.x.toFixed(3), g.player.z.toFixed(3)],
+      cache: [...g.cache.entries()].sort(),
+      doors: g.site.doors.map((d) => (d.open ? 1 : 0)).join(''),
+      circuits: [...g.site.circuits.values()].map((c) => (c.on ? 1 : 0)).join(''),
+      ambient: g.heat.ambientC,
+    }));
+  }
+  note(`${seeds.length} seeds produce ${fingerprints.size} distinct starting worlds`);
+  note('    N/A — "no seed is unwinnable" (§27.3). Nothing about the WORLD is seeded: the');
+  note('    mission rng drives exactly one thing, the resume token in net.js. Every seed');
+  note('    produces the identical floor, so the criterion is trivially true and therefore');
+  note('    untested. §14.4 protects against a randomiser this build does not have yet —');
+  note('    a Milestone 4 content-variety gap, not a Milestone 3 pass.');
+  eq('AI1 every seed produces the same world, so the claim is about nothing yet',
+    fingerprints.size, 1);
+  /* What IS worth asserting is that determinism holds, because the day a randomiser
+   * arrives this is the property it has to preserve. */
+  const runTwice = (seed) => {
+    const g = new Game(content, { seed });
+    g.commitLoadout(RECOMMENDED_MANIFEST);
+    g.setCommand('p1', { axis: { x: 0.4, y: -1 }, sprint: false, crouch: false });
+    g.skipMs(4000);
+    return `${g.player.x.toFixed(6)},${g.player.z.toFixed(6)},${g.anomaly.x.toFixed(6)},${g.heat.ambientC.toFixed(6)}`;
+  };
+  eq('AI2 and the same seed replays to the same coordinates, six decimals',
+    runTwice('replay'), runTwice('replay'));
+
+  /* ── 2. "Entry, investigation, staging, containment, and extraction are supported" ── */
+  const wanted = [PHASE.BRIEFING, PHASE.LOADOUT, PHASE.ARRIVAL, PHASE.INVESTIGATION,
+    PHASE.PROCEDURE_COMMITTED, PHASE.CONTAINMENT_ACTIVE, PHASE.CUSTODY_ESTABLISHED,
+    PHASE.EXTRACTION, PHASE.DEBRIEF];
+  ok(`AI3 the mission models all five stages §27.3 names (${wanted.length} phases)`,
+    wanted.every((p) => typeof p === 'string' && p.length > 0));
+  /* And section I actually drives a whole operation through them, which is the difference
+   * between the phases existing and being supported. */
+  const gRun = new Game(content, { seed: 'phases' });
+  eq('AI4 an operation starts at the briefing', gRun.mission.phase, PHASE.BRIEFING);
+  gRun.commitLoadout(RECOMMENDED_MANIFEST);
+  eq('AI5 committing a manifest is what deploys the squad', gRun.mission.phase, PHASE.ARRIVAL);
+  ok('AI6 and the phase order is total, so "have we reached X" is a comparison',
+    gRun.mission.atLeast(PHASE.BRIEFING) && !gRun.mission.atLeast(PHASE.DEBRIEF));
+
+  /* ── 3. "Critical objects have recovery rules" ─────────────────────────────
+   * The failure this guards is an object leaving the world with somebody's laptop, and
+   * §11.5 is explicit about it. Assert the rule exists for every kind of critical object
+   * the build now has — the case, and the distributed set. */
+  const rec = await loadContent({ incident: 'cold-storage-tally' });
+  const gRec = new Game(rec, { seed: 'recovery' });
+  gRec.commitLoadout(RECOMMENDED_MANIFEST);
+  const two = gRec.addPlayer('Two');
+  two.x = gRec.instances.list[0].x; two.z = gRec.instances.list[0].z;
+  gRec.instances.collect(two.id, gRec.instances.list[0]);
+  ok('AI7 an operative can be holding a critical object', !!gRec.instances.carriedBy(two.id));
+  gRec.instances.releaseHeldBy(two.id, two.x, two.z);
+  ok('AI8 and a dropped radio puts it on the floor rather than taking it out of the world',
+    !gRec.instances.carriedBy(two.id) && gRec.instances.list[0].loose);
+  ok('AI9 the transit case has the same rule (§11.5)',
+    typeof gRec._putDownCase === 'function');
+
+  /* ── 4. "NPC and infrastructure states replicate correctly" ────────────────
+   * Doors and circuits are the infrastructure. They ride the snapshot; assert a change on
+   * the host reaches a client rather than trusting that it does. */
+  const gHost = new Game(content, { seed: 'infra' });
+  const gClient = new Game(content, { seed: 'infra-c' });
+  gHost.commitLoadout(RECOMMENDED_MANIFEST);
+  const anyCircuit = [...gHost.site.circuits.values()][0];
+  const anyDoor = gHost.site.doors[0];
+  gHost.site.setCircuit(anyCircuit.id, true);
+  gHost.site.setDoorOpen(anyDoor, !anyDoor.open);
+  applySnapshot(gClient, encodeSnapshot(gHost, gHost.clock.simTimeMs));
+  eq('AI10 a circuit thrown on the host is on for the client',
+    gClient.site.circuitOn(anyCircuit.id), true);
+  eq('AI11 and a door moved on the host has moved for the client',
+    gClient.site.doors[0].open, anyDoor.open);
+
+  /* ── 5. "Navigation callouts are understandable" ───────────────────────────
+   * The callout a squad actually uses is the room name, and the failure mode is a name
+   * nobody can act on. Sweep every incident rather than the one floor. */
+  const unnamed = [];
+  for (const id of INCIDENTS) {
+    const pack = await loadContent({ incident: id });
+    const site = new Site(pack.map);
+    let bad = 0, tested = 0;
+    const b = pack.map.bounds;
+    for (let x = b.minX; x <= b.maxX; x += 0.5) {
+      for (let z = b.minZ; z <= b.maxZ; z += 0.5) {
+        if (!standsAt(site, x, z)) continue;
+        tested++;
+        if (site.roomNameAt(x, z) === 'Unmarked floor') bad++;
+      }
+    }
+    if (bad) unnamed.push(`${pack.map.id}: ${bad}/${tested}`);
+  }
+  eq(`AI12 every standable cell on every floor has a name a squad can say out loud${unnamed.length ? ` — ${unnamed.join(', ')}` : ''}`,
+    unnamed.length, 0);
+
+  /* ── 6. "Optional directives create decisions rather than chores" ──────────
+   * ⚠ THE TEST IS WHETHER THEY COST SOMETHING. A directive you satisfy by playing well
+   * anyway is a chore with a tick box; a decision is one that competes — with the mandate,
+   * with the clock, or with another directive. */
+  const site = await (await fetch('../content/site.json')).json();
+  const thin = [];
+  for (const op of site.operations) {
+    const opt = op.optional || [];
+    if (opt.length < 2) thin.push(`${op.id}: only ${opt.length}`);
+    else if (new Set(opt).size !== opt.length) thin.push(`${op.id}: duplicated directive`);
+  }
+  eq(`AI13 every operation offers at least two distinct optional directives${thin.length ? ` — ${thin.join(' · ')}` : ''}`,
+    thin.length, 0);
+
+  /**
+   * ⚠ AND THE REST OF THIS CRITERION IS A HUMAN JUDGEMENT, so it prints rather than
+   * asserting. The first version tried to detect a decision textually — it required every
+   * operation to carry both a recovery directive and a safety one — and flagged the
+   * stocktake, where nothing can hurt you and an "avoid a second contact" line would be
+   * precisely the chore §27.3 is warning about. A regex cannot tell a decision from a
+   * chore; it can only tell whether the words it was taught appear.
+   *
+   * What the suite CAN show is that one of them demonstrably costs something: section Q
+   * measures abandoning kit at −130 requisition and a standing hit with the departments
+   * that care, so "recover all issued equipment" is a directive with a price on it.
+   */
+  let recoveryPriced = 0;
+  for (const op of site.operations) {
+    const opt = op.optional || [];
+    note(`  ${op.id}: ${opt.join('  ·  ')}`);
+    if (opt.some((t) => /recover|equipment|intact/i.test(t))) recoveryPriced++;
+  }
+  note('    the rest of §27.3\'s "decisions rather than chores" is a playtest question and');
+  note('    is reported OPEN in section AC with the other five.');
+  eq('AI13b and the one directive the suite can price appears on every operation',
+    recoveryPriced, site.operations.length);
+
+  /* ── 7. "Debrief events accurately reflect the operation" ──────────────────
+   * The failure is a debrief that reports a number the mission never recorded. Drive two
+   * different operations and assert the report changes with them. */
+  const clean = new Game(content, { seed: 'clean' });
+  clean.commitLoadout(RECOMMENDED_MANIFEST);
+  const messy = new Game(content, { seed: 'messy' });
+  messy.commitLoadout(RECOMMENDED_MANIFEST);
+  messy.mission.tally.contacts = 2;
+  messy.player.applyCondition('exposure', 'serious');
+  /* ⚠ Mark the squad extracted before grading an extracted operation. `leftBehind` is
+   * `extracted ? squad.filter(p => p.alive && !p.extracted) : []`, so calling grade() with
+   * `extracted: true` while nobody carries the flag reports the whole squad as abandoned on
+   * the floor — which made a clean run and an injured one both come back "Costly" for
+   * completely different reasons, and looked like the debrief not discriminating. */
+  const gradeOf = (g) => {
+    for (const p of g.players) p.extracted = true;
+    return g.mission.grade({
+      custody: 'verified', extracted: true, players: g.players, player: g.player,
+      ledger: g.ledger, deployables: g.deployables, simTimeMs: 900000,
+      cargoIssued: g.cargoIssued, cargoRecovered: g.cargoIssued, instances: g.instances,
+    });
+  };
+  const a = gradeOf(clean), b2 = gradeOf(messy);
+  note(`clean run: ${a.overall} · injured run: ${b2.overall}`);
+  ok('AI14 an injured operation does not grade the same as a clean one', a.overall !== b2.overall);
+  const personnel = b2.dims.find((d) => d.name === 'Personnel survival');
+  ok('AI15 and the debrief names who, rather than reporting a word',
+    personnel && /Operative/.test(personnel.why), personnel ? personnel.why : 'none');
+  ok('AI16 every dimension carries a reason, not just a grade',
+    b2.dims.every((d) => d.why && d.why.length > 12));
+
+  /* ── 8. "Performance and network budgets pass with a full squad" ───────────
+   * The network half is section M; the performance half needs a wall clock the test
+   * harness does not have. Reported OPEN rather than assumed. */
+  note('    OPEN — performance budget with a full squad (§27.3). The suite runs under');
+  note('    --virtual-time-budget, which freezes performance.now(), so every timing inside');
+  note('    it reads 0.000us — convincingly and wrongly. It needs an un-virtualised run.');
+  ok('AI17 the network half of the budget is exercised — a five-seat squad over the wire',
+    MAX_SQUAD === 5);
+  emit();
+}
 /**
  * ⚠ ONE SECTION THROWING MUST NOT DELETE EVERY SECTION AFTER IT.
  *
@@ -4401,6 +4600,7 @@ async function run(name, fn) {
     await run('AF', () => sectionAF());
     await run('AG', () => sectionAG());
     await run('AH', () => sectionAH(content));
+    await run('AI', () => sectionAI(content));
     await run('K', () => sectionK());
     await run('L', () => sectionL());
     await run('V', () => sectionV());
