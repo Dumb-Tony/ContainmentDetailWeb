@@ -5735,6 +5735,180 @@ async function sectionAP(content) {
   emit();
 }
 
+/* ── AQ. a procedure a squad cannot physically carry ──────────────────────── */
+/**
+ * §9.2 gives an operative five slots: two compact, two that take compact OR general, and
+ * one long. A procedure names `requiredEquipment` and a `concurrentRoles`, and those two
+ * numbers have to be compatible or the procedure is not a procedure.
+ *
+ * ⚠ NOTHING CHECKED THIS, and the one that would have failed is on the board. Three of the
+ * four items in `pinfold-lodger`'s `blind-seal-safe` are `general` bulk and there are two
+ * general slots, so one operative physically cannot carry the imager, the case and the
+ * pack — `takeFromCache` refuses with "No free slot takes a general item." That procedure
+ * declares `concurrentRoles: 2` and is therefore correct. It is correct because its author
+ * worked the arithmetic out by hand, in a note, after being surprised by the refusal. The
+ * next author gets a load that validates, a briefing that promises the kit, and an
+ * operative standing at the cache being told no.
+ *
+ * Packing is a bin-packing problem in general and a trivial one here: three bulks, five
+ * slots, and `compact` fits anywhere the other two do not. Count each bulk and check the
+ * capacity that bulk actually has across `concurrentRoles` operatives.
+ */
+async function sectionAQ() {
+  lines.push('--- AQ. every procedure fits in the slots its own role count provides ---');
+
+
+  /**
+   * Capacity per operative, read from SLOTS rather than remembered.
+   *
+   * ⚠ THE LONG SLOT DOES NOT TAKE A COMPACT ITEM. A first pass at this bounded compact
+   * items by the TOTAL slot count, which quietly grants every operative a fifth pocket
+   * they do not have: `long1` accepts `long` and nothing else. General and compact
+   * COMPETE for `gen1`/`gen2`, so the real bound on the two of them is joint, and
+   * `ninety-one-tally/paired-verification` — two general and three compact, five items,
+   * five slots — reads as fitting one operative and does not.
+   */
+  const longSlots = SLOTS.filter((s) => s.accepts.includes('long')).length;
+  const generalSlots = SLOTS.filter((s) => s.accepts.includes('general')).length;
+  const compactSlots = SLOTS.filter((s) => s.accepts.includes('compact')).length;
+  note(`one operative: ${SLOTS.length} slots — ${compactSlots} take compact, ${generalSlots} of those also take general, ${longSlots} takes long and nothing else`);
+
+  const tooBig = [];
+  const checked = [];
+  for (const id of INCIDENTS) {
+    const pack = await loadContent({ incident: id });
+    for (const p of (pack.anomaly.containment && pack.anomaly.containment.procedures) || []) {
+      const roles = Math.max(1, p.concurrentRoles || 1);
+      const items = (p.requiredEquipment || []).map((i) => pack.itemsById.get(i)).filter(Boolean);
+      const n = (bulk) => items.filter((i) => i.bulk === bulk).length;
+      const nLong = n('long'), nGeneral = n('general'), nCompact = n('compact');
+      const fits = nLong <= longSlots * roles
+        && nGeneral <= generalSlots * roles
+        && nGeneral + nCompact <= compactSlots * roles;
+      checked.push(`${pack.anomaly.id}/${p.id}`);
+      if (!fits) {
+        tooBig.push(`${pack.anomaly.id}/${p.id}: ${nGeneral} general + ${nCompact} compact + ${nLong} long for ${roles} operative${roles === 1 ? '' : 's'}`);
+      }
+    }
+  }
+  note(`${checked.length} procedures checked across ${INCIDENTS.length} incident packages`);
+  eq(`AQ1 no procedure asks for more kit than its own concurrentRoles can carry${tooBig.length ? ` — ${tooBig.join(' · ')}` : ''}`,
+    tooBig.length, 0);
+
+  /* And the check is not vacuous: the arrangement that surprised the lodger's author does
+   * fail it when the role count is dropped to one. */
+  const lodger = await loadContent({ incident: 'ashlar-flat-lodger' });
+  const safe = ((lodger.anomaly.containment || {}).procedures || []).find((p) => (p.requiredEquipment || [])
+    .filter((i) => (lodger.itemsById.get(i) || {}).bulk === 'general').length > generalSlots);
+  ok('AQ2 and at least one shipped procedure genuinely needs a second pair of hands, so AQ1 is measuring something',
+    !!safe, safe ? `${safe.id} needs ${safe.concurrentRoles} operatives` : 'no procedure exceeds one operative\'s general slots');
+  if (safe) note(`  ${safe.id}: ${safe.requiredEquipment.join(', ')} — ${safe.concurrentRoles} operatives`);
+  emit();
+}
+
+/* ── AR. the declarations four files carry and two do not ─────────────────── */
+/**
+ * §27.2 asks an anomaly to be release-ready and §26.4 judges the slice on eight metrics,
+ * and a good part of what those need is DECLARED rather than simulated: what the incident's
+ * premise is, what each state looks and sounds like, what the containment goal actually is,
+ * what breaks it and how long you have to fix it, what a squad without stereo hearing or
+ * colour vision uses instead, and how the thing scales from one operative to four.
+ *
+ * ⚠ TWO OF THE SIX SHIPPED ANOMALIES CARRY NONE OF IT, and nothing anywhere noticed. An
+ * audit of every distinct key in `content/` against every file in `src/` found SEVENTEEN
+ * keys that no engine file reads and no assertion checks — `incidentPremise`, `visualTell`,
+ * `environmentalTell`, `failureSignal`, `integrityConditions`, `recoveryWindowMs`,
+ * `evidenceAvailability`, `accessibilityAlternatives`, `difficultyProfiles`, `timingScale`,
+ * `squadSize`, `preset`, `measure`, `goal`, `automationAllowed`, `behaviourModule`,
+ * `recordingInterference` — and then found the split: four files carry all of them and two
+ * carry none. Declarative is not the same as optional. A field nothing enforces is a field
+ * the fifth author will not know exists, which is exactly how the two that skipped it did.
+ *
+ * These are DECLARATIONS, so what can be asserted is that they are present, non-empty, and
+ * internally consistent — not that the prose is good. That is still worth having: it is the
+ * difference between an omission that shows up in a review and one that never does.
+ */
+async function sectionAR() {
+  lines.push('--- AR. every anomaly carries the declarations the Definition of Done reads ---');
+
+  const REQUIRED_TOP = ['incidentPremise'];
+  const REQUIRED_PER_STATE = ['visualTell', 'audioCue', 'environmentalTell'];
+  const missing = [];
+  const thin = [];
+  let statesChecked = 0;
+
+  for (const id of INCIDENTS) {
+    const pack = await loadContent({ incident: id });
+    const a = pack.anomaly;
+    const at = a.id;
+
+    for (const k of REQUIRED_TOP) {
+      if (!a[k] || !String(a[k]).trim()) missing.push(`${at}: ${k}`);
+    }
+    /* §8.2 wants every rule OBSERVABLE, and §19.2 forbids a required rule that depends on
+     * a microphone. A state with a visual tell and no environmental one is a state a
+     * player who cannot hear has one way to read; a state with neither is a state they
+     * cannot read at all. */
+    for (const s of a.states || []) {
+      statesChecked++;
+      const pres = s.presentation || {};
+      const has = REQUIRED_PER_STATE.filter((k) => pres[k] && String(pres[k]).trim());
+      if (!has.length) missing.push(`${at}/${s.id}: no tell of any kind`);
+      else if (has.length < 2) thin.push(`${at}/${s.id} (${has.join(' only')})`);
+    }
+
+    const c = a.containment || {};
+    if (!c.goal || !String(c.goal).trim()) missing.push(`${at}: containment.goal`);
+    /* An integrity condition without a recovery window is a failure the squad cannot be
+     * told how long they have to answer, which §8.2's "actionable" forbids. */
+    for (const ic of c.integrityConditions || []) {
+      if (!ic.failureSignal) missing.push(`${at}/${ic.id || '(unnamed)'}: no failureSignal`);
+      if (!(ic.recoveryWindowMs > 0)) missing.push(`${at}/${ic.id || '(unnamed)'}: no recoveryWindowMs`);
+    }
+    if (!(c.integrityConditions || []).length) missing.push(`${at}: no integrityConditions`);
+
+    /* §14.3: the profiles are how the same rules serve one operative and four. A profile
+     * that names no squad size is not a profile. */
+    const profiles = a.difficultyProfiles || [];
+    if (!profiles.length) missing.push(`${at}: no difficultyProfiles`);
+    for (const p of profiles) {
+      if (!p.preset) missing.push(`${at}: a difficulty profile with no preset`);
+      if (!p.squadSize || !(p.squadSize.max >= p.squadSize.min)) missing.push(`${at}/${p.preset || '?'}: squadSize is not a range`);
+      if (!(p.timingScale > 0)) missing.push(`${at}/${p.preset || '?'}: no timingScale`);
+    }
+    if (!(((a.perception || {}).accessibilityAlternatives) || []).length) missing.push(`${at}: no accessibilityAlternatives (§19.1)`);
+  }
+
+  note(`${statesChecked} states across ${INCIDENTS.length} incident packages`);
+  if (thin.length) note(`    one tell only: ${thin.join(', ')}`);
+  eq(`AR1 every anomaly carries the declarations §27.2 and §26.4 are judged on${missing.length ? ` — ${missing.slice(0, 8).join(' · ')}${missing.length > 8 ? ` (+${missing.length - 8} more)` : ''}` : ''}`,
+    missing.length, 0);
+
+  /* And the counter-check: `counterableBy` on a capability must name something that
+   * exists, or the archive is telling a squad to build a thing that is not in the game. */
+  const dangling = [];
+  for (const id of INCIDENTS) {
+    const pack = await loadContent({ incident: id });
+    const known = new Set([
+      ...(pack.anomaly.containment && pack.anomaly.containment.procedures || []).map((p) => p.id),
+      ...(pack.anomaly.rules || []).map((r) => r.id),
+      ...[...pack.itemsById.keys()],
+    ]);
+    for (const c of pack.anomaly.capabilities || []) {
+      for (const k of c.counterableBy || []) {
+        /* Counters are authored as free identifiers — an item id, a rule id, or a phrase
+         * like `heat-gradient` that names a procedure family. Only flag one that matches
+         * nothing at all AND contains no hyphenated family word, so this reports a typo
+         * rather than a style. */
+        if (!known.has(k) && !/^[a-z]+(-[a-z]+)+$/.test(k)) dangling.push(`${pack.anomaly.id}/${c.id}: ${k}`);
+      }
+    }
+  }
+  eq(`AR2 no capability says it is countered by something that does not exist${dangling.length ? ` — ${dangling.join(', ')}` : ''}`,
+    dangling.length, 0);
+  emit();
+}
+
 /**
  * ⚠ ONE SECTION THROWING MUST NOT DELETE EVERY SECTION AFTER IT.
  *
@@ -5800,6 +5974,8 @@ async function run(name, fn) {
     await run('AN', () => sectionAN(content));
     await run('AO', () => sectionAO());
     await run('AP', () => sectionAP(content));
+    await run('AQ', () => sectionAQ());
+    await run('AR', () => sectionAR());
     await run('K', () => sectionK());
     await run('L', () => sectionL());
     await run('V', () => sectionV());
