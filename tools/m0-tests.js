@@ -45,43 +45,11 @@ import { anomalyIsVisible } from '../src/render/renderer.js';
 import { Input, DEFAULT_BINDINGS, isReservedCode, PAD_BUTTONS, HOLD_MODE } from '../src/core/input.js';
 import { segmentHitsRect, moveWithWalls, dist, circleHitsRect } from '../src/sim/geometry.js';
 
-/* ── harness ─────────────────────────────────────────────────────────────── */
-const lines = [];
-let passes = 0, fails = 0;
-
-function ok(name, cond, detail = '') {
-  if (cond) { passes++; lines.push(`PASS  ${name}`); }
-  else { fails++; lines.push(`FAIL  ${name}${detail ? '  <- ' + detail : ''}`); }
-}
-const eq = (n, a, b) => ok(n, a === b, `got ${JSON.stringify(a)}, want ${JSON.stringify(b)}`);
-const near = (n, a, b, tol) => ok(n, Math.abs(a - b) <= tol, `got ${a}, want ${b} +/- ${tol}`);
-const note = (s) => lines.push(`      ${s}`);
-
-/* Emitted after EVERY section, not only at the end: the harness greps the dumped DOM, so a
- * suite that throws half way must still say how far it got. A silent page teaches nothing. */
-let _pre = null;
-function emit(status) {
-  if (!_pre) {
-    _pre = document.createElement('pre');
-    _pre.id = 'test-out';
-    _pre.style.cssText = 'position:fixed;inset:0;z-index:99999;overflow:auto;background:#06080c;'
-      + 'color:#cfe;font:11px ui-monospace,Consolas,monospace;padding:12px;white-space:pre';
-    document.body.appendChild(_pre);
-  }
-  const tail = status || (fails === 0 ? `ALL-PASS  ${passes} assertions` : `FAILURES  ${fails} of ${passes + fails}`);
-  _pre.textContent = '==CDTEST-BEGIN==\n' + lines.join('\n') + '\n\n' + tail + '\n==CDTEST-END==';
-}
-
-/* ⚠ MEASURED (Dev/INDEX.md): headless Chrome delivers one to three rAF callbacks in
- * TOTAL and then stops, so a bare `await new Promise(r => requestAnimationFrame(r))`
- * hangs the suite forever on the second call — and a hung suite reports nothing at all.
- * Race it against a timer, which keeps running under virtual time. */
-const yieldToLoop = () => new Promise((r) => {
-  let done = false;
-  const fire = () => { if (!done) { done = true; r(); } };
-  requestAnimationFrame(fire);
-  setTimeout(fire, 120);
-});
+/* ── harness ─────────────────────────────────────────────────────────────────
+ * Extracted to `tools/harness.js` so more than one suite file can share one report.
+ * `fails` is read in two places below, so it is exposed as a getter over the shared
+ * counters rather than copied — a copy would go stale the moment a section failed. */
+import { lines, counts, ok, eq, near, note, emit, run, yieldToLoop } from './harness.js';
 
 /* ── A. core ─────────────────────────────────────────────────────────────── */
 function sectionA() {
@@ -6257,29 +6225,6 @@ async function sectionAS(content) {
   emit();
 }
 
-/**
- * ⚠ ONE SECTION THROWING MUST NOT DELETE EVERY SECTION AFTER IT.
- *
- * This was a single try/catch around the whole run, and a suite of forty assertions can
- * afford that. At seven hundred it cannot: an evidence source authored 2.7m from a breaker
- * made section I's bot throw on an undefined transit case, and the report that came back
- * was 112 assertions of a 700-assertion suite — five hundred and eighty results silently
- * absent, none of them broken, with no indication that anything had been skipped. The
- * failure looked ten times worse than it was, and the six hundred passing results that
- * would have located it were the ones that went missing.
- *
- * So each section is isolated. A section that throws is one FAILURE with its stack, and
- * the run continues. The only thing that stops the suite now is the harness itself.
- */
-async function run(name, fn) {
-  try {
-    await fn();
-  } catch (e) {
-    lines.push(`FAIL  section ${name} threw: ${e && e.stack ? e.stack : e}`);
-    fails++;
-    emit();
-  }
-}
 
 (async () => {
   try {
@@ -6331,7 +6276,7 @@ async function run(name, fn) {
     emit();
   } catch (e) {
     lines.push(`FAIL  the harness itself threw: ${e && e.stack ? e.stack : e}`);
-    fails++;
+    counts.fails++;
     emit();
   }
 })();
