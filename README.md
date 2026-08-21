@@ -190,6 +190,55 @@ Failure is recoverable and never profitable. A failed operation still yields res
 valid observations, and the site can always fund one more attempt — but leaving your kit on
 the floor costs you, with the departments that care about kit.
 
+## Every sentence in one place
+
+The build was monolingual, and every sentence was spelled into the file that printed it —
+across eighteen source files. `src/core/i18n.js` and `content/locales/` are the other half
+of §23 Milestone 5's "accessibility and localization pass", and they run on one rule:
+
+> **A key names a message, never a fragment.**
+
+`t('hud.noise.walking')` is a message. `t('hud.noise.') + gait` is a sentence assembled at
+runtime, and runtime assembly is what breaks in every language that is not English — word
+order moves, adjectives agree, plurals are not two-valued. Interpolation is allowed;
+concatenation is not. It is the same argument `sim/senses.js` makes about content, one layer
+up: a key names a *whole thing said*, never a piece of one.
+
+`n === 1 ? '' : 's'` is not a plural rule either. It is English's, written out, and it is
+wrong in Polish before you reach a second language. `Intl.PluralRules` already knows; the
+message file authors the categories.
+
+**A pseudolocale, because an extraction pass is never finished and the way you find out is
+not by reading the diff.** `?locale=pseudo` accents every message and pads it 30%, so
+anything still hard-coded is the only unaccented text on screen and any layout that fits
+English only breaks visibly. It found two things a grep could not: `PHASE.ARRIVAL` and
+`CONFIG.pressure.stageNames` were engine *ids* that were also *labels*, arriving through an
+interpolation from a constant three modules away. The HUD read `⟦Încîdént préssûré: Latent⟧`.
+
+`en-US` ships deliberately **partial** — eight messages, the ones where American English
+differs — because the fallback path is the one piece of localization machinery a complete
+file can never test, and a fallback that is never exercised is broken the first time
+somebody ships a translation that is 80% done. It does not convert the units: the threshold
+is 40 °C and the seal radius is 1.5 m, and those are *rules* that every other surface prints.
+
+## Certification, which teaches a method and never an answer
+
+§18.6 puts training in three layers and then adds the sentence that rules out almost every
+tutorial this kind of game ships: *"Tutorials teach the reasoning pattern, not the solution
+to later anomalies."*
+
+So none of the nine competencies names a rule, a threshold, a distance or an anomaly. Every
+one is a verb you perform — logged two observations, marked a claim, *revised a view you had
+already taken*, wrote down what you were going to do before doing it. The loader **refuses**
+a competency whose text contains a figure, and the suite proves the refusal by handing it
+"a sustained gradient above 40C stops it" and requiring a throw.
+
+It certifies what was **done**, not what was read: each competency watches an event on the
+analytics bus, there is no acknowledgement step, and the suite asserts that no method on the
+class can award one. So you can earn the whole certificate during ordinary play without ever
+opening a training screen — which is correct, not a loophole. And it gates nothing: §12.1
+grants options, never permission.
+
 ## Accessibility
 
 Full remapping with browser-reserved keys refused, hold-vs-toggle resolved at the source,
@@ -345,10 +394,17 @@ this machine run the same server.
 There is no Node.js here, so the harness is a browser.
 
 ```bash
-powershell -ExecutionPolicy Bypass -File tools/smoketest.ps1 -Tests tools/m0-tests.js
+powershell -ExecutionPolicy Bypass -File tools/run-tests.ps1
 ```
 
-**875 assertions, all headless.** Section I is the one that matters: it plays a complete
+That runs every `tools/*-tests.js` — each in its own browser, on its own port, against its
+own scratch page — and sums them. Slower than one page, and the only version whose result
+means anything while several people are editing at once: one suite cannot leave state for
+the next, a suite that hangs cannot take the others with it, and a suite that produces no
+result block at all counts as a **failure** rather than as zero assertions and no problem.
+A crashed page reporting green is the failure mode the whole harness exists to avoid.
+
+**1,366 assertions across seven suites, all headless.** Section I is the one that matters: it plays a complete
 solo containment through the same interfaces a keyboard reaches — walks to the vehicle,
 takes kit, throws breakers, opens doors, baits, fences, seals, waits out custody and
 carries the case to the stairs. No teleports and no direct state writes, because testing
