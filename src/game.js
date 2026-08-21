@@ -233,6 +233,14 @@ export class Game {
     this.observation = { observed: false, by: [], count: 0 };
     this.viewers = [];
     this.extracted = false;
+
+    /* ⚠ THE VARIATION IS RE-APPLIED HERE, at the end of reset, because reset undoes it.
+     * `heat.reset()` puts ambient back to the constant, `site._rebuildBlocking()` reopens
+     * the jammed route and a faulted circuit forgets it is faulted — so a Game that was
+     * varied at construction quietly became the authored default the first time anything
+     * restarted it. Reading it off the content pack rather than being handed it is what
+     * makes that impossible to forget: the pack carries the variation the loader chose. */
+    this.applyVariation(this.content.variation);
   }
 
   /* ── the squad ───────────────────────────────────────────────────────────── */

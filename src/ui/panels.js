@@ -94,6 +94,35 @@ export class Panels {
 
   hide() { this.open = null; this.node.style.display = 'none'; this.onResume(); }
 
+  /**
+   * The conditions on THIS floor, read from the world rather than typed out.
+   *
+   * ⚠ THIS WAS THREE HARD-CODED SENTENCES ABOUT THE COLD STORE, on a panel five incidents
+   * across three buildings now share. A squad deploying to a condemned block was told where
+   * the cold store's office breaker is, and one deploying to a forest reserve was told the
+   * same thing. The ambient line was worse than wrong: it read `CONFIG.heat.ambientC`, the
+   * CONSTANT, so §14.4's weather could move the real ambient three degrees and this went on
+   * printing 6C — the one number on the card a squad plans their fence around.
+   */
+  _conditions(g) {
+    const out = [];
+    const circuits = [...g.site.circuits.values()];
+    if (circuits.length) {
+      const dead = circuits.filter((c) => !c.on).length;
+      out.push(`${circuits.length} circuit${circuits.length === 1 ? '' : 's'} on this floor, ${dead === circuits.length ? 'all dead' : `${dead} dead`}. `
+        + circuits.map((c) => escapeHtml(c.switchLabel || c.displayName)).join('; ') + '.');
+    }
+    const amb = g.heat.ambientC;
+    const w = g.content.weather;
+    out.push(`Ambient ${amb.toFixed(1)}C${w && w.ambientDeltaC ? ` — ${escapeHtml(w.label.toLowerCase())}, ${w.ambientDeltaC > 0 ? 'up' : 'down'} ${Math.abs(w.ambientDeltaC)} on the forecast` : ''}.`);
+    const doors = g.site.doors.length;
+    if (doors) {
+      const shut = g.site.doors.filter((d) => !d.open).length;
+      out.push(`${doors} door${doors === 1 ? '' : 's'}, ${shut} shut on arrival.`);
+    }
+    return out.map((t) => `<li>${t}</li>`).join('');
+  }
+
   _shell(title, sub, body, footer) {
     this.node.style.display = 'flex';
     this.node.innerHTML = `
@@ -234,8 +263,7 @@ export class Panels {
           <p>${escapeHtml(brief.report || '')}</p>
           <h2>Conditions</h2>
           <ul>
-            <li>Mains down six days. Two circuits, both dead. The office breaker is on the bay wall; the storage breaker is <em>inside the office</em>.</li>
-            <li>Ambient ${CONFIG.heat.ambientC}C.</li>
+            ${this._conditions(g)}
             ${known}
           </ul>
           <h2>Mandate</h2>

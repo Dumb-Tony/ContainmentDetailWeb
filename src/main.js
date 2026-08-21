@@ -58,9 +58,24 @@ async function boot() {
   const params = new URL(location.href).searchParams;
   const incidentId = params.get('incident') || 'cold-storage-draught';
 
+  /**
+   * The SCENARIO seed (GDD §14.4), which is not the mission seed.
+   *
+   * ⚠ THE TWO SEEDS DO DIFFERENT JOBS AND MUST NOT BE THE SAME ONE. The mission seed
+   * drives the simulation's rng and a replay has to be a replay, so it must not move the
+   * world. The scenario seed decides which world you get — the origin, the weather, which
+   * route is shut, which circuit is faulted, what evidence is on the floor.
+   *
+   * It defaults to the number of operations this site has closed, so redeploying to the
+   * same floor is a different night rather than the same one again — which is the whole
+   * point of §15.2's "the building is the constant". `?scenario=` pins one, so a squad can
+   * hand each other a specific operation and a bug report can name the one that broke.
+   */
+  const scenario = params.get('scenario');
+
   let content;
   try {
-    content = await loadContent({ incident: incidentId });
+    content = await loadContent({ incident: incidentId, seed: scenario });
   } catch (e) {
     bootNode.innerHTML = `<h1>Content refused</h1>
       <p>The mission did not load, and that is deliberate: a mission whose rules are broken
@@ -189,9 +204,16 @@ async function boot() {
       /* Taking an operation for a DIFFERENT incident means loading different rules and a
        * different evidence set, so it navigates — same reasoning as the incident switcher
        * above. Everything earned is in localStorage and survives it. */
-      if (op && op.incident && op.incident !== incidentId) {
+      /* A fresh scenario per deployment (§14.4). Taking the SAME operation again is a
+       * different night on the same floor — a different origin, weather, route and fault —
+       * which is what makes "the building is the constant" (§15.2) worth anything past the
+       * second visit. It is derived from the site's own history rather than a random draw,
+       * so a squad can be told which one they are on and get it again. */
+      const nextScenario = `${op ? op.id : incidentId}-${progression.profile.operationsCompleted + 1}`;
+      if (op && op.incident && (op.incident !== incidentId || nextScenario !== scenario)) {
         const u = new URL(location.href);
         u.searchParams.set('incident', op.incident);
+        u.searchParams.set('scenario', nextScenario);
         location.href = u.toString();
         return;
       }
