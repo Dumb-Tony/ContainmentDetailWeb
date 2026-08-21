@@ -18,6 +18,29 @@ import { INCIDENTS } from '../sim/content.js';
 import { GameClock } from '../core/clock.js';
 import { escapeHtml } from './hud.js';
 
+/**
+ * The procedure card — GDD §18.4. Five fields the squad fills in and commits to, never
+ * validated for correctness, because the planner does not know the answer either.
+ *
+ * ⚠ THESE WERE THE DRAUGHT'S OPTIONS, SHOWN FOR EVERY ANOMALY.
+ *
+ * Read them. Every one is about a cold mass, a heat gradient, a chiller, a freight door.
+ * A squad planning the containment of `blackthorn-caller` — which hunts SOUND and is
+ * restrained by SILENCE — was offered "Held against a heat gradient it cannot cross" and
+ * "Restoring the storage circuit to draw it to the lights", and nothing at all about being
+ * quiet. Four of the five fields could not be filled in truthfully.
+ *
+ * That is exactly the defect the hypothesis board had: seven claims written for the draught,
+ * frozen in code, and shown for all six anomalies. The board was moved into content earlier
+ * this session; this is the other half of the same tablet with the same bug, and it went on
+ * looking correct for longer because a planner that offers wrong options still offers
+ * options — the squad picks one, commits, and finds out in the field.
+ *
+ * `plannerFor(anomalyDef)` reads `containment.planner` from the anomaly. These arrays stay
+ * exported as the DOCUMENTED FALLBACK for a package that has not authored one yet, which is
+ * the same shape `CLAIMS` took in `sim/evidence.js` — and, like `CLAIMS`, a suite reports
+ * every anomaly still relying on it, so the fallback cannot quietly become the design.
+ */
 const PROCEDURE_FIELDS = [
   {
     key: 'target', label: 'Target', options: [
@@ -66,6 +89,30 @@ const ABORTS = [
   'Thermal coverage of the approach lost for longer than 5s',
   'Pressure reaches Breach',
 ];
+
+/**
+ * The planner an anomaly authors, or the draught's as a documented fallback.
+ *
+ * `containment.planner` is `{ target[], state[], trigger[], transfer[], maintained[], aborts[] }`.
+ * A package may author any subset; anything it leaves out falls back, and `usesFallback`
+ * says which fields did so, so the suite can report a package that has not been written yet
+ * rather than letting the draught's vocabulary pass as everybody's.
+ */
+function plannerFor(anomalyDef) {
+  const p = (anomalyDef && anomalyDef.containment && anomalyDef.containment.planner) || {};
+  const pick = (key, fallback) => (Array.isArray(p[key]) && p[key].length ? p[key] : fallback);
+  const usesFallback = [];
+  const fields = PROCEDURE_FIELDS.map((f) => {
+    const options = pick(f.key, f.options);
+    if (options === f.options) usesFallback.push(f.key);
+    return { ...f, options };
+  });
+  const maintained = pick('maintained', MAINTAINED);
+  if (maintained === MAINTAINED) usesFallback.push('maintained');
+  const aborts = pick('aborts', ABORTS);
+  if (aborts === ABORTS) usesFallback.push('aborts');
+  return { fields, maintained, aborts, usesFallback };
+}
 
 const el = (tag, cls, parent) => {
   const n = document.createElement(tag);
@@ -390,12 +437,17 @@ export class Panels {
           <option value="">—</option>
           ${f.options.map((o) => `<option ${this.plan[f.key] === o ? 'selected' : ''}>${o}</option>`).join('')}
         </select></label>`;
-      const maint = MAINTAINED.map((m, i) => `<label class="chk"><input type="checkbox" data-maint="${i}" ${this.plan.maintained.has(m) ? 'checked' : ''}>${m}</label>`).join('');
-      const abort = `<label>Abort condition<select data-abort>${ABORTS.map((a) => `<option ${this.plan.abort === a ? 'selected' : ''}>${a}</option>`).join('')}</select></label>`;
+      /* ⚠ THE PLANNER IS THE LOADED ANOMALY'S PLANNER, for the same reason the board is.
+       * These were the draught's four fields shown for every incident, so a squad planning
+       * the caller — which hunts sound and is stopped by silence — was offered a heat
+       * gradient, a chiller and a freight door, and nothing about being quiet. */
+      const planner = plannerFor(g.anomaly.def);
+      const maint = planner.maintained.map((m, i) => `<label class="chk"><input type="checkbox" data-maint="${i}" ${this.plan.maintained.has(m) ? 'checked' : ''}>${m}</label>`).join('');
+      const abort = `<label>Abort condition<select data-abort>${planner.aborts.map((a) => `<option ${this.plan.abort === a ? 'selected' : ''}>${a}</option>`).join('')}</select></label>`;
       const committed = g.mission.procedure;
       body = `<div class="pad plan">
         <p class="small">Five fields. The planner does not know whether your plan is right — it produces the checklist you said you would follow.</p>
-        ${PROCEDURE_FIELDS.map(sel).join('')}
+        ${planner.fields.map(sel).join('')}
         <div class="maint"><span>Maintained conditions</span>${maint}</div>
         ${abort}
         ${committed ? `<div class="card"><b>Committed at ${GameClock.formatMs(committed.committedMs)}</b>
@@ -419,7 +471,7 @@ export class Panels {
     });
     this.node.querySelectorAll('[data-field]').forEach((s) => s.onchange = () => { this.plan[s.dataset.field] = s.value; });
     this.node.querySelectorAll('[data-maint]').forEach((c) => c.onchange = () => {
-      const m = MAINTAINED[Number(c.dataset.maint)];
+      const m = plannerFor(g.anomaly.def).maintained[Number(c.dataset.maint)];
       if (c.checked) this.plan.maintained.add(m); else this.plan.maintained.delete(m);
     });
     const ab = this.node.querySelector('[data-abort]');
@@ -494,4 +546,4 @@ export class Panels {
 }
 
 
-export { PROCEDURE_FIELDS, MAINTAINED, ABORTS };
+export { PROCEDURE_FIELDS, MAINTAINED, ABORTS, plannerFor };
