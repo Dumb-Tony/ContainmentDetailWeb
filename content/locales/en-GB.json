@@ -151,6 +151,12 @@
     }
   },
 
+  "certification": {
+    "_note": "GDD §18.6's first training layer. The COMPETENCY NAMES AND REASONS ARE CONTENT — they live in content/onboarding.json, because what a squad is expected to demonstrate is a design decision with a designer's reviewer, not a button label. Only the chrome is here.",
+    "progress": "{earned} of {total} demonstrated",
+    "complete": "Certified — all {total} demonstrated"
+  },
+
   "phase": {
     "_note": "⚠ THE MISSION PHASE IS AN ID AND A LABEL, and it was one string doing both jobs. `PHASE.ARRIVAL` is the literal 'Arrival': it is compared against, written into the phase log, sent over the wire in a snapshot, and printed on the HUD. Localising the VALUE would break the comparisons; leaving it alone left an English word inside an otherwise translated line, which is exactly what the pseudolocale showed — 'Încîdént préssûré: Latent'.\n\nSo the id stays the id and this is the label. The same argument as the debrief's dimension ids, and the same argument senses.js makes about content.",
     "Briefing": "Briefing",

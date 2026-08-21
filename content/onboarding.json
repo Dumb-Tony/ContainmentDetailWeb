@@ -1,0 +1,107 @@
+{
+  "id": "base-certification",
+  "contentRevision": "0.1.0",
+  "displayName": "Base certification",
+
+  "_note": "GDD §18.6 puts training in three layers — base certification, a controlled field exercise, and a first live operation with generous intelligence — and then states the constraint the whole thing turns on:\n\n  \"Tutorials teach the reasoning pattern, not the solution to later anomalies.\"\n\nThat single sentence rules out almost every tutorial a game of this kind would normally ship. A tutorial that says \"a sustained gradient above 40C stops it\" has handed over the answer to the first incident, and §7.4 asks for confidence rather than checklist completion — so the second incident finds a squad that learned a number instead of a method, and the third finds them unable to work at all.\n\nSO NOTHING HERE NAMES A RULE, A THRESHOLD, A DISTANCE OR AN ANOMALY. Read the competencies below: every one is a VERB the operative performs and none of them is a fact about a thing. \"You logged an observation\" and never \"the frost boundary tells you it is cold\". \"You marked a claim on the board\" and never \"the draught cannot cross heat\". The reasoning pattern is: look, log, form a view, mark it, plan against it, do the plan, find out. Each competency is one move in that pattern.\n\nAND IT CERTIFIES WHAT WAS DONE, NOT WHAT WAS READ. Every competency below names an EVENT ON THE ANALYTICS BUS. There is no \"press F to continue\" and no acknowledgement step, because a player who clicked through a panel has demonstrated nothing. The certificate is issued by the game watching, which also means it can be earned during ordinary play by somebody who never opened the training screen — which is the correct outcome and not a loophole.\n\nORDER IS ADVISORY. `order` groups the competencies into the three layers so the screen can show them in a sensible sequence; it is not a gate. Nothing here blocks a deployment: §12.1 says progression grants options and never power, and a certificate that locked the mission board would be the base charging a player for a lesson they may not need.",
+
+  "layers": [
+    {
+      "id": "movement",
+      "order": 1,
+      "displayName": "Move and look",
+      "framing": "Getting from the vehicle to the floor, and back, in the dark."
+    },
+    {
+      "id": "tools",
+      "order": 2,
+      "displayName": "Carry, place, recover",
+      "framing": "Equipment is a wager: what you carry in is what you have, and what you leave behind is gone."
+    },
+    {
+      "id": "reasoning",
+      "order": 3,
+      "displayName": "Observe, argue, commit",
+      "framing": "The part that is not about equipment. Log what you see, decide what it means, write down what you are going to do, and then do that."
+    }
+  ],
+
+  "competencies": [
+    {
+      "id": "left-the-vehicle",
+      "layer": "movement",
+      "event": "PHASE_CHANGED",
+      "requires": { "count": 1 },
+      "displayName": "Left the command point",
+      "why": "Arrival ends when the squad leaves the vehicle, not after a distance walked. Pacing at the cache is not investigating."
+    },
+    {
+      "id": "took-equipment",
+      "layer": "tools",
+      "event": "EQUIPMENT_SELECTED",
+      "requires": { "count": 2 },
+      "displayName": "Changed what is in your hands",
+      "why": "Five slots, and only one thing in your hands at a time. Which one is a decision you make continuously and not once at the cache."
+    },
+    {
+      "id": "deployed-something",
+      "layer": "tools",
+      "event": "DEPLOYED",
+      "requires": { "count": 1 },
+      "displayName": "Set a unit down and powered it up",
+      "why": "A deployable belongs to the operation and not to whoever placed it. Anyone can lift it; a casualty never strands it."
+    },
+    {
+      "id": "recovered-something",
+      "layer": "tools",
+      "event": "RETRIEVED",
+      "requires": { "count": 1 },
+      "displayName": "Picked one back up",
+      "why": "Equipment stewardship is a graded dimension of the debrief. Everything you leave on the floor is on the report."
+    },
+    {
+      "id": "worked-the-power",
+      "layer": "tools",
+      "event": "CIRCUIT_CHANGED",
+      "requires": { "count": 1 },
+      "displayName": "Threw a breaker",
+      "why": "The building is a system with switches in it. What a circuit feeds is worth knowing before you need it."
+    },
+    {
+      "id": "logged-an-observation",
+      "layer": "reasoning",
+      "event": "EVIDENCE_LOGGED",
+      "requires": { "count": 2 },
+      "displayName": "Logged two observations",
+      "why": "The ledger records what was SEEN. What it means is a separate screen and a separate decision, and keeping those apart is most of the method."
+    },
+    {
+      "id": "marked-a-claim",
+      "layer": "reasoning",
+      "event": "HYPOTHESIS_CHANGED",
+      "requires": { "count": 1 },
+      "displayName": "Marked a claim on the board",
+      "why": "Nothing on the board is ticked for you and contradictions stay up. Believing something and being right are different states and the board only records the first."
+    },
+    {
+      "id": "changed-your-mind",
+      "layer": "reasoning",
+      "event": "HYPOTHESIS_CHANGED",
+      "requires": { "count": 3 },
+      "displayName": "Revised a view you had already taken",
+      "why": "The point of a board you can change is changing it. A squad that marks once and never returns has used it as a form rather than as an argument."
+    },
+    {
+      "id": "committed-a-procedure",
+      "layer": "reasoning",
+      "event": "PROCEDURE_COMMITTED",
+      "requires": { "count": 1 },
+      "displayName": "Wrote down what you were going to do, before doing it",
+      "why": "The planner does not know whether your plan is right. It produces the checklist you said you would follow, so that afterwards there is something to compare against."
+    }
+  ],
+
+  "_layerTwoNote": "§18.6's SECOND layer — a controlled field exercise against a harmless rule-based target — is an INCIDENT PACKAGE and not an engine feature, so it is not in this file. What it needs from content: an anomaly with no `contact` capability at all, one required rule, two evidence paths to it, and a seal. The competencies above are the first layer; the third is the `orientation` entry in each anomaly's `difficultyProfiles`, which already widens the timing windows without moving a rule.",
+
+  "_thirdLayerNote": "GDD §19.1's assists and §18.6's 'generous intelligence and recovery windows' are the same mechanism seen from two sides, and both are already implemented: `procedureTiming` stretches the gap between one contact and the next and the ninety seconds an operative has while down, and it moves NO rule — reach, what a contact applies, the gradient figure and the thirty seconds of custody read identically at 1.0 and at 2.0. A first live operation is that assist turned up, not a different game."
+}
