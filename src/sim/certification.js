@@ -46,6 +46,29 @@ export async function loadOnboarding(path = '../../content/onboarding.json') {
 }
 
 /**
+ * The document, loaded once at module scope, so nothing has to remember to load it.
+ *
+ * ⚠ SAME REASONING AS `core/i18n.js`, AND THE SAME FAILURE POSTURE. The alternative is a
+ * line in an entry point that every future entry point has to repeat, and the failure when
+ * somebody forgets is a feature that silently does nothing — which is the worst kind,
+ * because it looks exactly like a feature that is working and has nothing to report.
+ *
+ * A failure here is NOT fatal: `DOCUMENT` stays null, `Game` skips certification entirely,
+ * and the game runs. Certification is a record of competence and nothing gates on it, so
+ * losing it costs a screen and never an operation. `loadError` says so out loud, and the
+ * suite asserts it is null.
+ */
+export let DOCUMENT = null;
+export let loadError = null;
+try {
+  DOCUMENT = await loadOnboarding();
+} catch (e) {
+  loadError = e;
+  /* eslint-disable-next-line no-console */
+  console.warn('[certification] competency document unavailable; certification is off.', e);
+}
+
+/**
  * Refuse a document that would certify nothing, or that would teach an answer.
  *
  * ⚠ THE SECOND CHECK IS THE UNUSUAL ONE AND IT IS THE POINT. A competency whose text names

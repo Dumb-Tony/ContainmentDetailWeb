@@ -34,6 +34,7 @@ import { InstanceSet } from './sim/instances.js';
 import { SoundField, operativeSource, deployableSource, operativeMic, micOptionsFromItem, micReading } from './sim/sound.js';
 import { dist } from './sim/geometry.js';
 import { t as msg } from './core/i18n.js';
+import { Certification, DOCUMENT as CERT_DOCUMENT } from './sim/certification.js';
 
 /** A command is what one operative is asking for this step, whoever is asking. */
 export const EMPTY_COMMAND = Object.freeze({
@@ -152,13 +153,29 @@ export function recommendedManifest(content) {
 }
 
 export class Game {
-  constructor(content, { seed = 'containment-detail' } = {}) {
+  constructor(content, { seed = 'containment-detail', previouslyEarned = [] } = {}) {
     this.content = content;
     this.itemsById = content.itemsById;
     this.bus = new EventBus();
     /* §21.2: the notice feed is prose addressed to a player, and prose is the one thing
      * the analytics log may not keep. It still reaches every listener. */
     this.bus.unlogged.add(EVENTS.NOTICE);
+
+    /**
+     * §18.6's base certification, watching this operation.
+     *
+     * ⚠ IT WATCHES AND IT NEVER GATES. §12.1 grants options, context and efficiency —
+     * never power and never permission — so nothing below this line may ever ask the
+     * certificate whether an action is allowed. It counts events and says what has been
+     * demonstrated; a squad that has demonstrated nothing plays exactly the same game.
+     *
+     * `previouslyEarned` comes from a profile, so competence carries between operations. It
+     * is null when the document failed to load, and the game does not care.
+     */
+    this.certification = CERT_DOCUMENT
+      ? new Certification(CERT_DOCUMENT, previouslyEarned) : null;
+    if (this.certification) this.certification.watch(this.bus);
+
     this.clock = new GameClock({ stepMs: CONFIG.sim.stepMs, maxFrameMs: CONFIG.sim.maxFrameMs });
     this.rng = new Rng(hashStr(String(seed)), 'mission');
     this.seedLabel = String(seed);
