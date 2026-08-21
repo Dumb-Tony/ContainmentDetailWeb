@@ -24,6 +24,7 @@ import { loadContent } from '../src/sim/content.js';
 import { Game, RECOMMENDED_MANIFEST } from '../src/game.js';
 import { Hud } from '../src/ui/hud.js';
 import { CONFIG, SLOTS } from '../src/config.js';
+import { PHASE } from '../src/sim/mission.js';
 
 /* Files whose user-facing strings have been extracted. A file joins this list when it is
  * converted, and section D below fails the build if a literal creeps back into one. */
@@ -173,6 +174,43 @@ async function sectionCC() {
   eq('CC12 a tag this build does not ship is the default rather than a near match',
     chooseLocale('?locale=de-AT', null, ['de-DE']), DEFAULT_LOCALE);
   eq('CC13 and no signal at all is the default', chooseLocale('', null, null), DEFAULT_LOCALE);
+  emit();
+}
+
+/* ── CD. an enum that is also a label ─────────────────────────────────────── */
+async function sectionCD() {
+  heading('CD. every engine vocabulary that reaches a player has a label beside its id');
+
+  /**
+   * ⚠ THE PSEUDOLOCALE FOUND THIS ON THE LIVE BUILD, which is what it is for.
+   *
+   * The HUD read `⟦Încîdént préssûré: Latent⟧` — an accented message with a plain English
+   * word inside it. `Latent` is `CONFIG.pressure.stageNames[0]`, and `Arrival` is
+   * `PHASE.ARRIVAL`. Both are IDS: compared against, written into the phase log, carried in
+   * a snapshot. Localising the value would break every comparison; leaving it alone left
+   * English in a translated sentence. So the id stays the id and gets a label beside it —
+   * the same fix the debrief's dimension names needed, found the same way.
+   *
+   * A grep could not have found this. The string was never in the UI file; it arrived
+   * through an interpolation from a constant three modules away.
+   */
+  await loadLocale(DEFAULT_LOCALE);
+  const missingBefore = new Set(missingKeys());
+  const phases = Object.values(PHASE);
+  const stages = CONFIG.pressure.stageNames;
+  for (const p of phases) t(`phase.${p}`);
+  for (const s of stages) t(`pressure.${s}`);
+  const gaps = missingKeys().filter((k) => !missingBefore.has(k));
+  eq(`CD1 every mission phase and every pressure stage has a label${gaps.length ? ` — ${gaps.join(', ')}` : ''}`,
+    gaps.length, 0);
+  note(`${phases.length} phases and ${stages.length} pressure stages, all labelled`);
+
+  /* And under the pseudolocale the label is accented, so nothing English survives the line. */
+  await loadLocale('pseudo');
+  const accented = [...phases.map((p) => t(`phase.${p}`)), ...stages.map((s) => t(`pressure.${s}`))];
+  ok('CD2 and under the pseudolocale none of them comes through as plain English',
+    accented.every((s) => /[áéîöû]/.test(s) || !/[aeiou]/i.test(s)), accented.slice(0, 3).join(' '));
+  await loadLocale(DEFAULT_LOCALE);
   emit();
 }
 
@@ -330,6 +368,7 @@ async function sectionF() {
     await run('B', () => sectionB());
     await run('C', () => sectionC());
     await run('CC', () => sectionCC());
+    await run('CD', () => sectionCD());
     await run('D', () => sectionD());
     const content = await loadContent();
     await run('E', () => sectionE(content));

@@ -151,6 +151,28 @@
     }
   },
 
+  "phase": {
+    "_note": "⚠ THE MISSION PHASE IS AN ID AND A LABEL, and it was one string doing both jobs. `PHASE.ARRIVAL` is the literal 'Arrival': it is compared against, written into the phase log, sent over the wire in a snapshot, and printed on the HUD. Localising the VALUE would break the comparisons; leaving it alone left an English word inside an otherwise translated line, which is exactly what the pseudolocale showed — 'Încîdént préssûré: Latent'.\n\nSo the id stays the id and this is the label. The same argument as the debrief's dimension ids, and the same argument senses.js makes about content.",
+    "Briefing": "Briefing",
+    "Loadout": "Loadout",
+    "Arrival": "Arrival",
+    "Investigation": "Investigation",
+    "ProcedureCommitted": "Procedure committed",
+    "ContainmentActive": "Containment active",
+    "CustodyEstablished": "Custody established",
+    "Extraction": "Extraction",
+    "Debrief": "Debrief"
+  },
+
+  "pressure": {
+    "_note": "The five stage words of Incident Pressure (§5.4). Same shape as the phase above: CONFIG.pressure.stageNames is an ordered vocabulary the engine indexes into, and it was also the display text.\n\n⚠ THE HUD IS GIVEN THE WORD AND NEVER THE NUMBER, deliberately. §5.4 makes pressure a director input rather than a visible rage meter, so there is no key here for a percentage and there must never be one.",
+    "Latent": "Latent",
+    "Aware": "Aware",
+    "Active": "Active",
+    "Breach": "Breach",
+    "Critical": "Critical"
+  },
+
   "hud": {
     "_note": "The head-up display. Everything here is read at a glance while something is walking toward you, so it is short by design and the short forms are the ones that must survive translation.",
     "pressure": "Incident pressure: {stage}",

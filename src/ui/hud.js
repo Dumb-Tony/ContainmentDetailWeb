@@ -228,8 +228,8 @@ export class Hud {
     const power = Array.from(left.values()).map((c) => `<i class="${c.on ? 'on' : 'off'}"></i>${c.displayName.replace(' circuit', '')}`).join('');
     this._set('tl', this.topLeft, `
       <div class="row big">${room}</div>
-      <div class="row">${t('hud.clock', { time: GameClock.formatMs(now), phase: m.phase })}</div>
-      <div class="row stage s${m.stage}">${t('hud.pressure', { stage: `<b>${m.stageName}</b>` })}</div>
+      <div class="row">${t('hud.clock', { time: GameClock.formatMs(now), phase: t(`phase.${m.phase}`) })}</div>
+      <div class="row stage s${m.stage}">${t('hud.pressure', { stage: `<b>${t(`pressure.${m.stageName}`)}</b>` })}</div>
       <div class="row power">${power}</div>`);
 
     /* ── top right: the objective, in the order it actually happens ── */
