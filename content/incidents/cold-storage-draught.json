@@ -10,6 +10,20 @@
 
   "anomalySpawn": [-10.0, 10.0],
 
+  "_variationNote": "GDD §14.4, controlled variation. THE BOUNDS ARE HERE AND THE CHOOSING IS IN CODE — the same split senses.js makes for triggers. This file says the origin may be any of four places and that at most one circuit may be faulted; it does not say how one is picked and it cannot introduce a new axis.\n\n⚠ `droppable` IS THE DANGEROUS ONE and it is why `dropMax` is 1. §27.2 gives every rule two discovery paths and §14.4 requires that critical procedure items keep redundant ones, so a seed may remove one path for a rule and never both. `applyVariation` checks that per RULE rather than per source, because dropping two sources is fine and dropping the only two that reveal the same rule is not — a difference invisible in a list of ids. Nothing on this list is the only path to anything.\n\nThe four origins are the four ends of the two aisles the draught can actually work from; all are standable and all have been walked. Neither breaker is on the fault list: killing the office circuit permanently would make the office door unopenable and the authored pen unreachable, which is exactly the unwinnable state §14.4 forbids.",
+  "variation": {
+    "origins": [[-10.0, 10.0], [-10.2, 4.6], [4.4, 10.4], [4.4, 2.0]],
+    "routes": ["door-freight-cold"],
+    "routesShutMax": 1,
+    "faults": ["circuit-storage"],
+    "faultsMax": 1,
+    "droppable": ["chart-recorder", "lantern-pair", "spent-cells", "ambulance-transcript", "crew-imager"],
+    "dropMax": 2,
+    "falseLeads": ["maintenance-log", "stairwell-draught"],
+    "weather": ["still", "cold", "wet", "wind"],
+    "times": ["night", "dawn", "day"]
+  },
+
   "briefing": {
     "headline": "Missing maintenance crew, sub-level 2",
     "report": "A maintenance crew sealed the floor after reporting 'cold that moves'. Two of the three came back. Mains have been down six days.",

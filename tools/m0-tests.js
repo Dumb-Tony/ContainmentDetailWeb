@@ -19,6 +19,7 @@ import { GameClock } from '../src/core/clock.js';
 import { mulberry32, Rng, hashStr } from '../src/core/rng.js';
 import { loadContent, ContentError, INCIDENTS } from '../src/sim/content.js';
 import { HeatField } from '../src/sim/heat.js';
+import { chooseVariation, applyVariation, WEATHER, TIMES } from '../src/sim/variation.js';
 import { Site } from '../src/sim/site.js';
 import { DeployableSet } from '../src/sim/deployables.js';
 import { Anomaly, ANOMALY_STATE } from '../src/sim/anomaly.js';
@@ -819,7 +820,7 @@ async function sectionK() {
     'src/sim/geometry.js', 'src/sim/site.js', 'src/sim/heat.js', 'src/sim/sound.js', 'src/sim/anomaly.js',
     'src/sim/deployables.js', 'src/sim/evidence.js', 'src/sim/player.js',
     'src/sim/mission.js', 'src/sim/content.js', 'src/sim/senses.js', 'src/sim/perception.js',
-    'src/sim/comms.js', 'src/ui/commswheel.js',
+    'src/sim/comms.js', 'src/ui/commswheel.js', 'src/sim/variation.js', 'src/sim/instances.js',
     'src/net/protocol.js', 'src/net/net.js',
     'src/render/scene.js', 'src/render/renderer.js', 'src/render/thermalFloor.js',
     'src/sim/progression.js',
@@ -4375,13 +4376,12 @@ async function sectionAI(content) {
       ambient: g.heat.ambientC,
     }));
   }
-  note(`${seeds.length} seeds produce ${fingerprints.size} distinct starting worlds`);
-  note('    N/A — "no seed is unwinnable" (§27.3). Nothing about the WORLD is seeded: the');
-  note('    mission rng drives exactly one thing, the resume token in net.js. Every seed');
-  note('    produces the identical floor, so the criterion is trivially true and therefore');
-  note('    untested. §14.4 protects against a randomiser this build does not have yet —');
-  note('    a Milestone 4 content-variety gap, not a Milestone 3 pass.');
-  eq('AI1 every seed produces the same world, so the claim is about nothing yet',
+  note(`${seeds.length} MISSION seeds produce ${fingerprints.size} distinct starting worlds`);
+  note('    The mission seed is not the scenario seed. This one drives the simulation rng —');
+  note('    which drives exactly one thing, the resume token — so it must NOT move the world:');
+  note('    a replay has to be a replay. §14.4\'s controlled variation is a separate seed on');
+  note('    the CONTENT LOADER, and section AJ sweeps forty of those for winnability.');
+  eq('AI1 a mission seed does not move the world — a replay is a replay',
     fingerprints.size, 1);
   /* What IS worth asserting is that determinism holds, because the day a randomiser
    * arrives this is the property it has to preserve. */
@@ -4542,6 +4542,204 @@ async function sectionAI(content) {
     MAX_SQUAD === 5);
   emit();
 }
+
+/* ══ AJ. controlled variation, and no seed that cannot be finished ═════════════
+ *
+ * GDD §14.4. A scenario seed selects the incident origin, which routes are shut, which
+ * power is faulted, where the civilians are, which evidence is on the floor and which
+ * source is the false lead, the weather and time, the secondary hazard, and the anomaly's
+ * parameters within approved bounds.
+ *
+ * Two sentences of §14.4 are the whole thing, and they are the last two: "critical
+ * procedure items always have redundant discovery paths", and "randomization must not
+ * generate unwinnable states". Everything below is those two, measured.
+ *
+ * ⚠ SECTION AI REPORTED THIS CRITERION N/A, because nothing about the world was seeded and
+ * a criterion that is trivially true is untested rather than met. This is the same
+ * criterion with something to test.
+ */
+async function sectionAJ() {
+  lines.push('--- AJ. controlled variation (GDD §14.4) ---');
+
+  /* An incident that declares no bounds varies in nothing, whatever seed it is given.
+   * That is what let this be added without touching the four incidents that predate it. */
+  const plain = await loadContent({ incident: 'cold-storage-figure', seed: 'anything' });
+  const plainB = await loadContent({ incident: 'cold-storage-figure', seed: 'different' });
+  eq('AJ1 an incident with no variation block is identical under any seed',
+    JSON.stringify(plain.map.anomalySpawn) + plain.map.evidenceSources.length,
+    JSON.stringify(plainB.map.anomalySpawn) + plainB.map.evidenceSources.length);
+  ok('AJ2 and loading with no seed at all is the authored default',
+    (await loadContent({ incident: 'cold-storage-draught' })).map.anomalySpawn.join() === '-10,10');
+
+  /* ── the same seed is the same operation ──────────────────────────────────── */
+  const fingerprint = (p) => JSON.stringify({
+    origin: p.map.anomalySpawn,
+    sources: p.map.evidenceSources.map((s) => s.evidenceId).sort(),
+    v: p.variation,
+  });
+  const a1 = await loadContent({ incident: 'cold-storage-draught', seed: 'kilo' });
+  const a2 = await loadContent({ incident: 'cold-storage-draught', seed: 'kilo' });
+  eq('AJ3 the same seed produces exactly the same operation', fingerprint(a1), fingerprint(a2));
+
+  /* ── and different seeds are different operations ─────────────────────────── */
+  const SEEDS = Array.from({ length: 40 }, (_, i) => `seed-${i}`);
+  const packs = [];
+  for (const s of SEEDS) packs.push(await loadContent({ incident: 'cold-storage-draught', seed: s }));
+  const distinct = new Set(packs.map(fingerprint));
+  const origins = new Set(packs.map((p) => p.map.anomalySpawn.join()));
+  const weathers = new Set(packs.map((p) => p.variation.weather));
+  const faults = new Set(packs.map((p) => p.variation.faults.join() || 'none'));
+  const routes = new Set(packs.map((p) => p.variation.routesShut.join() || 'none'));
+  note(`${SEEDS.length} seeds → ${distinct.size} distinct operations · ${origins.size} origins · ${weathers.size} weathers · faults ${[...faults].join('/')} · routes shut ${[...routes].join('/')}`);
+  ok(`AJ4 forty seeds produce many distinct operations (${distinct.size})`, distinct.size > 10);
+  ok(`AJ5 the origin actually moves (${origins.size} of 4 authored)`, origins.size >= 3);
+  ok(`AJ6 and the weather does (${weathers.size} of 4)`, weathers.size >= 3);
+
+  /* ── §14.4's first promise: redundant discovery paths survive ─────────────── */
+  const anomaly = packs[0].anomaly;
+  const worst = { rule: null, left: Infinity, seed: null };
+  for (let i = 0; i < packs.length; i++) {
+    const p = packs[i];
+    const placed = new Set(p.map.evidenceSources.map((s) => s.evidenceId));
+    const authored = new Set((a1.map.evidenceSources || []).map((s) => s.evidenceId));
+    const byRule = new Map();
+    for (const e of anomaly.evidenceRules) {
+      if (!e.revealsRule) continue;
+      /* A path survives if it is still on the floor, or if it was never a floor object in
+       * the first place — the live detectors (thermal-void, frost-boundary, battery-drain)
+       * are generated by play rather than placed, and a seed cannot remove them. */
+      const survives = placed.has(e.id) || !authored.has(e.id);
+      byRule.set(e.revealsRule, (byRule.get(e.revealsRule) || 0) + (survives ? 1 : 0));
+    }
+    for (const [rule, left] of byRule) {
+      if (left < worst.left) { worst.rule = rule; worst.left = left; worst.seed = SEEDS[i]; }
+    }
+  }
+  note(`across all seeds, the thinnest any rule ever gets is ${worst.left} path(s) — ${worst.rule} on ${worst.seed}`);
+  ok('AJ7 no seed removes every discovery path for any rule (§14.4)', worst.left >= 1);
+
+  /* ⚠ AND THE LOADER REFUSES ONE THAT WOULD. The promise is only worth anything if it is
+   * enforced rather than hoped for, so this hands `applyVariation` a variation that strips
+   * both paths from one rule and asserts it is a refusal. */
+  const bad = chooseVariation(a1, 'kilo');
+  const twoPaths = anomaly.evidenceRules.filter((e) => e.revealsRule).reduce((m, e) => {
+    (m[e.revealsRule] = m[e.revealsRule] || []).push(e.id); return m;
+  }, {});
+  const placedIds = new Set((a1.map.evidenceSources || []).map((s) => s.evidenceId));
+  const doomed = Object.entries(twoPaths).find(([, ids]) => ids.filter((id) => placedIds.has(id)).length >= 2);
+  ok('AJ8 some rule has two paths that are BOTH placed objects, so the refusal is testable',
+    !!doomed, doomed ? `${doomed[0]}: ${doomed[1].join()}` : 'none');
+  if (doomed) {
+    const res = applyVariation(a1, { ...bad, dropped: doomed[1].filter((id) => placedIds.has(id)) });
+    ok('AJ9 stripping both paths for one rule is a REFUSAL, not a warning',
+      res.problems.length > 0, res.problems.join(' | ') || 'accepted');
+    ok('AJ10 and the refusal names the rule a squad could no longer learn',
+      res.problems.some((t) => t.includes(doomed[0])), res.problems.join(' | '));
+  }
+
+  /* ── §14.4's second promise: no seed is unwinnable ────────────────────────── */
+  /* Structural winnability, checked the same way the maps were: the origin is standable,
+   * the cache and the extraction are reachable from the spawn with every door in the
+   * state the seed left it, and a procedure's kit still fits the cargo budget. */
+  const unwinnable = [];
+  for (let i = 0; i < packs.length; i++) {
+    const p = packs[i];
+    const g = new Game(p, { seed: SEEDS[i] });
+    g.applyVariation(p.variation);
+    const site = g.site;
+    const why = [];
+    if (!standsAt(site, p.map.anomalySpawn[0], p.map.anomalySpawn[1])) why.push('origin is inside geometry');
+    if (!standsAt(site, site.cache.x, site.cache.z)) why.push('cache unreachable');
+
+    /* Flood fill from the spawn, with the seed's doors where the seed left them. */
+    const K = 0.4, b = p.map.bounds;
+    const key = (x, z) => `${Math.round(x / K)},${Math.round(z / K)}`;
+    const seen = new Set([key(site.spawn.x, site.spawn.z)]);
+    const q = [[site.spawn.x, site.spawn.z]];
+    while (q.length) {
+      const [x, z] = q.pop();
+      for (const [dx, dz] of [[K, 0], [-K, 0], [0, K], [0, -K]]) {
+        const nx = x + dx, nz = z + dz;
+        if (nx < b.minX || nx > b.maxX || nz < b.minZ || nz > b.maxZ) continue;
+        const k = key(nx, nz);
+        if (seen.has(k) || !standsAt(site, nx, nz)) continue;
+        seen.add(k); q.push([nx, nz]);
+      }
+    }
+    const near = (x, z) => {
+      for (let dx = -0.8; dx <= 0.8; dx += K) for (let dz = -0.8; dz <= 0.8; dz += K) {
+        if (seen.has(key(x + dx, z + dz))) return true;
+      }
+      return false;
+    };
+    if (!near(site.extraction.x, site.extraction.z)) why.push('extraction not reachable from spawn');
+    if (!near(site.cache.x, site.cache.z)) why.push('cache not reachable from spawn');
+    if (!near(p.map.anomalySpawn[0], p.map.anomalySpawn[1])) why.push('the anomaly is walled off from the squad');
+
+    /* And a manifest that can actually be taken. */
+    const kit = recommendedManifest(p);
+    const vol = kit.reduce((acc, x) => acc + p.itemsById.get(x.itemId).cargoVolume * x.qty, 0);
+    if (vol > p.items.cargoVolumeBudget) why.push(`recommended manifest is over budget (${vol}/${p.items.cargoVolumeBudget})`);
+    if (!kit.some((x) => x.itemId === 'reinforced-transit-case')) why.push('no containment vessel in the recommendation');
+
+    if (why.length) unwinnable.push(`${SEEDS[i]}: ${why.join(', ')}`);
+  }
+  note(`${SEEDS.length} seeds swept for structural winnability: ${unwinnable.length} unwinnable`);
+  eq(`AJ11 no seed produces an operation that cannot be finished (§14.4)${unwinnable.length ? ` — ${unwinnable.slice(0, 3).join(' · ')}` : ''}`,
+    unwinnable.length, 0);
+
+  /* ── the faulted circuit is a discovery, not an announcement ──────────────── */
+  const faulted = packs.find((p) => p.variation.faults.length);
+  ok('AJ12 some seed faults a circuit', !!faulted, faulted ? faulted.variation.faults.join() : 'none');
+  if (faulted) {
+    const g = new Game(faulted, { seed: 'fault' });
+    g.applyVariation(faulted.variation);
+    const id = faulted.variation.faults[0];
+    /* ⚠ It looks exactly like a dead circuit until somebody throws it. That is the point:
+     * a fault you are told about is a difficulty setting, and a fault you discover is a
+     * variation. */
+    eq('AJ13 a faulted circuit reads as simply off beforehand', g.site.circuitOn(id), false);
+    g.site.setCircuit(id, true);
+    eq('AJ14 and refuses to come up when thrown', g.site.circuitOn(id), false);
+    const other = [...g.site.circuits.values()].find((c) => c.id !== id);
+    if (other) {
+      g.site.setCircuit(other.id, true);
+      eq('AJ15 while a healthy one on the same floor comes up normally', g.site.circuitOn(other.id), true);
+    }
+  }
+
+  /* ── weather reaches both fields, not just the briefing ──────────────────── */
+  const byWeather = new Map();
+  for (let i = 0; i < packs.length; i++) {
+    const w = packs[i].variation.weather;
+    if (byWeather.has(w)) continue;
+    const g = new Game(packs[i], { seed: SEEDS[i] });
+    g.applyVariation(packs[i].variation);
+    byWeather.set(w, { amb: g.heat.ambientC, db: g.sound.ambientDb });
+  }
+  for (const [w, r] of byWeather) note(`  ${w}: ambient ${r.amb.toFixed(1)}°C, room tone ${r.db.toFixed(1)}dB`);
+  const temps = new Set([...byWeather.values()].map((r) => r.amb.toFixed(2)));
+  const tones = new Set([...byWeather.values()].map((r) => r.db.toFixed(2)));
+  ok(`AJ16 weather changes the ambient temperature every contour is computed from (${temps.size} values)`, temps.size > 1);
+  ok(`AJ17 and the room tone every audibility is measured against (${tones.size} values)`, tones.size > 1);
+
+  /* ⚠ WHICH IS A REAL CHANGE IN HOW MUCH FENCE A FLOODLIGHT BUYS. Two degrees of weather
+   * moves the 40°C contour radius, because the radius is a function of ambient. */
+  const radii = [];
+  for (const [w, r] of byWeather) {
+    const h = new HeatField();
+    h.ambientC = r.amb;
+    h.setEmitters([{ id: 't', x: 0, z: 0, peakC: 60, falloffM: 2.2, active: true }]);
+    h.setSinks([]);
+    let rad = 0;
+    for (let d = 0; d < 6; d += 0.005) { if (h.temperatureAt(d, 0) >= 40) rad = d; else break; }
+    radii.push({ w, rad });
+  }
+  note(`  40°C contour radius by weather: ${radii.map((x) => `${x.w} ${x.rad.toFixed(3)}m`).join(' · ')}`);
+  ok('AJ18 so the weather changes how much fence one floodlight buys',
+    new Set(radii.map((x) => x.rad.toFixed(3))).size > 1);
+  emit();
+}
 /**
  * ⚠ ONE SECTION THROWING MUST NOT DELETE EVERY SECTION AFTER IT.
  *
@@ -4601,6 +4799,7 @@ async function run(name, fn) {
     await run('AG', () => sectionAG());
     await run('AH', () => sectionAH(content));
     await run('AI', () => sectionAI(content));
+    await run('AJ', () => sectionAJ());
     await run('K', () => sectionK());
     await run('L', () => sectionL());
     await run('V', () => sectionV());

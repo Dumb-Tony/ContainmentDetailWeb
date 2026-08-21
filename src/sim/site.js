@@ -82,6 +82,11 @@ export class Site {
   setCircuit(id, on) {
     const c = this.circuits.get(id);
     if (!c) return false;
+    /* ⚠ A FAULTED CIRCUIT REFUSES TO COME UP, and it refuses HERE because this is the only
+     * door in — the seed marks it (GDD §14.4, "power and communication faults") and every
+     * caller, the context verb and the netcode alike, gets the same answer without knowing
+     * faults exist. A circuit can always be killed; it is only coming up that can fail. */
+    if (on && c.faulted) return false;
     if (c.on === on) return false;
     c.on = on;
     /* A powered door does not open itself — it becomes openable. A door on a circuit that

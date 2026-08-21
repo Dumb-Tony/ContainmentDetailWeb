@@ -13,6 +13,7 @@
  */
 
 import { SENSES, EFFECT_VERBS, FIELD_KINDS, HUNT_KINDS, BLOCK_KINDS, isSense, isPerformed } from './senses.js';
+import { varyContent } from './variation.js';
 
 const url = (p) => new URL(p, import.meta.url).href;
 
@@ -227,6 +228,18 @@ function validateAnomaly(doc, itemIds) {
 export async function loadContent({
   incident = 'cold-storage-draught',
   itemsPath = '../../content/equipment/items.json',
+  /**
+   * GDD §14.4's scenario seed. `null` means the authored default — every incident that
+   * predates variation loads exactly as it did, and an incident with no `variation` block
+   * varies in nothing whatever seed it is given.
+   *
+   * ⚠ A VARIATION THAT MAKES THE OPERATION UNWINNABLE IS A REFUSAL, not a warning. §14.4
+   * says randomisation must not generate unwinnable states, and the only way to keep that
+   * promise is to check each one before anybody deploys into it — a seed that removes the
+   * last discovery path for a rule arrives one time in fifty and is impossible to
+   * reconstruct from a bug report.
+   */
+  seed = null,
 } = {}) {
   const incidentPath = `../../content/incidents/${incident}.json`;
   const pack = await fetchJson(incidentPath);
@@ -278,7 +291,17 @@ export async function loadContent({
   if (problems.length) throw new ContentError(`${incidentPath} + ${mapPath}`, problems);
 
   const itemsById = new Map(items.items.map((i) => [i.id, Object.freeze(i)]));
-  return { items, map: bound, anomaly, incident: pack, itemsById };
+  const loaded = { items, map: bound, anomaly, incident: pack, itemsById };
+  if (seed === null) return loaded;
+
+  /* §14.4. Applied AFTER validation, and then re-validated: a variation may only move
+   * things the map already validated, so what has to be checked again is what the
+   * variation itself could have broken. */
+  const { pack: varied, problems: vp } = varyContent(loaded, seed);
+  if (vp.length) throw new ContentError(`${incidentPath} @ seed "${seed}"`, vp);
+  const remap = validateMap(varied.map, itemIds, evidenceIds);
+  if (remap.length) throw new ContentError(`${incidentPath} @ seed "${seed}" + ${mapPath}`, remap);
+  return varied;
 }
 
 /** Every incident the build ships, for the mission board. Content, not code. */

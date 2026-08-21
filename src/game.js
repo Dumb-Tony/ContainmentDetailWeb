@@ -317,6 +317,44 @@ export class Game {
    * case, where "the host" and "the player who set it" are the same person.
    */
   /**
+   * Apply the state half of a §14.4 variation. The geometry half — where it started, what
+   * evidence is on the floor, the weather in the briefing — is baked into the content pack
+   * by `applyVariation` before a Game ever sees it; this is the part about the world's
+   * CONDITION rather than its shape.
+   *
+   * ⚠ A FAULTED CIRCUIT IS NOT A DEAD ONE. A dead circuit comes up when somebody throws
+   * the breaker; a faulted one does not, and the squad finds that out by throwing it. That
+   * is §14.4's "power and communication faults" as something you discover rather than
+   * something you are told, and it is the difference between a variation and a difficulty
+   * setting.
+   */
+  applyVariation(v) {
+    if (!v) return this;
+    this.variation = v;
+    /* Weather reaches BOTH fields. Ambient is not decoration: every contour radius in the
+     * game is a function of it, and so is how far a footstep carries. */
+    const w = this.content.weather;
+    if (w) {
+      this.heat.ambientC += w.ambientDeltaC || 0;
+      this.sound.ambientDb += w.ambientDeltaDb || 0;
+    }
+    for (const id of v.routesShut || []) {
+      const d = this.site.doors.find((x) => x.id === id);
+      if (d) { d.open = false; d.jammed = true; }
+    }
+    this.site._rebuildBlocking();
+    this.faultedCircuits = new Set(v.faults || []);
+    for (const c of this.site.circuits.values()) {
+      if (this.faultedCircuits.has(c.id)) c.faulted = true;
+    }
+    for (const [k, val] of Object.entries(v.behaviour || {})) {
+      if (k === 'assistTiming') this.anomaly.assistTiming = val;
+      else this.anomaly.varied = { ...(this.anomaly.varied || {}), [k]: val };
+    }
+    return this;
+  }
+
+  /**
    * A squad call — GDD §11.3. Returns a refusal addressed to the caller, or null.
    *
    * ⚠ THE REFUSAL GOES TO `noticeLocal`, NEVER `notice`. "You cannot see that from here"
