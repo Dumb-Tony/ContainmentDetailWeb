@@ -179,8 +179,42 @@ export function encodeSnapshot(game) {
      * incident file, so sending the truth flag would be sending it a copy of something it
      * loaded at boot. What travels is where each object is and whose hands it is in. */
     ix: game.instances.encode(),
-    rs: game.result || 0,
+    /**
+     * ⚠ THE DEBRIEF RODE EVERY SNAPSHOT, FOR EVER, UNCHANGED.
+     *
+     * `game.result` is the whole graded report — ten dimensions, each with a name, a word
+     * and a sentence of prose — and it was sent flat in every snapshot. Measured by
+     * `tools/soak.ps1`: the field steps from 1 byte to about 1,430 the instant the mission
+     * ends and then repeats at 12 Hz for the rest of the session. About 17 kB/s of pure
+     * repetition, on six of nine incidents, after there is nothing left to play.
+     *
+     * Not a leak — a step, and the largest field on the wire post-debrief. It is sent on the
+     * frames where it CHANGED and skipped otherwise; a client that already has it keeps what
+     * it has, because `applySnapshot` only overwrites when the field is present.
+     *
+     * A snapshot is still a FULL snapshot of everything a late or lossy client needs to
+     * converge — that is the property 30% packet loss is survivable because of, and it is
+     * not being given up here. The debrief is the one field that cannot go stale: once the
+     * mission has ended nothing produces a different one, so a client that missed the frame
+     * it changed on gets it from the next change, and there is never a next change.
+     *
+     * ⚠ WHICH IS WHY A JOINER STILL GETS IT. `_welcome` sends a full snapshot with `rs`
+     * forced, so somebody arriving after the debrief is not looking at a blank screen.
+     */
+    ...(game.result && game.result !== game._sentResult ? { rs: game.result } : {}),
   };
+}
+
+/**
+ * The same snapshot with every optional field forced on.
+ *
+ * For the one moment a client has NO prior state to keep: the welcome. Everything else can
+ * rely on "absent means unchanged"; a joiner cannot, because for them absent means unknown.
+ */
+export function encodeFullSnapshot(game) {
+  const s = encodeSnapshot(game);
+  if (game.result) s.rs = game.result;
+  return s;
 }
 
 const SLOT_IDS = ['belt1', 'belt2', 'gen1', 'gen2', 'long1'];
@@ -280,7 +314,11 @@ export function applySnapshot(game, snap, { localId = null } = {}) {
   game.notices = snap.no.map(([atMs, text]) => ({ atMs, text }));
   game.comms.decode(snap.pg || []);
   game.instances.decode(snap.ix || []);
-  game.result = snap.rs || null;
+  /* ⚠ ABSENT MEANS UNCHANGED, NOT NULL. `snap.rs || null` would clear the debrief on the
+   * very next frame after it arrived, because the field is only sent when it changes. The
+   * one field in this function that is not a full overwrite, and the comment is here so
+   * nobody tidies it back into the pattern the others follow. */
+  if (snap.rs !== undefined) game.result = snap.rs || null;
   return true;
 }
 

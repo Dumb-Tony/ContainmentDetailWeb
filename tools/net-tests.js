@@ -35,7 +35,7 @@ import { PHASE } from '../src/sim/mission.js';
 import { NetSession, loopbackPair, ROLE } from '../src/net/net.js';
 import {
   MSG, ACT, LACT, PROTOCOL_VERSION, MAX_SQUAD,
-  encodeSnapshot, encodeCommand, encodeLobby, applyLobby,
+  encodeSnapshot, encodeCommand, encodeLobby, applyLobby, applySnapshot,
 } from '../src/net/protocol.js';
 import {
   Lobby, SessionDirectory, LOBBY_PHASE, VISIBILITY, LOG_KIND, LOG_WORDS, REMOVAL_REASONS,
@@ -922,6 +922,77 @@ async function sectionT() {
 }
 
 
+/* ── X. the debrief does not ride every snapshot for ever ────────────────── */
+async function sectionX(content) {
+  heading('X. the largest field on the wire is sent when it changes, and not otherwise');
+
+  /**
+   * ⚠ MEASURED BY tools/soak.ps1, AND IT IS A STEP RATHER THAN A LEAK, WHICH IS WHY NOTHING
+   * CAUGHT IT. `game.result` is the whole graded debrief — ten dimensions, each with a name,
+   * a word and a sentence of prose — and it was sent flat in every snapshot. The field goes
+   * from 1 byte to about 1,430 the instant the mission ends and then repeats at 12 Hz for
+   * the rest of the session: roughly 17 kB/s of identical bytes, on six of nine incidents,
+   * after there is nothing left to play.
+   *
+   * A snapshot is still a FULL snapshot of everything a late or lossy client needs to
+   * converge — that is the property that makes 30% packet loss survivable and it is not
+   * being given up. The debrief is the one field that cannot go stale: once the mission has
+   * ended nothing produces a different one.
+   */
+  const host = rig(content, { seed: 'debrief' });
+  host.n.host();
+  host.g.commitLoadout(RECOMMENDED_MANIFEST);
+  const client = mkClient(content, { seed: 'debrief-c' });
+  client.links = seatOn(host, client, 'Two');
+
+  const before = JSON.stringify(encodeSnapshot(host.g)).length;
+  host.g.endMission('measured', host.g.clock.simTimeMs);
+  ok('X1 the mission produced a graded debrief', !!host.g.result, typeof host.g.result);
+
+  const first = JSON.stringify(encodeSnapshot(host.g));
+  ok('X2 the first snapshot after the debrief carries it', first.includes('"rs"'));
+  const step = first.length - before;
+  note(`the debrief adds ${step} bytes to the snapshot it lands on`);
+  ok('X3 and it is the largest single field on the wire', step > 400, `${step} bytes`);
+
+  /* Pump one frame so the host records what it sent, then look again. */
+  host.n.pump(200);
+  const second = JSON.stringify(encodeSnapshot(host.g));
+  ok('X4 the next snapshot does not carry it again', !second.includes('"rs"'), second.slice(0, 80));
+  const saved = (first.length - second.length) * 12;
+  note(`${Math.round(saved / 1024)} kB/s of repetition removed, per client, at 12 Hz`);
+  ok('X5 and the saving is the whole field, every second, for the rest of the session', saved > 4000);
+
+  /* ⚠ ABSENT MEANS UNCHANGED, NOT NULL. The clearing bug is one character away: a client
+   * that reads `snap.rs || null` loses the debrief on the very frame after it arrives. */
+  const cg = client.g;
+  applySnapshot(cg, JSON.parse(first));
+  ok('X6 a client that receives it keeps it', !!cg.result);
+  applySnapshot(cg, JSON.parse(second));
+  ok('X7 and a later snapshot without the field does not clear it', !!cg.result);
+
+  /**
+   * ⚠ AND THE CASE THAT MATTERS IS A RESUME, NOT A JOIN. Nobody can JOIN after the debrief —
+   * §11.5's gate shuts at PROCEDURE_COMMITTED and the mission has ended — so the only way
+   * anybody arrives at a welcome with a debrief already on the host is a dropped operative
+   * reconnecting into their held seat. Which is exactly the person the field is for: they
+   * missed the frame it changed on, and there is never another one.
+   *
+   * Written this way after X8 failed against a join and the refusal was correct. A test that
+   * was "fixed" by moving the mission back before the gate would have tested the gate.
+   */
+  const seatId = client.n.localPlayerId;
+  const seatToken = host.n.seats.get(seatId).token;
+  client.links ? client.links.hl.close() : null;
+  const back = mkClient(content, { seed: 'debrief-back' });
+  const [bh, bc] = loopbackPair();
+  host.n.accept(bh);
+  back.n.join(bc, { name: 'Two', token: seatToken });
+  ok('X8 a dropped operative resuming after the debrief still gets it, because a welcome forces every field',
+    !!back.g.result, back.n.refusedWhy || back.n.status);
+  emit();
+}
+
 /* ── W. a held seat is not a permanent claim ─────────────────────────────── */
 async function sectionW(content) {
   heading('W. a dropped seat is held, and held is not held for ever');
@@ -1002,4 +1073,5 @@ await suite('net-tests', async () => {
   await run('U', () => sectionU());
   await run('T', () => sectionT());
   await run('W', () => sectionW(content));
+  await run('X', () => sectionX(content));
 });

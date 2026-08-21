@@ -19,7 +19,7 @@
 
 import {
   MSG, ACT, LACT, PROTOCOL_VERSION, MAX_SQUAD,
-  encodeCommand, decodeCommand, encodeSnapshot, applySnapshot, encodeLobby, applyLobby,
+  encodeCommand, decodeCommand, encodeSnapshot, encodeFullSnapshot, applySnapshot, encodeLobby, applyLobby,
 } from './protocol.js';
 import {
   Lobby, SessionDirectory, LOBBY_PHASE, VISIBILITY, LOG_KIND, REMOVAL_REASONS,
@@ -552,7 +552,10 @@ export class NetSession {
       t: MSG.WELCOME, v: PROTOCOL_VERSION, id, token,
       seed: this.game.seedLabel,
       map: this.game.site.id,
-      snap: encodeSnapshot(this.game),
+      /* A joiner has no prior state to keep, so every optional field is forced on. See
+       * `encodeFullSnapshot`: for everyone else absent means unchanged; for them it would
+       * mean unknown. */
+      snap: encodeFullSnapshot(this.game),
     };
   }
 
@@ -814,6 +817,8 @@ export class NetSession {
       this._sinceSnapMs = 0;
       const snap = encodeSnapshot(this.game);
       for (const seat of this.seats.values()) if (seat.link.open) seat.link.send(snap);
+      /* Remember what went out, so the next frame can leave it out. See `encodeSnapshot`. */
+      if (snap.rs !== undefined) this.game._sentResult = snap.rs;
       /**
        * §21.2's "match reconnect and network quality", reported as FACTS rather than as a
        * grade: how many seats, how many are answering, how much has been refused and how
