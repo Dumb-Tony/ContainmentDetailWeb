@@ -1,0 +1,455 @@
+{
+  "id": "pinfold-lodger",
+  "contentRevision": "0.1.0",
+  "displayName": "The lodger",
+  "licensingRecordId": null,
+  "_licensingNote": "Original, not an SCP. GDD §25 makes an attribution record a prerequisite for implementing SCP-derived content and §25.7's ShareAlike questions are unsettled. Nothing here is derived from anyone's work.",
+
+  "incidentPremise": "A strip-out crew finished five flats on the ninth floor of a condemned block and left the sixth. Two of them went into Flat 5 on the third visit. The one who was working head-down came out with a cold burn and a broken wrist; the one who was standing behind the partition doing nothing came out on his own feet and will not go back. Neither of them can tell you what it looks like, and both of them can tell you the exact moment it started.",
+
+  "_designNote": "A FIFTH PROCEDURE FAMILY: containment performed without information. GDD §26.2 names three, the caller made a fourth, and the thing all four have in common is that the squad's job is to ACQUIRE and HOLD something — a gradient, a cone of attention, an account, a silence. Every one of them is a resource you spend the operation building up. This one is the first where the resource has to be thrown away, on purpose, at the exact moment it is most wanted.\n\nIT IS SET RIGID BY ATTENTION AND SLACKENED BY INATTENTION, and the second half is what makes it a job rather than a reskin of the figure. The stillwater-figure is an OBSERVATION problem in which observation is the answer: you never stop looking, you hand coverage from a person to a camera, and the failure is dropping it. This is the same quantity used as a POISON. Look at it and it goes hard, cold, and gets its hands on whatever is inside two metres of it; look away for five seconds and it goes slack and the case will close on it. So the climax is one operative standing on a glazed floor with their back to something they can hear, pressing a button they cannot aim, on faith in a coordinate they wrote down thirty seconds ago. The figure's endgame is four people watching one thing. This one's is one person refusing to.\n\nTHE REMOTE CAMERA CHANGES SIDES, WHICH IS THE WHOLE OF §15.2 IN ONE ITEM. On the cold store's aisle B a deployed camera is custody itself — it does not blink, it does not get bored, and leaving one behind is the entire answer. Here a camera pointed at the thing is the one deployment that makes the operation impossible, and it does not stop being pointed at it because the squad walked away. A team that has run the figure will deploy one out of muscle memory, withdraw correctly, wait correctly, and never once get the verb. It is on the research-grade list all the same — pointed at the DOORWAYS, so somebody can see a teammate about to walk in and arm it. Same item, opposite face.\n\nTHREE NUMBERS ARE THE RULE AND ALL THREE ARE VISIBLE ON THE FLOOR. Contact reaches 2.2m. The glaze it lays down while it is attended is 4.4m across — the same 2.2m, drawn. And the case has to be within 1.5m of it while the operative has to be within 2.2m of the case, so 1.5 + 2.2 = 3.7m is how far outside its reach you can stand and still shut the lid. A squad that paces the bright ring has been told the answer in metres. §8.2 asks for observable, consistent, actionable; a capability whose range is literally painted on the floor is the strongest form of all three this build has managed.\n\nNOTHING IS BLOCKED, BECAUSE NOTHING MOVES. `presence.blockedBy` is absent and that is deliberate rather than an omission: it is read only by the mover, this thing has speedMps 0 in every state, and authoring a value would be stating a rule no player could ever test. §8.2 does not allow a rule that cannot be observed, and the honest thing to do with an inapplicable one is to say so in a note rather than to write a number nobody can check.",
+
+  "presence": {
+    "hunts": "none",
+    "_huntsNote": "It does not go anywhere. It has been in the south room of one flat for eleven months and the operation ends where it started, which is the first time in this build the squad cannot bring the problem to a place of their choosing. There is no lure and there is no lane — the whole cost is that the work has to be done at ITS address, on the floor it has already spoiled, inside its reach.",
+    "field": {
+      "kind": "sink",
+      "quantity": "heat",
+      "magnitude": 14,
+      "falloffMetres": 1.9,
+      "_note": "A cold mass about a metre across, fourteen degrees under the room at its centre and about three under it at four metres. It is a SINK for the same reason the tally's objects are — so that the imager the squad already owns is the instrument that finds it — and it is deliberately far too weak to matter to any fence: at these numbers it moves a floodlight's 40C contour by centimetres. The point is not that it is cold. The point is that the ONLY way to find it is to point something at it, and pointing something at it is the thing you must not do."
+    }
+  },
+
+  "perception": {
+    "channels": ["thermal", "physical-trace", "instrument-only"],
+    "recordingInterference": "None, and it is worth stating plainly because the temptation is enormous. It records perfectly. A camera left running holds it exactly as a person does, which is the trap rather than the flaw — an anomaly that corrupted its own recording would let a squad cheat the rule by deploying something and not watching the feed. Custody here has to cost the squad their eyes, so the recording has to work.",
+    "accessibilityAlternatives": [
+      "The set/slack state is announced as a caption and a distinct two-tone drop as well as by the visual change, so 'it has gone slack' does not require watching a colour.",
+      "The glaze boundary carries a shape tell — the polished screed has a hard edge and a different footfall sound — so its 4.4m ring is readable without fine colour discrimination.",
+      "Coverage is reported as a count and a named source ('held by camera 2'), and the count that matters here is zero, which is stated rather than implied by an absence."
+    ]
+  },
+
+  "states": [
+    {
+      "id": "unremarked",
+      "kind": "latent",
+      "speedMps": 0,
+      "displayName": "Unremarked",
+      "description": "Eleven months of nobody. It is a cold patch on a partition with no pipe behind it, and it is doing nothing at all, which is what it has been doing since the block was decanted.",
+      "presentation": {
+        "visualTell": "Nothing to the eye. On thermal, a mass about a metre across against the partition, fourteen degrees under the room",
+        "audioCue": "None. The room sounds like a room",
+        "environmentalTell": "The screed under it is dry when everything else on the floor has eleven months of dust on it"
+      }
+    },
+    {
+      "id": "attended",
+      "kind": "active",
+      "speedMps": 0,
+      "displayName": "Attended",
+      "description": "Somebody is looking at it, or somebody warm is in the room with it. It goes hard: it takes hold of anything inside 2.2m, it pulls charge out of every cell nearby, and it polishes the floor out to the edge of its own reach. It cannot be cased in this state and nothing you do to the room will change that.",
+      "presentation": {
+        "visualTell": "The floor around it goes bright and hard out to a clean circular edge, and stays bright",
+        "audioCue": "The room noise drops out of the space it occupies about half a second before the cold arrives",
+        "environmentalTell": "Breath fogs at head height in a band along the wall it is against, and on that face of the wall only"
+      }
+    },
+    {
+      "id": "unheeded",
+      "kind": "vulnerable",
+      "speedMps": 0,
+      "displayName": "Unheeded",
+      "description": "Five seconds in which nothing has held it in view — no operative, no camera. It slackens, it spreads, it loses its edge, and a case will close on it. It has NOT become safe: it still has hold of everything inside 2.2m and the floor is still glass.",
+      "presentation": {
+        "visualTell": "On thermal, the same mass four degrees under the room instead of fourteen, and half a metre wider at the edges",
+        "audioCue": "The room noise comes back into the space, unevenly, like a door being opened somewhere",
+        "environmentalTell": "The glaze stops growing. What is already down stays down"
+      }
+    },
+    {
+      "id": "cased",
+      "kind": "contained",
+      "speedMps": 0,
+      "displayName": "Cased",
+      "description": "Sealed, with the case heater cycling and nothing pointed at it. Custody here is the closed lid and not the camera, which is the opposite of the aisle B result and is going to have to be argued out at the debrief.",
+      "presentation": {
+        "visualTell": "Case seams frost under load; the ring on the floor is still there and will be there after the demolition",
+        "audioCue": "Heater cycling, roughly every twenty seconds",
+        "environmentalTell": "The room comes back up to corridor temperature over about a minute, which is what the surveyor's logger recorded nine times"
+      }
+    }
+  ],
+
+  "triggers": [
+    {
+      "id": "noticed",
+      "from": "*",
+      "to": "attended",
+      "when": { "sense": "observed", "viewers": 1 },
+      "condition": "at least one operative or powered remote camera has it in view, unobstructed",
+      "telegraph": "The room noise drops out of the space it is in, and the floor under it goes bright, before anything is cold.",
+      "pressureDelta": 2,
+      "latencyToleranceMs": 300,
+      "_note": "NO SUSTAIN, AND FROM ANY STATE, deliberately mirroring the caller's `disturbed`. Setting is instantaneous and slackening takes five seconds, and that asymmetry is the whole endgame: an operative who glances round to check where the case is has spent five seconds they have to buy again. §8.2 is paid on the other side of the pair — see `let-be`."
+    },
+    {
+      "id": "walked-in",
+      "from": "unremarked",
+      "to": "attended",
+      "when": { "sense": "heat-within", "radiusMetres": 5, "sustainSeconds": 4 },
+      "condition": "any warm body or powered emitter within 5m for longer than 4s, whether or not anything is looking at it",
+      "telegraph": "The dust stops moving in the doorway and the draught through the flat drops away. Nothing is visibly different yet.",
+      "pressureDelta": 1,
+      "latencyToleranceMs": 1200,
+      "_note": "IT IS NOT ONLY THE LOOKING, and this trigger exists so that a squad cannot solve the incident by walking in blindfolded. It wakes on warmth as well, which means the first arming is unavoidable and the procedure begins AFTER it, not instead of it. From `unremarked` only: once it has been woken, warmth never re-arms it and attention is the only thing that does, so the endgame is about eyes and nothing else."
+    },
+    {
+      "id": "let-be",
+      "from": "attended",
+      "to": "unheeded",
+      "when": { "sense": "unobserved-for", "sustainSeconds": 5 },
+      "condition": "no operative and no powered camera has held it in view for a continuous five seconds",
+      "telegraph": "The room noise comes back into the space it is in, about a second before the edges of it go soft.",
+      "pressureDelta": -1,
+      "latencyToleranceMs": 400,
+      "_note": "THE SUSTAIN IS THE PROCEDURE. Five seconds is long enough that it cannot be done by flinching and short enough that it can be done inside one contact cooldown — 7000ms — so an operative who takes station correctly eats exactly one contact and not two. A squad that does not know the figure is five will consistently turn back round at three and buy nothing. The asymmetry with `noticed`, which has no sustain at all, is where §8.2 is paid: a client whose camera feed is 80ms stale cannot lose the operation to a dropped packet, because losing it requires five continuous seconds and gaining it requires none."
+    },
+    {
+      "id": "sealed",
+      "from": "unheeded",
+      "to": "cased",
+      "when": { "sense": "enclosed-by", "itemId": "reinforced-transit-case", "radiusMetres": 1.5 },
+      "condition": "the transit case is closed around it while nothing at all is holding it in view",
+      "telegraph": "The latches go over. Nobody sees it happen, which is the only way it happens.",
+      "pressureDelta": -4,
+      "latencyToleranceMs": 2500
+    }
+  ],
+
+  "capabilities": [
+    {
+      "id": "take-hold",
+      "verb": "contact",
+      "availableInStates": ["attended", "unheeded"],
+      "effect": "It gets hold of whatever is inside its reach and does not let go quickly. A wrenched joint and a cold burn; survivable once, and the second one puts an operative on the floor.",
+      "rangeMetres": 2.2,
+      "cooldownMs": 7000,
+      "latencyToleranceMs": 300,
+      "compounding": true,
+      "applies": [
+        { "condition": "mobility-injury", "severity": "serious" },
+        { "condition": "exposure", "severity": "minor" }
+      ],
+      "counterableBy": ["stand-off"],
+      "_note": "AVAILABLE IN THE VULNERABLE STATE TOO, and that is the single most important line in this file. Every other anomaly here becomes harmless at the moment it becomes sealable — banked, held, stilled, gathering. This one does not. Not being able to see it does not make it safe, and the operative who is about to shut the lid is standing inside its reach with their back to it. If this capability were withdrawn in `unheeded` the whole procedure would collapse into walking up to something and pressing a key."
+    },
+    {
+      "id": "pull-charge",
+      "verb": "drain-power",
+      "availableInStates": ["attended"],
+      "effect": "Cells within range shed charge about four times faster than rated while it is set. The case is the one that matters: a case with a flat heater will not take custody and will not hold it.",
+      "rangeMetres": 5,
+      "cooldownMs": 0,
+      "counterableBy": ["stand-off"],
+      "_note": "THIS IS THE CLOCK, AND IT IS WOUND BY LOOKING. Searching for it means pointing something at it, and every second it is pointed at costs the transit case four seconds of heater. So the instrument that finds it spends the custody budget, and a squad that sweeps the flat thoroughly arrives at the case it needs with less of it.\n\nThe counter is geometry rather than kit, and it is a TRANSFER rather than an escape. MEASURED: a power pack set down 5.83m out — beyond the 5m drain radius — and 4.34m from the case, inside its own 5m feed radius, takes the case's draw entirely: over four seconds of held attention the case spent 0ms of its own cell and the pack spent 16,000. The pack does not dodge the multiplier, it stands in the way of it, so nine minutes of pack is about three minutes of protected custody against thirty seconds of verification. That is the trade, and it is the reason the pack is on the safe list and not the minimum one."
+    },
+    {
+      "id": "glaze",
+      "verb": "surface-hazard",
+      "availableInStates": ["attended"],
+      "effect": "Polishes the screed out to the edge of its reach and leaves it that way. The ring persists after the operation ends; it is 4.4m across, and it is exactly the ground the thing can touch you on.",
+      "rangeMetres": 4.4,
+      "cooldownMs": 6000,
+      "counterableBy": ["stand-off"],
+      "_note": "THE HAZARD IS THE PROCEDURE'S ONLY MAP. It is drawn while the thing is attended, which means the squad's own first sighting is what paints the boundary — and the boundary is `take-hold`'s 2.2m reach at 1:1. That is why the ring is laid at 4.4m across rather than at some other number: an authored hazard that did not agree with the authored reach would be decoration, and this one is the rule made visible. It also costs what ice costs: accelerate and stop badly on it, which is the last thing wanted by an operative who has to come to a dead halt on a mark, facing away, with one hand free."
+    }
+  ],
+
+  "constraints": [
+    {
+      "id": "attention-sets-it",
+      "effect": "blocks",
+      "statement": "It cannot be cased while anything holds it in view. One unobstructed viewer is enough and it does not distinguish a person from a deployed camera. This is the whole procedure: the squad does not build anything, they stop knowing where it is.",
+      "requiredEquipment": []
+    },
+    {
+      "id": "stand-off",
+      "effect": "weakens",
+      "statement": "Everything it does reaches 2.2m and no further, through walls as readily as through air. The case must be within 1.5m of it and an operative within 2.2m of the case, so there is 3.7m of standing room outside its reach if the case is put down between the two of you.",
+      "requiredEquipment": ["reinforced-transit-case"]
+    },
+    {
+      "id": "walls-are-privacy",
+      "effect": "weakens",
+      "statement": "Sight is geometric and reach is not. A stud-and-plasterboard partition breaks a sightline as completely as a concrete crosswall does, and stops nothing else at all — an operative standing behind one is unseen and still inside 2.2m.",
+      "requiredEquipment": []
+    },
+    {
+      "id": "thermal-finds-it",
+      "effect": "reveals",
+      "statement": "It reads fourteen degrees under the room while it is set and four under while it is slack, so an imager both finds it and tells you which state it is in. It is also how you arm it: there is no way to point the instrument at it without looking at it.",
+      "requiredEquipment": ["thermal-imager"]
+    }
+  ],
+
+  "_evidenceNote": "GDD §27.2 wants at least two evidence paths per required rule, and the hard part here is the same one the figure had: `noticed` and `let-be` are two faces of one coin, so a careless second path for either is a restatement of the other. They are split on what the observation RECORDS. `noticed` is evidenced by things that WENT HARD at a known moment — a cold-burn band on one face of a sheet of plasterboard and not the other, a helmet camera whose audio floor drops out only in the clips where the wearer's head is up, a man describing the second his mate looked up. `let-be` is evidenced by things that CAME BACK: a room that returns to corridor temperature within an hour of every logged visit, a watchman who has walked the ninth in the dark for four months, and an imager reading taken twice ninety seconds apart.\n\nThe reliabilities inside each group are mismatched on purpose. §7.3 grades an observation confirmed, probable or disputed, and two confirmed sources for one rule is one source written twice. The watchman is graded disputed and stays in: he is one frightened man who will not say why he does it, and §7.3 has a word for that rather than a reason to leave him out.\n\nTWO SOURCES COST CARGO AND THEY ARE DIFFERENT INSTRUMENTS ON PURPOSE — the imager sweep and the helmet footage, which needs the camera. Neither is the only path to its rule and neither can be reached by walking, so the loadout wager (§10.7) bites without ever gating a rule behind a purchase. `battery-drain` is the one entry with no location at all: it is earned by having two powered things in the room while it is set, which is telemetry rather than a pickup, and it is the second path for `pull-charge` so that a squad that never finds the watchman's note can still learn what is eating the case.",
+
+  "evidenceRules": [
+    {
+      "id": "mate-statement",
+      "type": "testimonial",
+      "dimension": "trigger",
+      "rawObservation": "The second fitter. He states the pair of them worked in the south room for about a quarter of an hour with the lamp on the floor and nothing happened, and that it went cold 'the second he put his head up'. Asked what he himself was doing, he says he was standing behind the partition in the other half of the flat looking at his phone, and that it got to him too.",
+      "reliability": "probable",
+      "revealsRule": "noticed",
+      "requiredEquipment": [],
+      "channel": "witness",
+      "isFalseLead": false
+    },
+    {
+      "id": "frost-band",
+      "type": "environmental",
+      "dimension": "constraint",
+      "rawObservation": "A band of cold-burnt paper on the partition at head height, 1.55m up, running two and a half metres along it. It is on the south face only. The north face of the same sheet of plasterboard, eleven millimetres away, is unmarked.",
+      "reliability": "confirmed",
+      "revealsRule": "noticed",
+      "requiredEquipment": [],
+      "channel": "visual",
+      "isFalseLead": false
+    },
+    {
+      "id": "helmet-footage",
+      "type": "instrumental",
+      "dimension": "trigger",
+      "rawObservation": "The injured fitter's helmet camera, recovered with the rest of his kit. Fifty-one minutes in eleven clips, continuous, no cuts. In the three clips where he raises his head from his work the audio floor drops by eighteen decibels for exactly as long as his head is up, and comes back when he looks down again. Nothing enters or leaves frame in any of the eleven.",
+      "reliability": "probable",
+      "revealsRule": "noticed",
+      "requiredEquipment": ["remote-camera"],
+      "channel": "instrument",
+      "isFalseLead": false
+    },
+    {
+      "id": "watchman-statement",
+      "type": "testimonial",
+      "dimension": "constraint",
+      "rawObservation": "The site watchman states that he does his round of the ninth floor in the dark and has done for four months. Pressed on why, he says only that the torch is 'more trouble than it's worth up there'. He has not missed a round and he has not reported anything.",
+      "reliability": "disputed",
+      "revealsRule": "let-be",
+      "requiredEquipment": [],
+      "channel": "witness",
+      "isFalseLead": false
+    },
+    {
+      "id": "damp-logger",
+      "type": "instrumental",
+      "dimension": "constraint",
+      "rawObservation": "A building surveyor's damp logger clipped to the meter tails in Flat 5, still running on its own cell, half-hourly readings for eleven months. Room temperature holds within a degree of the corridor for the whole file except in nine intervals. Every one of the nine begins inside a visit written up in the contractor's day book, and every one of them is back to corridor temperature within an hour of that visit ending.",
+      "reliability": "probable",
+      "revealsRule": "let-be",
+      "requiredEquipment": [],
+      "channel": "instrument",
+      "isFalseLead": false
+    },
+    {
+      "id": "thermal-void",
+      "type": "instrumental",
+      "dimension": "form",
+      "rawObservation": "Thermal sweep of Flat 5 from the corridor. A sub-ambient mass 1.1m across against the partition, holding its shape and its edge, fourteen degrees under the room for as long as it is on the screen. Taken off the screen and put back on it ninety seconds later, the same mass reads four degrees under the room and is half a metre wider at the edges.",
+      "reliability": "confirmed",
+      "revealsRule": "let-be",
+      "requiredEquipment": ["thermal-imager"],
+      "channel": "instrument",
+      "isFalseLead": false
+    },
+    {
+      "id": "day-book",
+      "type": "documentary",
+      "dimension": "trigger",
+      "rawObservation": "The strip-out contractor's day book for the flats. Flat 5 has three entries and all three are half days. Against the third, in a different pen and a different hand: 'doesn't have to be looking at it'.",
+      "reliability": "probable",
+      "revealsRule": "walked-in",
+      "requiredEquipment": [],
+      "channel": "document",
+      "isFalseLead": false
+    },
+    {
+      "id": "dropped-tiles",
+      "type": "environmental",
+      "dimension": "trigger",
+      "rawObservation": "The strip-out in Flat 5 stops nine tiles in. Eight are stacked square on edge against the north room wall, which is a man working steadily. The ninth is face down in the middle of the floor with the bar still under it, and a mug of tea beside it, full, and frozen through.",
+      "reliability": "confirmed",
+      "revealsRule": "walked-in",
+      "requiredEquipment": [],
+      "channel": "visual",
+      "isFalseLead": false
+    },
+    {
+      "id": "glazed-ring",
+      "type": "environmental",
+      "dimension": "capability",
+      "rawObservation": "A circle of floor in the south room of Flat 5, 4.4m across, where eleven months of dust has been polished off and the screed under it has gone glassy. The edge is a hard line rather than a fade. A battery lamp lies just inside it and a wrecking bar just outside, and neither has been moved.",
+      "reliability": "confirmed",
+      "revealsRule": "glaze",
+      "requiredEquipment": [],
+      "channel": "visual",
+      "isFalseLead": false
+    },
+    {
+      "id": "ambulance-sheet",
+      "type": "documentary",
+      "dimension": "capability",
+      "rawObservation": "Ambulance handover sheet for the fitter taken off the ninth floor. Two injuries: a cold burn to the right forearm and a fractured left wrist. The mechanism recorded against the wrist is 'fell on a wet floor indoors'. The ninth floor has been dry for eleven months and the water was cut off with the gas.",
+      "reliability": "probable",
+      "revealsRule": "glaze",
+      "requiredEquipment": [],
+      "channel": "document",
+      "isFalseLead": false
+    },
+    {
+      "id": "charger-note",
+      "type": "documentary",
+      "dimension": "capability",
+      "rawObservation": "A note taped inside the meter cupboard in the west stair, in the watchman's hand: 'DON'T LEAVE THE CHARGER UP ON 9'. Underneath it, four dates and four sets of initials, all four in the same hand.",
+      "reliability": "disputed",
+      "revealsRule": "pull-charge",
+      "requiredEquipment": [],
+      "channel": "document",
+      "isFalseLead": false
+    },
+    {
+      "id": "battery-drain",
+      "type": "instrumental",
+      "dimension": "capability",
+      "rawObservation": "Two separate battery-powered items standing in the same room as the cold mass shed charge about four times faster than their rated draw. Carried out of the room, both return to their normal rate within a minute.",
+      "reliability": "probable",
+      "revealsRule": "pull-charge",
+      "requiredEquipment": [],
+      "channel": "instrument",
+      "isFalseLead": false,
+      "_note": "NO LOCATION, ON PURPOSE. This is the one entry in the file that is earned rather than found — game.js `_stepEvidence` logs it when two powered deployables are inside five metres of an awake anomaly, so it is the squad's own telemetry and it arrives while they are working rather than while they are walking. The incident file therefore places no source for it."
+    },
+    {
+      "id": "decant-file",
+      "type": "documentary",
+      "dimension": "anchor",
+      "rawObservation": "Housing decant file for Flat 5, left in the flat with the meter cards. The last tenant refused the offer twice, was moved into care in the eleventh month of the programme and died four weeks after that. The flat was never re-let and the strip-out was booked for the anniversary.",
+      "reliability": "disputed",
+      "revealsRule": "",
+      "requiredEquipment": [],
+      "channel": "document",
+      "isFalseLead": true
+    },
+    {
+      "id": "lift-blower",
+      "type": "environmental",
+      "dimension": "anchor",
+      "rawObservation": "The lift motor-room riser is still running its blower on the emergency supply and has been since the decant. The whole riser reads two degrees under the rest of the floor, top to bottom.",
+      "reliability": "unreliable",
+      "revealsRule": "",
+      "requiredEquipment": [],
+      "channel": "sensory",
+      "isFalseLead": true
+    }
+  ],
+
+  "containment": {
+    "goal": "The lodger sealed inside a transit case with its heater cycling, verified by a stable case interior for thirty seconds. Custody is the closed lid. Nothing is watching it when the lid goes over, and nothing needs to afterwards.",
+
+    "procedures": [
+      {
+        "id": "blind-seal-minimum",
+        "grade": "minimum",
+        "displayName": "One operative, nothing deployed but the case",
+        "requiredEquipment": ["reinforced-transit-case"],
+        "verbs": ["survey", "withdraw", "seal"],
+        "concurrentRoles": 1,
+        "statement": "Find the room, set the case down beside it, back out to the far side of the case, turn your back and stand still for five seconds, then shut the lid without turning round.",
+        "abortConditions": [
+          "A second contact on the operative taking the seal",
+          "The case heater goes flat before the lid is over"
+        ],
+        "_note": "It works, it costs two volumes, and it is a trap in the same shape as the tally's `sweep-and-lift`: the only way to find the thing without an instrument is to walk around the flat until it takes hold of you, and by then it has glazed the floor you have to come to a dead stop on and drained whatever you were carrying. Fast when you already know the room and expensive when you do not."
+      },
+      {
+        "id": "blind-seal-safe",
+        "grade": "safe",
+        "displayName": "Imager to mark it, pack outside the drain, seal from the doorway",
+        "requiredEquipment": ["thermal-imager", "reinforced-transit-case", "power-pack", "trauma-kit"],
+        "verbs": ["survey", "mark", "withdraw", "screen", "seal", "verify"],
+        "concurrentRoles": 2,
+        "statement": "Sweep from outside the room and mark it on the imager before anyone is inside 2.2m. Set the pack down more than 5m from it and within 5m of where the case is going, so the case runs on the pack's cells and not its own. Put the case down between you and it, take station on the far side of the case, break the sightline on the building's own wall, and seal blind.",
+        "abortConditions": [
+          "Anyone still has it in view when the five seconds are due to expire",
+          "The pack is inside the drain radius, so both batteries are being spent at four times rate",
+          "A second contact on any operative"
+        ],
+        "_note": "The pack is on this list for a geometric reason and not a generic one: the drain radius and the pack's feed radius are both 5m, and the case has to be within 1.5m of the thing. So there is a band of standing room — measured on the Flat 5 pen at 5.83m out and 4.34m back — in which the pack is beyond the drain and the case is still inside the feed, and finding it is the difference between a case that holds thirty seconds and one that does not. It buys time rather than immunity, because the pack takes the four-times rate in the case's place. §12.1.\n\n⚠ THREE OF THESE FOUR ITEMS ARE `general` BULK AND THERE ARE TWO GENERAL SLOTS (GDD §9.2). One operative physically cannot carry the imager, the case and the pack, which is why this procedure is `concurrentRoles: 2` and why the minimum grade is a real grade rather than a formality. Solo, the wager is the vessel plus ONE instrument, and the whole of §10.7 is in that sentence."
+      },
+      {
+        "id": "blind-seal-research",
+        "grade": "research",
+        "displayName": "Cameras on the doors, sample from the ring, seal blind",
+        "requiredEquipment": ["thermal-imager", "reinforced-transit-case", "power-pack", "remote-camera", "sample-kit", "trauma-kit"],
+        "verbs": ["survey", "mark", "witness", "withdraw", "screen", "seal", "verify"],
+        "concurrentRoles": 3,
+        "statement": "Two cameras, both pointed at a doorway and neither at the thing, so the operative taking the seal knows a teammate is about to walk in before they do. One operative on the imager calls the mark and then puts the instrument away. A screed sample is lifted from the hard edge of the ring before the case goes down.",
+        "abortConditions": [
+          "A camera has line of sight to it at any point after the case is placed",
+          "The screed sample is compromised before the lid is over",
+          "Any condition from the safe procedure"
+        ],
+        "_note": "⚠ THIS IS WHERE IT GOES WRONG AND IT IS WHY THIS GRADE IS RESEARCH RATHER THAN SAFE. A remote camera is the correct answer to the figure and the wrong answer to this, and it does not stop being wrong because the squad walked away from it — a camera deployed facing the room holds the thing set for its whole battery, from an angle nobody is looking at. The procedure is not 'no cameras'. It is 'no camera pointed at it', which needs somebody who knows which way each one is facing, and that is a third pair of hands."
+      }
+    ],
+
+    "integrityConditions": [
+      {
+        "id": "case-heater",
+        "measure": "temperature",
+        "failureSignal": "The heater cycle audibly lengthens, then stops, and the case gets appreciably colder to the hand.",
+        "recoveryWindowMs": 20000
+      },
+      {
+        "id": "case-power",
+        "measure": "power",
+        "failureSignal": "The case indicator drops a step every few seconds rather than every few minutes — which means it is inside the drain and the pack is not carrying it.",
+        "recoveryWindowMs": 12000
+      },
+      {
+        "id": "no-coverage",
+        "measure": "observation-coverage",
+        "failureSignal": "The coverage count comes off zero and the room noise goes out of the corner again. Something is looking at it, and the five seconds start over.",
+        "recoveryWindowMs": 5000,
+        "_note": "The only integrity condition in this build whose healthy value is ZERO. Everywhere else coverage falling is the failure; here it rising is."
+      }
+    ]
+  },
+
+  "difficultyProfiles": [
+    {
+      "preset": "orientation",
+      "squadSize": { "min": 1, "max": 4 },
+      "timingScale": 1.6,
+      "evidenceAvailability": "generous",
+      "automationAllowed": ["automated-observation-unit"]
+    },
+    {
+      "preset": "field",
+      "squadSize": { "min": 1, "max": 5 },
+      "timingScale": 1,
+      "evidenceAvailability": "standard",
+      "automationAllowed": []
+    },
+    {
+      "preset": "severe",
+      "squadSize": { "min": 2, "max": 5 },
+      "timingScale": 0.8,
+      "evidenceAvailability": "sparse",
+      "automationAllowed": []
+    }
+  ],
+
+  "behaviourModule": null
+}

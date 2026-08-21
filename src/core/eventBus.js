@@ -48,6 +48,8 @@ export class EventBus {
     this.logSize = logSize;
     this.log = [];                // ring, newest last
     this.emitted = 0;
+    /** Types dispatched to listeners but kept out of `log`. See emit(). */
+    this.unlogged = new Set();
   }
 
   /** @returns {() => void} unsubscribe */
@@ -70,8 +72,20 @@ export class EventBus {
     const evt = { type, simTimeMs, ...payload };
     this.emitted++;
 
-    this.log.push(evt);
-    if (this.log.length > this.logSize) this.log.shift();
+
+    /**
+     * ⚠ SOME EVENTS ARE FOR LISTENERS AND NOT FOR THE RECORD.
+     *
+     * GDD §21.2 forbids free text in the analytics log, and the only free text in this game
+     * is a callsign somebody typed. NOTICE carries prose written for a player — "Vasquez is
+     * down. Somebody get to them." — so it must still reach the audio cue and the HUD, and
+     * must never be kept. Live dispatch and durable record are two different jobs; only the
+     * second one is regulated.
+     */
+    if (!this.unlogged.has(type)) {
+      this.log.push(evt);
+      if (this.log.length > this.logSize) this.log.shift();
+    }
 
     const set = this._handlers.get(type);
     // iterate a copy: a handler may unsubscribe itself mid-dispatch

@@ -409,7 +409,7 @@ export class Panels {
     this.node.querySelector('[data-close]').onclick = () => this.hide();
     this.node.querySelectorAll('[data-claim]').forEach((b) => b.onclick = () => {
       const cur = g.ledger.claimState.get(b.dataset.claim);
-      g.ledger.setClaim(b.dataset.claim, cur === b.dataset.val ? null : b.dataset.val);
+      g.setClaim(b.dataset.claim, cur === b.dataset.val ? null : b.dataset.val);
       this._renderTablet();
     });
     this.node.querySelectorAll('[data-field]').forEach((s) => s.onchange = () => { this.plan[s.dataset.field] = s.value; });

@@ -1,0 +1,42 @@
+{
+  "id": "cold-storage-passenger",
+  "contentRevision": "0.1.0",
+  "displayName": "What was left running",
+  "anomaly": "coldharbour-passenger",
+  "map": "cold-storage-l2",
+  "difficulty": "field",
+
+  "_note": "THE FOURTH INCIDENT ON THIS FLOOR AND THE FIFTH PROCEDURE FAMILY. Cold storage level 2 now carries a thing that hunts heat, a thing that stops when you look at it, a set of objects that does nothing, and this — a thing that does not move at all, takes whatever warm object comes within a metre and a half of it, and will not be watched while it holds one.\n\n§15.2 wants the building constant and the incident variable, and the fourth time round the point is no longer that the map is reused. It is that a squad walks in carrying three operations' worth of correct knowledge about this floor and every piece of it is aimed at the wrong thing:\n\n  · They know the 4.2m aisles need two staggered tripods to fence. Nothing here is fenced, by anything, ever.\n  · They know a single camera at the mouth of an aisle holds the lane for free. A camera pointing anywhere near the case makes the whole operation stutter — take, let go, take, on a three-and-a-half second cycle — and burns five of the case's twelve minutes doing it.\n  · They know the office breaker is on the bay wall and the storage breaker is inside the office. Restoring the mains does one thing here: it makes the floor bright enough to look at things by, and looking at things is the failure mode.\n  · They know the imager finds what is cold. There is nothing cold on this floor that matters. There are three things that are warm and one of them is a man.\n\nThe only habit that survives is the one nobody thinks of as a habit: get the case out of cargo and get it powered before anything else happens.\n\nAND THE FLOOR IS BIGGER HERE THAN IN ANY OF THE OTHER THREE, because the anomaly is at the far north end of the west run and the squad arrives at the stair head in the south-east corner. That is twenty-four metres of a building they already know, and it is the last twenty-four metres of somebody else's Tuesday: the band of thawed and refrozen floor runs the whole way and his own boot prints are in it.",
+
+  "anomalySpawn": [-10.9, 6.4],
+  "_spawnNote": "It is on the contractor, and it has been since he stopped walking. That is not colour — it is the state machine's first state made physical. `settled` has exactly one exit, `noticed`, which is two continuous seconds of view, so the operation cannot begin until the squad decides to look at the body. Standing on the evidence source IS standing on the anomaly, and perception.js `sees` counts anything inside 0.35m regardless of facing, so a squad that walks right up to take the observation starts the incident by taking it — which is the correct lesson and a survivable way to learn it, because a settled passenger has no capability at all.",
+
+  "briefing": {
+    "headline": "One fatality, one burn, cold storage level 2",
+    "report": "Level 2 was mothballed eleven weeks ago with one mobile heater left running to keep the sprinkler main off freezing. The heater failed at 06:14 Tuesday. A contractor went down at 10:40 to replace it and did not come back up. Three men went down on the Wednesday to find him; they found him at the far end of the west run, and the one who knelt at his head came back up with a burn across one palm. The floor was sealed that afternoon.",
+    "known": [
+      { "text": "The contractor is at the north end of the west run, four days down. The men who reached him say he was warm.", "confidence": "probable" },
+      { "text": "There has been exactly one powered object on this level for eleven weeks, and it failed on Tuesday morning.", "confidence": "probable" },
+      { "text": "The site's fixed camera at the head of the west run has been turned to face the wall and its lens taped over, from the aisle side, at some point after the floor was sealed. Nobody has claimed it.", "confidence": "probable" },
+      { "text": "The chiller return still reads under room temperature along its whole length. The plant has been off for eleven weeks.", "confidence": "disputed" }
+    ]
+  },
+
+  "_placementNote": "⚠ THE INVARIANT, NOT A FEELING. `contextAction` is nearest-wins and `sourceInReach` probes `reach + 0.6` = 2.8m, so two sources inside 2.8m of each other means the earlier one answers for both and the later one loses its verb entirely once the earlier is logged; and a source inside 2.8m of where an operative stands to work a breaker or a door beats the fixture outright, because it is nearer. The second kind has cost this project a whole operation already — see cold-storage-draught.json, where a charging rack 2.7m from the office breaker took the breaker's verb away and the solo containment could not get into the office.\n\nSo every source here was placed against a computed clearance rather than by eye:\n  · > 5.0m (`reach` + probe) from BOTH door centres — freight (-8.0, -5.0), office (-8.0, -9.75) — and from BOTH circuit switches — office (-6.0, -7.0), storage (-10.0, -10.0).\n  · > 5.0m from the cargo cache (6.4, -7.2), which is a context candidate at `reach + 1.0`.\n  · > 3.2m from every other source in this file, comfortably clear of the 2.8m probe and of section AF's 2.5m reporting margin.\nMEASURED minima are printed by the probe and quoted in the report: 3.40m source-to-source, 5.36m source-to-fixture.\n\nTHE OFFICE DESK IS DELIBERATELY EMPTY. Three incidents have put a document on it and two of those are pinned there by the suite; the office is 3.8m square and already holds the storage breaker and a door, and this incident had no reason to make it a fourth interactable in the most crowded room on the floor. Nothing here is in the office or the freight lobby.\n\nTHE LAYOUT IS THE STORY IN THE ORDER YOU WALK IT. Four sources stand in a line up the west run at 3.5m spacing — his work light where he set it down, the glove the Wednesday party left, the man, and his helmet camera past him — so the lane reads as the last forty metres of somebody's Tuesday, in sequence, ending at the thing that is still there. The bay carries the paperwork and the two rings around the dead heater, which is where it started. The band of thawed floor between the two is only visible on the imager, which is why the sweep is authored at the mouth of Aisle C: it is the point on the walk where a squad can see the whole run of it at once.",
+
+  "evidenceSources": [
+    { "evidenceId": "work-light", "at": [-10.8, -0.6], "label": "A work light standing in the west run", "prompt": "Examine the work light", "requiresEquipment": [] },
+    { "evidenceId": "scorched-glove", "at": [-10.4, 2.9], "label": "A glove on the floor", "prompt": "Examine the glove", "requiresEquipment": [] },
+    { "evidenceId": "the-contractor", "at": [-10.9, 6.4], "label": "A man in site coveralls", "prompt": "Examine him", "requiresEquipment": [] },
+    { "evidenceId": "helmet-footage", "at": [-10.5, 9.9], "label": "His helmet camera, on the floor", "prompt": "Play back the card", "requiresEquipment": [] },
+
+    { "evidenceId": "fault-printer", "at": [-2.8, -11.3], "label": "Fault printer on the bay wall", "prompt": "Read the printout", "requiresEquipment": [] },
+    { "evidenceId": "thaw-rings", "at": [0.6, -11.3], "label": "The dead heater, and two rings on the floor", "prompt": "Examine the rings", "requiresEquipment": [] },
+
+    { "evidenceId": "residual-heat", "at": [3.4, -2.6], "label": "The mouth of Aisle C", "prompt": "Sweep the floor from here", "requiresEquipment": ["thermal-imager"] },
+    { "evidenceId": "mothball-notice", "at": [-5.6, 2.0], "label": "Notice on the sprinkler riser, Aisle A", "prompt": "Read the notice", "requiresEquipment": [] },
+    { "evidenceId": "chiller-return", "at": [9.8, -2.0], "label": "The chiller return, east run", "prompt": "Sweep the return", "requiresEquipment": ["thermal-imager"] },
+
+    { "evidenceId": "search-party", "at": [11.4, -11.4], "label": "The three from the Wednesday, at the stair head", "prompt": "Take statements", "requiresEquipment": [] }
+  ]
+}

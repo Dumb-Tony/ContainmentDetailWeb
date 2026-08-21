@@ -138,10 +138,23 @@ export class DeployableSet {
   stepPower(stepMs, anomaly) {
     const packs = this.list.filter((d) => d.isPack && d.on && d.batteryMs > 0);
 
-    /* The anomaly eats charge in range while it is awake (capability `drain-battery`). */
-    const drainRadius = CONFIG.anomaly.batteryDrainRadiusM;
-    const drainMult = CONFIG.anomaly.batteryDrainMultiplier;
-    const draining = anomaly && anomaly.isAwake;
+    /**
+     * The anomaly eats charge in range while it is awake — IF ITS CONTENT SAYS IT DOES.
+     *
+     * This read `anomaly.isAwake` and two CONFIG constants and never looked at the
+     * content, so an anomaly that authored NO `drain-power` capability still drained
+     * batteries, and one that authored a range and a state list had both ignored.
+     * Three fields that looked like rules and were comments.
+     */
+    const drainCap = anomaly && anomaly.def
+      && (anomaly.def.capabilities || []).find((c) => c.verb === 'drain-power');
+    const draining = !!drainCap && (drainCap.availableInStates
+      ? drainCap.availableInStates.includes(anomaly.state)
+      : anomaly.isAwake);
+    const drainRadius = drainCap && drainCap.rangeMetres !== undefined
+      ? drainCap.rangeMetres : CONFIG.anomaly.batteryDrainRadiusM;
+    const drainMult = drainCap && drainCap.multiplier !== undefined
+      ? drainCap.multiplier : CONFIG.anomaly.batteryDrainMultiplier;
 
     for (const d of this.list) {
       d.fedByPack = false;

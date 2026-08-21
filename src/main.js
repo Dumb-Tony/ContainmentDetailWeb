@@ -358,7 +358,7 @@ async function boot() {
       for (let i = 1; i <= 5; i++) {
         if (!input.wasPressed(`slot${i}`)) continue;
         if (client) net.act(ACT.SLOT, { n: i - 1 });
-        else if (me) me.selectSlot(i - 1);
+        else game.selectSlot(net.localPlayerId, i - 1);
       }
       if (input.wasPressed('tablet')) { document.exitPointerLock(); panels.showTablet(); }
       if (input.wasPressed('settings')) { document.exitPointerLock(); settingsPanel.show(); }

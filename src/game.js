@@ -62,6 +62,17 @@ export const EVENTS = Object.freeze({
   INSTANCE_LOGGED: 'INSTANCE_LOGGED',
   SET_PURGED: 'SET_PURGED',
   NOISE_MADE: 'NOISE_MADE',
+  /* GDD �21.2's core events. The seven the bus did not carry, added so �27.1's "analytics
+   * answer a named design question" can be more than an intention. Every one of them names
+   * a question in �21.1: which evidence is misunderstood, how often teams revise a
+   * procedure, which role lacks meaningful work, how long each phase takes. */
+  HYPOTHESIS_CHANGED: 'HYPOTHESIS_CHANGED',
+  PROCEDURE_COMMITTED: 'PROCEDURE_COMMITTED',
+  PROCEDURE_REVISED: 'PROCEDURE_REVISED',
+  EQUIPMENT_SELECTED: 'EQUIPMENT_SELECTED',
+  OPERATIVE_EXTRACTED: 'OPERATIVE_EXTRACTED',
+  DIRECTIVE_OUTCOME: 'DIRECTIVE_OUTCOME',
+  LINK_QUALITY: 'LINK_QUALITY',
   NOTICE: 'NOTICE',
 });
 
@@ -145,6 +156,9 @@ export class Game {
     this.content = content;
     this.itemsById = content.itemsById;
     this.bus = new EventBus();
+    /* §21.2: the notice feed is prose addressed to a player, and prose is the one thing
+     * the analytics log may not keep. It still reaches every listener. */
+    this.bus.unlogged.add(EVENTS.NOTICE);
     this.clock = new GameClock({ stepMs: CONFIG.sim.stepMs, maxFrameMs: CONFIG.sim.maxFrameMs });
     this.rng = new Rng(hashStr(String(seed)), 'mission');
     this.seedLabel = String(seed);
@@ -188,6 +202,7 @@ export class Game {
     this.anomaly.reset();
     this.ledger.reset();
     this.mission.reset();
+    this._downLogged = new Set();
 
     this.players.length = 0;
     this.commands.clear();
@@ -230,6 +245,9 @@ export class Game {
     this.localNotices = [];
     this.result = null;
     this.custody = 'none';        // none | sealed | verified
+    /* Ids already logged as down. Lives across steps on purpose: a condition applied
+     * between two steps is still an edge, and the sweep in step() has to see it. */
+    this._downLogged = new Set();
     this.observation = { observed: false, by: [], count: 0 };
     this.viewers = [];
     this.extracted = false;
@@ -396,6 +414,45 @@ export class Game {
    * squad feed would be destroyed by the next snapshot 80ms later, which is exactly the
    * bug two real browsers found and the two-feed split exists to prevent.
    */
+  /**
+   * Mark, unmark or change a claim on the hypothesis board.
+   *
+   * ⚠ ONE DOOR, because there were two and neither told anyone. The tablet called
+   * `ledger.setClaim` and so did the netcode, so nothing on the event bus knew the board
+   * had ever been touched — and §21.1's first two design questions are "where do teams
+   * form their first useful hypothesis" and "which evidence is found, ignored, or
+   * misunderstood". Both are unanswerable from a log that does not record the board.
+   *
+   * It emits the CLAIM AND THE STATE, never the truth. The board does not know the answer
+   * before the debrief (§7.3) and neither does anything listening to it.
+   */
+  setClaim(claimId, state, playerId = 'p1') {
+    const before = this.ledger.claimState.get(claimId) || null;
+    if (!this.ledger.setClaim(claimId, state)) return false;
+    if (before !== (state || null)) {
+      this.bus.emit(EVENTS.HYPOTHESIS_CHANGED,
+        { claimId, from: before, to: state || null, by: playerId }, this.clock.simTimeMs);
+    }
+    return true;
+  }
+
+  /**
+   * Select a belt slot. §21.1 asks which role lacks meaningful work, and what an operative
+   * is HOLDING over time is the cheapest honest answer to it — a squad member who never
+   * changes slot is carrying one thing and doing one job.
+   */
+  selectSlot(playerId, n) {
+    const p = this.playerById(playerId);
+    if (!p) return false;
+    const before = p.heldSlot;
+    p.selectSlot(n);
+    if (p.heldSlot !== before) {
+      this.bus.emit(EVENTS.EQUIPMENT_SELECTED,
+        { id: playerId, slot: p.heldSlot, itemId: p.heldItemId || null }, this.clock.simTimeMs);
+    }
+    return true;
+  }
+
   ping(playerId, phraseId, x, z) {
     const res = requestPing(this.comms, this.playerById(playerId), String(phraseId || ''),
       { x, z }, { atMs: this.clock.simTimeMs, blockers: this.site.blockingRects() });
@@ -515,7 +572,17 @@ export class Game {
      * that finds them — and superposition, which nothing here writes, makes three in a
      * drawer legible from the doorway while one on its own is a smudge you have to stand
      * over. The field that is a WALL in one incident is an INSTRUMENT in another. */
-    const sink = this.anomaly.asSink();
+    /* An anomaly that declares itself a heat SOURCE goes in the emitter list. It validated
+     * and was silently applied as a sink before — see `Anomaly.asSink`. */
+    const presence = this.anomaly.asSink();
+    if (presence && presence.kind === 'source') {
+      emitters.push({
+        id: 'anomaly', x: presence.x, z: presence.z,
+        peakC: presence.chillC, falloffM: presence.falloffM, active: true,
+      });
+      this.heat.setEmitters(emitters);
+    }
+    const sink = presence && presence.kind !== 'source' ? presence : null;
     this.heat.setSinks([...(sink ? [sink] : []), ...this.instances.sinks()]);
 
     /**
@@ -653,20 +720,32 @@ export class Game {
     for (const c of res.contacts) {
       m.tally.contacts++;
       const victim = c.operative;
-      const wasDown = victim.downed;
       for (const a of c.applies) victim.applyCondition(a.condition, a.severity);
       this.bus.emit(EVENTS.CONTACT, { count: c.count, id: victim.id }, simTimeMs);
-      if (victim.downed && !wasDown) {
-        this.notice(this.players.length > 1
-          ? `${victim.name} is down. Somebody get to them.`
-          : `${victim.name} is down, and there is nobody else on this floor.`);
-        this.bus.emit(EVENTS.OPERATIVE_DOWNED, { id: victim.id }, simTimeMs);
-        /* Whatever they were carrying hits the floor where they fell — including, if it
-         * comes to that, custody itself. */
-        if (victim.hands) this._putDownCase(victim);
-      } else {
-        this.notice(`${victim.name}: contact. The cold goes through you and your leg stops answering.`);
-      }
+      this.notice(`${victim.name}: contact. The cold goes through you and your leg stops answering.`);
+    }
+
+    /**
+     * ⚠ AN OPERATIVE CAN GO DOWN WITHOUT BEING TOUCHED.
+     *
+     * OPERATIVE_DOWNED was emitted only inside the contact loop above, so a casualty from
+     * accumulated exposure — the cold of a wet-weather variation, a surface hazard, any
+     * condition applied by something that is not a contact — went down with NOTHING on the
+     * log. §21.1 asks what causes containment faults; the answer it could not see was the
+     * commonest one. The edge is detected once, here, so every route into it is recorded.
+     *
+     * Dropping what they carried moved here for the same reason: an operative who freezes
+     * standing over the case used to keep hold of it while unconscious.
+     */
+    for (const p of this.players) {
+      if (!p.downed) { this._downLogged.delete(p.id); continue; }
+      if (this._downLogged.has(p.id)) continue;
+      this._downLogged.add(p.id);
+      this.notice(this.players.length > 1
+        ? `${p.name} is down. Somebody get to them.`
+        : `${p.name} is down, and there is nobody else on this floor.`);
+      this.bus.emit(EVENTS.OPERATIVE_DOWNED, { id: p.id }, simTimeMs);
+      if (p.hands) this._putDownCase(p);
     }
 
     /* 5. custody, evidence, pressure, phase */
@@ -713,8 +792,23 @@ export class Game {
      * Who is standing on the stair when it does is recorded per operative, because the
      * debrief has to be able to say that the case came up and somebody did not. */
     if (carrier && this.custody === 'verified' && this.site.inExtraction(carrier.x, carrier.z)) {
-      for (const p of this.players) p.extracted = this.site.inExtraction(p.x, p.z);
+      for (const p of this.players) {
+        p.extracted = this.site.inExtraction(p.x, p.z);
+        /* §21.2 wants this per OPERATIVE, not per mission, because §21.1's "which role
+         * lacks meaningful work" is answered by who was where when it ended. */
+        this.bus.emit(EVENTS.OPERATIVE_EXTRACTED,
+          { id: p.id, extracted: p.extracted }, simTimeMs);
+      }
       this.extracted = true;
+      /* §21.2's "optional directive outcome". The directives are on the operation card and
+       * the site owns those, so what the mission can honestly report is the FACTS each one
+       * is judged on — whether anything was left behind and whether anyone took a contact —
+       * rather than a verdict it would have to be told the directives to reach. */
+      this.bus.emit(EVENTS.DIRECTIVE_OUTCOME, {
+        kitLeftBehind: this.deployables.list.length,
+        contacts: this.mission.tally.contacts,
+        everyoneOut: this.players.every((p) => !p.alive || p.extracted),
+      }, simTimeMs);
       this.endMission(null, simTimeMs);
     }
 
@@ -849,9 +943,15 @@ export class Game {
      * `isHeld` already answers it — the `accounted` state is of the vulnerable kind, which
      * is the same thing `banked` and `held` are for the other two families.
      */
+    /* ⚠ THE SEAL RADIUS IS CONTENT AND THIS HARD-CODED 1.5. `trySeal` reads the trigger's
+     * own `radiusMetres`, so an anomaly authoring 2.6 was sealable at 2.1m and the PROMPT
+     * was never offered — the rule accepted an action the interface would not let anybody
+     * take. One number, two places, and only one of them was the rule. */
+    const sealTrigger = this.anomaly.performedTrigger;
+    const sealRadius = (sealTrigger && sealTrigger.when && sealTrigger.when.radiusMetres) || 1.5;
     const inTheCase = this.anomaly.isDistributed
       ? true
-      : (caseDep && dist(this.anomaly.x, this.anomaly.z, caseDep.x, caseDep.z) <= 1.5);
+      : (caseDep && dist(this.anomaly.x, this.anomaly.z, caseDep.x, caseDep.z) <= sealRadius);
     const sealable = caseDep && this.anomaly.isHeld && inTheCase;
     /**
      * ⚠ THE SEAL OUTRANKS EVERYTHING FOR A MASS, AND MUST NOT FOR A SET.
@@ -1210,10 +1310,17 @@ export class Game {
    * would be doing the deduction the game exists to make the player do.
    */
   commitProcedure(card) {
+    /* �21.1 asks how often teams revise a procedure, so a second commit is a REVISION
+     * rather than another commit. It is one of the few numbers that says whether the
+     * hypothesis loop is doing anything. */
+    const revised = !!this.mission.procedure;
     this.mission.procedure = { ...card, committedMs: this.clock.simTimeMs };
     this.mission.procedureCommittedMs = this.clock.simTimeMs;
     this.mission.setPhase(PHASE.PROCEDURE_COMMITTED, this.clock.simTimeMs);
     this.bus.emit(EVENTS.PHASE_CHANGED, { phase: this.mission.phase }, this.clock.simTimeMs);
+    this.bus.emit(revised ? EVENTS.PROCEDURE_REVISED : EVENTS.PROCEDURE_COMMITTED,
+      { revision: this.mission.procedureRevisions || 0 }, this.clock.simTimeMs);
+    if (revised) this.mission.procedureRevisions = (this.mission.procedureRevisions || 0) + 1;
     return null;
   }
 

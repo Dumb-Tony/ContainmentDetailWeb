@@ -168,11 +168,24 @@ export class Anomaly {
     if (!this.isLoose) return null;
     const f = this.def.presence && this.def.presence.field;
     if (f && f.kind === 'none') return null;
+    /* ⚠ `kind: "source"` VALIDATED AND WAS APPLIED AS A SINK. This branched only on "none"
+     * and always emitted a chill, so an anomaly declaring itself a heat SOURCE cooled the
+     * room — `FIELD_KINDS` accepted the word and nothing in the engine ever read it. There
+     * was no way to author a warm anomaly, and the file that tried would have looked
+     * correct and behaved backwards. A source is emitted as an emitter, and `Game` puts it
+     * in the right list. */
     return {
       id: 'anomaly', x: this.x, z: this.z,
+      kind: f && f.kind === 'source' ? 'source' : 'sink',
       chillC: f && f.magnitude !== undefined ? f.magnitude : CONFIG.heat.anomalyChillC,
       falloffM: f && f.falloffMetres !== undefined ? f.falloffMetres : CONFIG.heat.anomalyChillFalloffM,
     };
+  }
+
+  /** True when its presence WARMS the floor rather than cooling it. */
+  get isHeatSource() {
+    const f = this.def.presence && this.def.presence.field;
+    return !!(f && f.kind === 'source');
   }
 
   /* ── path tests ─────────────────────────────────────────────────────────── */
@@ -257,9 +270,25 @@ export class Anomaly {
    * nothing anywhere special-cases "ignore floodlights".
    */
   chooseTarget(sources) {
+    /**
+     * ⚠ THE CHOOSER AND THE MOVER HAVE TO AGREE ABOUT WHAT STOPS IT.
+     *
+     * This read `heat.blocksPath` unconditionally while `pathBlocked` consulted
+     * `presence.blockedBy`, so an anomaly that declared heat does not stop it was still
+     * refused every target behind a gradient — and refused SILENTLY, because a target that
+     * is never chosen produces no error, no telegraph and no movement. The thing simply
+     * never comes, and there is nothing to read.
+     *
+     * Measured on a powered transit case with an operative standing near it: 55.6°C at 1m,
+     * 45.6 at 2m, 40.3 at 4m — so an operative had to be over six metres from the case
+     * before the case was targetable at all. Any heat-hunting anomaly whose procedure puts
+     * somebody near the vessel would have failed with no way to find out why, which is a
+     * defect a content author could not diagnose and could not work around.
+     */
+    const gradientStops = this.blockedBy.includes('gradient');
     let best = null, bestKey = -Infinity;
     for (const s of sources) {
-      if (this.heat.blocksPath(this.x, this.z, s.x, s.z)) continue;
+      if (gradientStops && this.heat.blocksPath(this.x, this.z, s.x, s.z)) continue;
       const d = dist(this.x, this.z, s.x, s.z);
       const key = s.peakC * 1000 - d;
       if (key > bestKey) { bestKey = key; best = s; }
@@ -426,9 +455,13 @@ export class Anomaly {
      * masking and occlusion, exactly as `chooseTarget` already carries heat reachability —
      * a lure drowned by a louder one was never chosen, and neither was a target behind a
      * 40°C wall. Both fields answer the same question in their own terms. */
-    const target = this.hunts === 'sound'
-      ? ((ctx.sound && ctx.sound.heard) || null)
-      : this.chooseTarget(ctx.sources);
+    /* ⚠ `hunts: "none"` HAD NO BRANCH. `HUNT_KINDS` accepted it, `validateAnomaly` passed
+     * it, and the mover fell through to the heat chooser — so an anomaly that declared it
+     * hunts nothing walked 2.2m toward the nearest operative. A vocabulary that accepts a
+     * word the engine does not implement is worse than one that refuses it. */
+    const target = this.hunts === 'none' ? null
+      : this.hunts === 'sound' ? ((ctx.sound && ctx.sound.heard) || null)
+        : this.chooseTarget(ctx.sources);
     this.targetId = target ? target.id : null;
     const senseCtx = { ...ctx, target };
 
@@ -539,9 +572,23 @@ export class Anomaly {
        * there were two. */
       c.sealed = false;
       this.sealedIn = null;
-      const escape = this.def.triggers.find((t) => t.from === 'banked' && this.stateDef.get(t.to)
-        && this.stateDef.get(t.to).kind === 'hunting');
-      this._enter(escape ? escape.to : STATE.DRAWN, escape ? escape.id : 'gradient-lost', simTimeMs);
+      /**
+       * ⚠ AND `from` IS A KIND, NOT A NAME. This read `t.from === 'banked'` — the DRAUGHT's
+       * vulnerable state, and nothing else's. Every other anomaly in the build lost its
+       * escape route the moment it lost case power: the figure's is `held`, the tally's
+       * `gathering`, the caller's `stilled`, and none of them matched, so all three fell
+       * through to `STATE.DRAWN` — a state id that exists in none of their files. The
+       * anomaly went inert in a state nothing could reach, mid-operation, on a battery
+       * failure, and the comment two lines above already said this was the mistake.
+       *
+       * Search from whatever state it is actually in, and fall back to the first hunting
+       * state the content defines rather than to a name from one file.
+       */
+      const escape = this.def.triggers.find((t) => (t.from === this.state || t.from === '*')
+        && this.stateDef.get(t.to) && this.stateDef.get(t.to).kind === 'hunting');
+      const anyHunting = (this.def.states.find((s) => s.kind === 'hunting')
+        || this.def.states.find((s) => s.kind === 'active') || this.def.states[0]).id;
+      this._enter(escape ? escape.to : anyHunting, escape ? escape.id : 'custody-lost', simTimeMs);
       return { verified: false, lost: true };
     }
     c.custodyHeldMs += stepMs;

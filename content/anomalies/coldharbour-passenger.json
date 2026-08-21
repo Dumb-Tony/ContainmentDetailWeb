@@ -1,0 +1,425 @@
+{
+  "id": "coldharbour-passenger",
+  "contentRevision": "0.1.0",
+  "displayName": "The passenger",
+  "licensingRecordId": null,
+  "_licensingNote": "Original, not an SCP. GDD §25 makes an attribution record a prerequisite for implementing SCP-derived content and §25.7's ShareAlike questions are unsettled. Nothing here is derived from anyone's work.",
+
+  "incidentPremise": "Level 2 was mothballed eleven weeks ago with one mobile heater left running to keep the sprinkler main off freezing. The heater failed at 06:14 on the Tuesday. A contractor went down at 10:40 to replace it and did not come back up. Three men went down on the Wednesday to find him, and the one who knelt at his head came back up with a burn across one palm.",
+
+  "_designNote": "THE FIFTH PROCEDURE FAMILY, AND THE ARGUMENT FOR IT IS THAT IT IS NOT A FIFTH THING TO MAINTAIN.\n\nThe four families this build ships are the same shape underneath. The draught asks the squad to hold a gradient; the figure asks them to hold a sightline; the tally asks them to hold an account; the caller asks them to hold a silence. Every one is a condition established AROUND the anomaly and then defended against decay, and every one fails the same way — the thing you were holding slipped.\n\nThis one is not held. It is HANDED OVER, once, in an order, and the order is the whole procedure:\n\n    put the vessel inside its reach → step back out of its reach → make it let go → look away\n\nNothing in that sequence can be maintained and nothing in it decays. Three of the four steps are things you do exactly once, and the fourth is a thing you stop doing. What the squad spends is not effort but SEQUENCE — every step is safe in the right order and lethal in the wrong one, and there is no meter anywhere that tells you which one you are on.\n\nIT DOES NOT TRAVEL, AND THAT IS THE FAMILY. Every state has speedMps 0 and `presence.hunts` is \"none\": it has never been recorded crossing a room and it is not recorded crossing one here. It takes whatever warm thing comes within a metre and a half of it, and that is the entire extent of its ambition. It got from the loading bay to the west run because a man walked there carrying it. So the vessel is not a trap and not a fence — it is a STRETCHER, and containment is the act of being the thing that offers a better handhold than a person.\n\nWHAT THE SQUAD SPENDS IS ABSTENTION. It will not be watched while it is resting on something. Two continuous seconds of view — an operative or a deployed camera, it does not distinguish — and it lets go. That is the only way to start the operation and it is also the only way to lose it, which is why `disturb` and `avert` are both verbs in the procedure. The climax is an operative standing beside a box with their back deliberately turned to the only object on the floor that matters.\n\nAND SO THE OPENING MOVE IS THE DANGEROUS ONE, DELIBERATELY. Nothing at all happens on this floor until somebody looks at the body for two seconds. A squad that never looks never starts; a squad that looks before the case is down has made the warmest thing within reach of an unhoused passenger into whichever of them is nearest. GDD §8.4 wants containment to be a state the squad CREATES rather than one that arrives, and this is the sharpest form of that in the build: the incident begins when you decide it begins, and it begins with a mistake you can make.\n\nTHE INSTRUMENT READS ITS HISTORY, NOT ITS POSITION. `presence.field.kind` is `none` — it disturbs nothing, has no signature in any state and cannot be swept for. What the imager reads is the WAKE: the dead heater still at 21C with flat cells and a broken element, the luminaire above it, the floor that has thawed and refrozen where it has stood. Three incidents on this floor have taught a squad that the imager finds the thing. Here it finds where the thing has BEEN, and a squad that does not notice the difference spends four minutes proving that the chiller return is cold.\n\nTHE HABIT THIS FLOOR HAS TAUGHT IS THE TRAP (§15.2). They know the 4.2m aisles need two staggered tripods — nothing here is fenced. They know a camera at the mouth of an aisle holds the lane for free — a camera pointing at the case turns the whole operation into a stutter, taking and letting go on a three-and-a-half second cycle and burning the case's cells through two seconds of every one of them. They know the breakers are a two-step puzzle — restoring the mains here only makes the floor bright enough to look at things by, and looking at things is the failure mode. Every piece of that is correct knowledge, correctly applied, and wrong.\n\nONE HONEST LIMIT, RECORDED RATHER THAN HIDDEN. The engine has no sense for WHAT it is on: `heat-within` reports that something warm is inside its reach and nothing reports which thing. So the file does not pretend to know either. The danger of being the nearest warm object is priced by `takes-hold`'s reach rather than by a wrong-lodge state, and the fiction never claims the squad is told. If a sense for the identity of a chosen source is ever added, this is the file that wanted it.",
+
+  "presence": {
+    "field": { "kind": "none" },
+    "hunts": "none",
+    "blockedBy": [],
+
+    "_fieldNote": "IT HAS NO SIGNATURE OF ITS OWN, and that is the family rather than a detail. The draught is a 26C sink you can watch coming; the tally's objects are 4C sinks that superpose into a search gradient; this reads at ambient on every instrument in the manifest, in every state, from every distance. An imager pointed at it shows the floor. What the imager is FOR here is the wake — see the constraint `it-leaves-a-mark` and the two evidence entries under it. A squad on its fourth cold-store operation will sweep for a cold mass, find nothing, and conclude the floor is clear. The floor is not clear; the floor is warm in three places and one of them is a man.",
+
+    "_huntsNote": "⚠ `hunts` IS \"none\" AND `blockedBy` IS EMPTY, AND BOTH ARE VACUOUS ON PURPOSE — every state has speedMps 0, so nothing here ever asks what it moves toward or what stops it. They are written out rather than omitted because the defaults are not the truth: `Anomaly.hunts` returns \"heat\" for a file that says nothing, and `Anomaly.blockedBy` returns [\"insulation\",\"gradient\"] for a file that says nothing, and both of those would be claims this anomaly does not make.\n\n⚠ AND THE ENGINE DOES NOT IMPLEMENT \"none\". src/sim/anomaly.js step() reads `hunts === 'sound' ? sound.heard : chooseTarget(sources)`, so \"none\" falls through to the heat branch and a target IS chosen. It is harmless here only because nothing moves. An author who writes `hunts: \"none\"` on a state with a speed will get an anomaly that walks toward the warmest thing it can reach, silently, with the content file saying it hunts nothing. Measured and recorded; not worked around."
+  },
+
+  "perception": {
+    "channels": ["visible", "physical-trace", "recorded"],
+    "recordingInterference": "None, and it records perfectly — which is the problem rather than the mercy. A camera is a viewer, so anything a camera is holding it will not stay on. The contractor's helmet footage is the clearest evidence on this floor of a rule that his helmet camera is also what made lethal.",
+    "accessibilityAlternatives": [
+      "⚠ THE ENDGAME MUST NOT REQUIRE A FAST MOUSE. Turning away is the custody move, and 'turn 180 degrees inside two seconds' is a motor demand rather than a decision. The two-second sustain on `disturbed` is set where it is for exactly that reason, and GDD §19.1's `procedureTiming` assist must widen it — a player who needs four seconds to turn round is not playing a different game, they are turning round.",
+      "Every transition is announced as a sentence on the notice channel, so 'it has let go of the case' never depends on catching a colour or a posture in peripheral vision.",
+      "Coverage is a count and a named source. 'Camera 2 is holding it' is the only actionable form of that warning, because the fix is to go and switch off camera 2."
+    ]
+  },
+
+  "states": [
+    {
+      "id": "settled",
+      "kind": "latent",
+      "speedMps": 0,
+      "displayName": "Settled",
+      "description": "On the warmest thing inside its reach, and it has been for four days. It does nothing at all and it is not dangerous. The object is the only part of it that can be observed, and the object looks ordinary until it is measured.",
+      "presentation": {
+        "visualTell": "Nothing. What it is on looks exactly like what it is on",
+        "audioCue": "Metal near it ticking occasionally, the way metal does while it is taking up heat",
+        "environmentalTell": "No frost within about a metre of it, on a floor that has been frosted for eleven weeks"
+      }
+    },
+    {
+      "id": "unhoused",
+      "kind": "active",
+      "speedMps": 0,
+      "displayName": "Unhoused",
+      "description": "It has been watched and it has let go. It is on nothing, it is exactly where it was, and it will take the first warm thing that comes inside a metre and a half of it. This is the only state in which it is dangerous and it is the only state the squad has to walk past.",
+      "presentation": {
+        "visualTell": "A disc of floor about three metres across going dark and wet, from the middle outward",
+        "audioCue": "Running meltwater, which on this floor is a sound nobody has heard for eleven weeks",
+        "environmentalTell": "What it let go of ticks again on the way back down"
+      }
+    },
+    {
+      "id": "lodged",
+      "kind": "vulnerable",
+      "speedMps": 0,
+      "displayName": "Lodged",
+      "description": "On something warm inside its reach, unwatched, and it will stay there for exactly as long as both of those remain true. This is the only state it can be sealed in, and it is a state the squad created by putting a better handhold on the floor.",
+      "presentation": {
+        "visualTell": "The frost that formed on the case seams within a minute of it being set down, going",
+        "audioCue": "The case heater cycling under load, on a longer cycle than it should be running",
+        "environmentalTell": "Meltwater stops arriving and what is already on the floor starts to set"
+      }
+    },
+    {
+      "id": "cased",
+      "kind": "contained",
+      "speedMps": 0,
+      "displayName": "Cased",
+      "description": "Sealed into the case it took. Custody here is not the lid — it is that the case is still the warmest thing inside its reach and that nothing else is going to come inside its reach again. A case that goes cold in the van is a case whose contents are within a metre and a half of a driver.",
+      "presentation": {
+        "visualTell": "Case exterior dry, on a floor where every other surface has frosted over",
+        "audioCue": "Heater cycling roughly every twenty seconds and holding its cycle",
+        "environmentalTell": "The floor it stood on stays as it is. None of that comes back"
+      }
+    }
+  ],
+
+  "triggers": [
+    {
+      "id": "noticed",
+      "from": "settled",
+      "to": "unhoused",
+      "when": { "sense": "observed", "viewers": 1, "sustainSeconds": 2.0 },
+      "condition": "any operative or powered remote camera holds it in view, unobstructed, for two continuous seconds",
+      "telegraph": "What it is on starts shedding heat from the top down about a second before anything else happens — thirty degrees in two seconds on the imager, and without one, frost closing back over a casing that was dry a moment ago.",
+      "pressureDelta": 1,
+      "latencyToleranceMs": 300,
+      "_note": "TWO SECONDS, NOT AN INSTANT, and the asymmetry is the one senses.js argues for: the transition that COSTS the squad carries the sustain, so a flicker of coverage never decides it. A glance is free; a look is not. It also means the rule can be learned safely — put eyes on the body, watch the casing frost over, look away again, and nothing has started.\n\n⚠ AND THIS IS THE ONLY WAY IN. There is no other trigger out of `settled`. A squad that never looks at anything is a squad standing in a cold room with a fully charged case and no operation, which is the correct outcome and not a stall: §8.4 wants containment to be a state the squad CREATES."
+    },
+    {
+      "id": "takes",
+      "from": "unhoused",
+      "to": "lodged",
+      "when": { "sense": "heat-within", "radiusMetres": 1.5, "sustainSeconds": 1.5 },
+      "condition": "anything above ambient has been within a metre and a half of it for a second and a half",
+      "telegraph": "Whatever is inside the radius ticks — metal taking up heat far too fast — for about three quarters of a second before it goes quiet.",
+      "pressureDelta": -2,
+      "latencyToleranceMs": 1200,
+      "_note": "⚠ `heat-within` AND NOT `strongest-heat-within`, AND THE DIFFERENCE IS LOAD-BEARING. `strongest-heat-within` reads `ctx.target`, which comes from `chooseTarget`, which refuses any source with a 40C sample anywhere on the line to it — the draught's rule, applied by the engine to every heat-reading anomaly regardless of what its `blockedBy` says. MEASURED on this floor: a powered case at 39C plus one operative standing within about six metres of it sum over 40C at the case, so the case becomes untargetable and `strongest-heat-within` goes false — while the squad is doing exactly what the procedure tells them to do.\n\n`heat-within` reads `ctx.sources` directly and is not affected. It is also the honest sense for this rule: the question really is 'is there something warm inside its reach', not 'which is the warmest'.\n\nTHE RADIUS IS 1.5 AND SO IS THE SEAL'S. That is not tidiness — game.js `contextAction` hard-codes 1.5m as the distance at which a case counts as being on the anomaly, while `Anomaly.trySeal` reads `radiusMetres` from this file. Author anything above 1.5 here and the seal is legal but never offered."
+    },
+    {
+      "id": "disturbed",
+      "from": "lodged",
+      "to": "unhoused",
+      "when": { "sense": "observed", "viewers": 1, "sustainSeconds": 2.0 },
+      "condition": "anything holds it in view for two continuous seconds while it is resting on something",
+      "telegraph": "The case stops cycling under load and frost starts back across the lid from the hinge end.",
+      "pressureDelta": 2,
+      "latencyToleranceMs": 300,
+      "_note": "THE WAY BACK IS `takes`, AND IT COSTS ONE AND A HALF SECONDS RATHER THAN THE OPERATION. Look at the case and it lets go; look away and, because the case is still inside its reach, it takes the case again. That is deliberately cheap. §27.2 criterion 3 asks that a squad recover from one ordinary procedural mistake, and glancing at the thing you are working on is the most ordinary mistake available on this floor. What it costs is the drain — `bleeds-charge` runs for the whole of `unhoused`, so a squad that keeps looking pays for it out of the case's twelve minutes and finds out at the end.\n\n⚠ AND A CAMERA LEFT POINTING AT IT DOES NOT STALL THE OPERATION, IT MAKES IT STUTTER. `takes` reads heat and not observation, so a watched passenger still takes the case a second and a half after it lets go, and then lets go again two seconds after that. MEASURED: a 3.5-second cycle, indefinitely, with the notice channel announcing both halves of it. The seal is genuinely available in the two-second half of every cycle — this is not an unwinnable state and §14.4 is satisfied — but the drain runs through the other half, so the case's twelve minutes come out at about five. The pressure deltas on `takes` and `disturbed` are -2 and +2 so that the loop is net zero: a squad that has left a camera on is being told, repeatedly, rather than being punished by a ratchet they cannot see."
+    },
+    {
+      "id": "sealed",
+      "from": "lodged",
+      "to": "cased",
+      "when": { "sense": "enclosed-by", "itemId": "reinforced-transit-case", "radiusMetres": 1.5 },
+      "condition": "the transit case is closed on it while it is lodged and nothing is watching",
+      "telegraph": "The latches go over. The case is warm to the hand for the first time since it came off the van, and it stays warm.",
+      "pressureDelta": -4,
+      "latencyToleranceMs": 2500
+    }
+  ],
+
+  "capabilities": [
+    {
+      "id": "takes-hold",
+      "verb": "contact",
+      "availableInStates": ["unhoused"],
+      "effect": "It is on nothing and something warm has come inside its reach. It does not travel to you and it does not choose you; you walked into the radius. Serious burn and a minor injury getting out of it. Survivable once, and the man who took one on the Wednesday has not been back on site.",
+      "rangeMetres": 1.1,
+      "cooldownMs": 6000,
+      "latencyToleranceMs": 300,
+      "compounding": true,
+      "applies": [
+        { "condition": "exposure", "severity": "serious" },
+        { "condition": "mobility-injury", "severity": "minor" }
+      ],
+      "counterableBy": ["it-does-not-travel", "attention-dislodges"],
+      "_note": "AVAILABLE IN EXACTLY ONE STATE AND IT IS THE STATE THE SQUAD CREATES ON PURPOSE. Nothing on this floor can hurt anybody until an operative decides to look at something for two seconds, and after that the danger is a disc a metre and a bit across that does not move. 1.1m against a `takes` radius of 1.5m is the entire safety margin of the procedure: there is a 0.4m band in which the case can be offered and an operative cannot be burned, and `deployHeld` puts a set-down item 0.9m in front of the operative, which is what makes that band reachable rather than theoretical."
+    },
+    {
+      "id": "bleeds-charge",
+      "verb": "drain-power",
+      "availableInStates": ["unhoused"],
+      "effect": "Cells within five metres flatten at roughly four times their rated rate for as long as it is on nothing. The case is the thing within five metres and the case is the thing that runs out, which is the whole of the clock.",
+      "rangeMetres": 5,
+      "cooldownMs": 0,
+      "latencyToleranceMs": 2000,
+      "counterableBy": ["it-does-not-travel"],
+      "_engineNote": "⚠ THE NUMBERS ON THIS CAPABILITY ARE DESCRIPTIVE, NOT AUTHORITATIVE, and that is an engine defect rather than a choice. src/sim/deployables.js `stepPower` implements the drain from `anomaly.isAwake` and two CONFIG constants; it never reads this capability, its `rangeMetres`, its `availableInStates`, or whether the anomaly authored one at all. MEASURED: deleting this entry from the file changes the drain by nothing. `availableInStates` is set to the only state of kind `active` and `rangeMetres` to CONFIG.anomaly.batteryDrainRadiusM so that the file and the engine agree today. They agree by hand."
+    },
+    {
+      "id": "thaw-disc",
+      "verb": "surface-hazard",
+      "availableInStates": ["unhoused"],
+      "effect": "Everything on this floor has been frozen for eleven weeks. While it is on nothing it puts its heat into the floor instead, and what thaws sets again as a lens of clear ice that does not come back.",
+      "rangeMetres": 2.8,
+      "cooldownMs": 9000,
+      "counterableBy": [],
+      "_note": "THE HAZARD IS UNDER THE PLACE YOU HAVE TO WORK, and that is why it is not a garnish here. It does not move, so the ice does not spread — it deepens, in a disc centred on the one spot the operation has to be conducted from, and it is laid down for exactly as long as the squad leaves it unhoused. A squad that gets the sequence right sees one patch. A squad that looks at the case three times is sealing a box while standing on a rink of its own making."
+    }
+  ],
+
+  "constraints": [
+    {
+      "id": "it-does-not-travel",
+      "effect": "blocks",
+      "description": "It has never been recorded crossing a room. It takes whatever warm thing comes within about a metre and a half of it and that is the whole of its reach — it does not follow, it cannot be lured across a floor, and a squad that backs off two metres is out of the operation entirely. It got from the loading bay to the west run because a man walked there carrying it. So the vessel is not a trap: it is a stretcher, and containment is the act of being a better handhold than a person.",
+      "statement": "A metre and a half, and no further, ever. It does not come to you; you go to it.",
+      "requiredEquipment": ["reinforced-transit-case"]
+    },
+    {
+      "id": "attention-dislodges",
+      "effect": "weakens",
+      "description": "It will not be watched while it is resting on something. Two continuous seconds of view lets it go — an operative or a deployed remote camera, unobstructed, inside about fourteen metres, and it does not distinguish between them. This is the only way to start the operation and the only way to spoil it. A camera left pointing at the case does not stop the operation; it makes it stutter. It takes the case, lets go two seconds later, takes it again a second and a half after that, and keeps doing that on a three-and-a-half second cycle for as long as the camera is live — and the drain runs through every unhoused part of it, so the case's twelve minutes come out at about five. The seal is still there. It is there for two seconds at a time, seventeen times a minute, and then it is not.",
+      "statement": "Two seconds of continuous view and it lets go. A camera counts. A glance does not. A camera you forgot costs you seven of the case's twelve minutes.",
+      "requiredEquipment": []
+    },
+    {
+      "id": "takes-hold",
+      "effect": "blocks",
+      "description": "While it is on nothing it is a disc a metre and a bit across that will take a hand off. It does not move and it does not choose; whatever is inside the radius is what it gets. Every burn on this floor was taken by somebody who walked in, and the site's own record of that is a glove.",
+      "statement": "On nothing, it takes what comes inside about a metre. That has only ever been a person who walked in.",
+      "requiredEquipment": ["trauma-kit"]
+    },
+    {
+      "id": "it-leaves-a-mark",
+      "effect": "reveals",
+      "description": "Nothing reads it — no field, no signature, no state in which an instrument sees it. What it leaves does: an object it has been on holds its heat for hours after it lets go, and floor it has stood on has thawed and set again. The imager reads its history and never its position, which is the opposite of what this building has taught three squads.",
+      "statement": "Nothing reads it. Everything reads where it has been.",
+      "requiredEquipment": ["thermal-imager"]
+    }
+  ],
+
+  "_evidenceNote": "Eight entries across four rules and two false leads, read in PAIRS, each pair two different kinds of observation carrying two different reliabilities (GDD §27.2 criterion 2, §7.3).\n\nThe pair that was hardest to write honestly is `attention-dislodges`, because the rule is a thing that STOPS happening and the obvious evidence for it is an absence, which is not an observation. So neither entry describes the anomaly at all. `helmet-footage` is a man's own thermal overlay recording one object cooling and another warming, four times, each time while he holds the first in frame. `search-party` is three men agreeing about which of them was kneeling. Both are raw facts about heat and posture, and neither contains the word 'watched'.\n\nOnly one required rule costs cargo — `it-leaves-a-mark` needs the imager for its confirmed path, and its free path is two rings of refrozen meltwater you can stand and look at. The false lead that costs cargo is the one that gets taken first: a squad three incidents into this building sweeps for a cold mass, finds the chiller return three degrees under the room, and has learned nothing about anything.",
+
+  "evidenceRules": [
+    {
+      "id": "fault-printer",
+      "type": "documentary",
+      "dimension": "trigger",
+      "displayName": "The fault printer",
+      "rawObservation": "Fault printer on the bay wall, running on its own cells, paper still feeding. 06:14 Tuesday: mobile heater 2, flame failure. 06:19: emergency luminaire E2, thermal trip — that is the fitting directly over the heater, 2.1m up. 10:52: E2 thermal trip, cleared. Nothing between those three and nothing after them until the Wednesday.",
+      "reliability": "confirmed",
+      "revealsRule": "it-does-not-travel",
+      "requiredEquipment": [],
+      "channel": "document",
+      "isFalseLead": false
+    },
+    {
+      "id": "the-contractor",
+      "type": "environmental",
+      "dimension": "trigger",
+      "displayName": "The contractor",
+      "rawObservation": "A man in site coveralls at the north end of the west run, four days dead by the state of him, and warm to the back of a hand against a six degree ambient. There is no frost on him or within a metre of him. A band of floor about two metres wide runs from the loading bay to where he lies, thawed and set again, and his own boot prints are in it, going this way, spaced for a walk rather than a run.",
+      "reliability": "probable",
+      "revealsRule": "it-does-not-travel",
+      "requiredEquipment": [],
+      "channel": "visual",
+      "isFalseLead": false
+    },
+    {
+      "id": "helmet-footage",
+      "type": "instrumental",
+      "dimension": "constraint",
+      "displayName": "His helmet camera",
+      "rawObservation": "The contractor's helmet camera on the floor beside him, card readable, thermal overlay on. Four times in nine minutes he holds the dead heater in frame. On each of the four the heater's own reading falls about thirty degrees across the two seconds he holds it, the luminaire two metres above it rises by about the same, and both are back where they started within four seconds of the frame moving off. He never holds it longer than three seconds until the last time, which runs eleven.",
+      "reliability": "confirmed",
+      "revealsRule": "attention-dislodges",
+      "requiredEquipment": [],
+      "channel": "instrument",
+      "isFalseLead": false
+    },
+    {
+      "id": "search-party",
+      "type": "testimonial",
+      "dimension": "constraint",
+      "displayName": "The three from the Wednesday",
+      "rawObservation": "The three who went down on the Wednesday. All three agree they stood over the contractor for a minute or so with their lamps on him. All three agree the one who took the burn was the one kneeling at his head and that the other two were standing back. Two of them say it happened 'the moment we got a proper look at him'. The third will not answer any question about it and has not been back on site.",
+      "reliability": "disputed",
+      "revealsRule": "attention-dislodges",
+      "requiredEquipment": [],
+      "channel": "witness",
+      "isFalseLead": false
+    },
+    {
+      "id": "thaw-rings",
+      "type": "environmental",
+      "dimension": "capability",
+      "displayName": "Two rings on the bay floor",
+      "rawObservation": "Two rings of refrozen meltwater on the bay floor around the dead heater, one inside the other, with a dry band between them. The outer is about 2.8m across and the inner about 1.2m. Both have set with the ripple still in them and the ripple in both runs outward from the heater.",
+      "reliability": "confirmed",
+      "revealsRule": "it-leaves-a-mark",
+      "requiredEquipment": [],
+      "channel": "visual",
+      "isFalseLead": false
+    },
+    {
+      "id": "residual-heat",
+      "type": "instrumental",
+      "dimension": "capability",
+      "displayName": "What is still warm",
+      "rawObservation": "Thermal sweep from the mouth of Aisle C against a 6C ambient. The dead heater's casing reads 21C on flat cells and a broken element. The luminaire above it reads 19C and its own cells went flat on the Tuesday. A band of floor roughly two metres wide runs out of the bay and away north at 8C along its whole length, with hard edges and no source at either end of it. Nothing else on this level is above ambient except the squad.",
+      "reliability": "probable",
+      "revealsRule": "it-leaves-a-mark",
+      "requiredEquipment": ["thermal-imager"],
+      "channel": "instrument",
+      "isFalseLead": false
+    },
+    {
+      "id": "scorched-glove",
+      "type": "environmental",
+      "dimension": "capability",
+      "displayName": "A glove on the floor",
+      "rawObservation": "A site glove in the west run, right hand, palm burnt through and the back of it untouched. The floor beneath it has thawed and set again in the shape of the glove, with the fingers splayed, and there is nothing burnt anywhere else in the lane.",
+      "reliability": "confirmed",
+      "revealsRule": "takes-hold",
+      "requiredEquipment": [],
+      "channel": "visual",
+      "isFalseLead": false
+    },
+    {
+      "id": "work-light",
+      "type": "instrumental",
+      "dimension": "capability",
+      "displayName": "His work light",
+      "rawObservation": "The contractor's work light stands in the west run with flat cells and its lamp glass cracked from the inside. The fault LED behind the diffuser shows over-temperature, latched, which the fitting can only do while it is running. It is seven metres from where he lies and there is no mark on the floor under it at all.",
+      "reliability": "probable",
+      "revealsRule": "takes-hold",
+      "requiredEquipment": [],
+      "channel": "instrument",
+      "isFalseLead": false
+    },
+    {
+      "id": "mothball-notice",
+      "type": "documentary",
+      "dimension": "anchor",
+      "displayName": "The mothball notice",
+      "rawObservation": "A laminated notice cable-tied to the sprinkler riser in Aisle A: 'LEVEL 2 MOTHBALLED — HEATER 2 TO RUN CONTINUOUS UNTIL SPRINKLER MAIN IS DRAINED. DO NOT SWITCH OFF.' Signed and dated eleven weeks ago. The gauge on the riser beside it reads zero.",
+      "reliability": "disputed",
+      "revealsRule": "",
+      "requiredEquipment": [],
+      "channel": "document",
+      "isFalseLead": true
+    },
+    {
+      "id": "chiller-return",
+      "type": "instrumental",
+      "dimension": "presence",
+      "displayName": "The chiller return",
+      "rawObservation": "Thermal sweep of the chiller return where it runs up the east wall: 3C along its whole length, three degrees under the room, with no gradient at either end. The plant has been off for eleven weeks and the line was drained.",
+      "reliability": "disputed",
+      "revealsRule": "",
+      "requiredEquipment": ["thermal-imager"],
+      "channel": "instrument",
+      "isFalseLead": true,
+      "_note": "THE FALSE LEAD THAT GETS TAKEN FIRST, and it is aimed at a specific squad: one that has run this floor three times and knows the imager finds what is cold. It costs an imager, a walk and about four minutes, and every word of it is true."
+    }
+  ],
+
+  "containment": {
+    "goal": "It lodged onto a powered transit case that was standing inside its reach when it let go, and the case sealed on it, verified by thirty seconds of continuous custody with the heater holding its cycle. Custody is not the lid — it is that the case is still the warmest thing within a metre and a half of it and that nothing else is ever going to be.",
+
+    "procedures": [
+      {
+        "id": "vessel-first",
+        "grade": "safe",
+        "displayName": "Vessel first, then look",
+        "requiredEquipment": ["reinforced-transit-case", "thermal-imager", "power-pack", "trauma-kit"],
+        "verbs": ["assess", "place", "withdraw", "disturb", "avert", "seal", "verify"],
+        "statement": "Sweep on the imager first and find what is warm; there will be one thing and it will not be moving. Walk in and set the powered case down inside a metre and a half of it WITHOUT looking at it for two seconds together — approach off the line, turn, set down, turn away. Then withdraw past two metres and look at it deliberately until it lets go. Wait out the second and a half. Then walk back in with your back to it and seal.",
+        "abortConditions": [
+          "The case falls below the reserve needed to stay above ambient while it is unhoused",
+          "Any operative takes a second contact",
+          "A deployed camera cannot be accounted for"
+        ],
+        "_note": "The order is the procedure and every step of it is safe in the right order. Placing the case is safe because a settled passenger has no capability at all; looking is safe because you did it from four metres; sealing is safe because it is lodged and lodged things do not reach. Do the same four actions in any other order and at least one of them is a burn. The pack is on the list because `bleeds-charge` takes the case's twelve minutes down to about three for as long as it is unhoused, and the imager is because there is otherwise no way to know which object on this floor it is on before you walk up to it."
+      },
+      {
+        "id": "hands-and-a-box",
+        "grade": "minimum",
+        "displayName": "A box, and your own eyes",
+        "requiredEquipment": ["reinforced-transit-case"],
+        "verbs": ["place", "disturb", "seal"],
+        "statement": "Carry the case in, put it down beside the body, back off, look at him until something happens, and go back for it.",
+        "abortConditions": [
+          "The case goes flat before it has been taken"
+        ],
+        "_note": "It works, it needs one item, and it is a trap in the same shape as the tally's and the caller's minimum grades. Without the imager you cannot tell which object it is on, so 'beside the body' is a guess — and it is a guess you make by walking to within a metre and a half of something that will take a hand off if the guess has already gone wrong. Without a pack the operation is twelve minutes long and you will not know how many of them you have spent, because the only thing burning them is a state you cannot see."
+      },
+      {
+        "id": "two-pairs-of-hands",
+        "grade": "research",
+        "displayName": "Placed by one, disturbed by the other",
+        "requiredEquipment": ["reinforced-transit-case", "thermal-imager", "power-pack", "sample-kit", "trauma-kit"],
+        "verbs": ["assess", "place", "withdraw", "disturb", "relieve", "avert", "seal", "verify"],
+        "statement": "One operative places and seals and never looks at it; a second stands off at eight metres and does all of the looking, on a call, and stops on a call. Neither of them is ever both inside the reach and the reason it is unhoused. Sample the refrozen floor before the case goes down, because after it goes down nobody is walking back in there.",
+        "abortConditions": [
+          "Both operatives are inside two metres at the same time",
+          "The one who looks cannot see the one who places",
+          "Any condition from the safe procedure"
+        ],
+        "_note": "⚠ IT IS RESEARCH GRADE BECAUSE OF `relieve`, NOT BECAUSE OF THE KIT. The single-operative version makes one person do the looking and the placing, which means the person inside the reach is the person who decides when the reach becomes dangerous — survivable, and exactly the kind of thing §12.1 says a research-grade procedure should remove rather than optimise. Splitting the two jobs costs a second operative, most of the cargo budget and about four minutes, and buys nobody an easier operation. It buys a sample and the fact that no one person is ever holding both halves of the mistake."
+      }
+    ],
+
+    "integrityConditions": [
+      {
+        "id": "case-heat",
+        "measure": "temperature",
+        "failureSignal": "The heater cycle lengthens, then frost re-forms along the seams from the hinge end. It is not leaving because the lid failed; it is leaving because the case stopped being warmer than the floor.",
+        "recoveryWindowMs": 20000
+      },
+      {
+        "id": "case-power",
+        "measure": "power",
+        "failureSignal": "The case indicator drops amber and the interior fan slows audibly a few seconds before the heat goes.",
+        "recoveryWindowMs": 12000
+      },
+      {
+        "id": "unattended-coverage",
+        "measure": "observation-coverage",
+        "failureSignal": "The case takes it, loses it, and takes it again on a three-and-a-half second cycle, and says so both times. That is a camera nobody switched off. It is not fatal and it is not free: the drain runs through two of every three and a half seconds, and the case's twelve minutes come out at about five.",
+        "recoveryWindowMs": 30000
+      }
+    ],
+
+    "thresholds": [
+      { "id": "reach", "statement": "A metre and a half. It takes what comes inside that and it never goes further than that, in any state, ever.", "value": 1.5 },
+      { "id": "attention-window", "statement": "Two continuous seconds of view and it lets go of whatever it is on. A glance is free.", "value": 2 },
+      { "id": "safety-band", "statement": "It reaches 1.1m while it is on nothing and takes at 1.5m. The 0.4m between those two is the whole margin the procedure works in.", "value": 0.4 }
+    ]
+  },
+
+  "difficultyProfiles": [
+    {
+      "preset": "orientation",
+      "squadSize": { "min": 1, "max": 4 },
+      "timingScale": 1.6,
+      "evidenceAvailability": "generous",
+      "automationAllowed": []
+    },
+    {
+      "preset": "field",
+      "squadSize": { "min": 1, "max": 5 },
+      "timingScale": 1,
+      "evidenceAvailability": "standard",
+      "automationAllowed": []
+    },
+    {
+      "preset": "severe",
+      "squadSize": { "min": 2, "max": 5 },
+      "timingScale": 0.8,
+      "evidenceAvailability": "sparse",
+      "automationAllowed": []
+    }
+  ],
+
+  "behaviourModule": null
+}

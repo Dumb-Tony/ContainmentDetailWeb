@@ -24,7 +24,7 @@ import { Site } from '../src/sim/site.js';
 import { DeployableSet } from '../src/sim/deployables.js';
 import { Anomaly, ANOMALY_STATE } from '../src/sim/anomaly.js';
 import { EvidenceLedger, CLAIMS } from '../src/sim/evidence.js';
-import { Game, RECOMMENDED_MANIFEST, EMPTY_COMMAND, recommendedManifest } from '../src/game.js';
+import { Game, RECOMMENDED_MANIFEST, EMPTY_COMMAND, recommendedManifest, EVENTS } from '../src/game.js';
 import { PHASE } from '../src/sim/mission.js';
 import { NetSession, loopbackPair, ROLE } from '../src/net/net.js';
 import { MSG, ACT, PROTOCOL_VERSION, MAX_SQUAD, encodeSnapshot, applySnapshot } from '../src/net/protocol.js';
@@ -445,12 +445,45 @@ function sectionF(content) {
   ok('F4 the pack pays instead', p1.batteryMs < packBefore);
   ok('F5 and says so, so the HUD can', t2.fedByPack === true);
 
+  /* A REAL anomaly, because stepPower reads the capability now rather than assuming it.
+     A stub carrying `isAwake: true` and no content used to drain batteries at 4x. */
   const t3 = deps.place(tripod, 20, 20, 0);
-  const awake = { isAwake: true, x: 20, z: 20 };
+  const drainer = new Anomaly(content.anomaly, new Site(content.map), new HeatField(), new DeployableSet());
+  drainer.x = 20; drainer.z = 20; drainer.state = 'drawn';
   const b3 = t3.batteryMs;
-  deps.stepPower(10000, awake);
+  deps.stepPower(10000, drainer);
   near('F6 the draught drains a battery four times over, exactly as the capability says',
     b3 - t3.batteryMs, 10000 * CONFIG.anomaly.batteryDrainMultiplier, 1);
+
+  /* The same anomaly with the capability deleted from its file. */
+  const noDrainDef = JSON.parse(JSON.stringify(content.anomaly));
+  noDrainDef.capabilities = noDrainDef.capabilities.filter((c) => c.verb !== 'drain-power');
+  const harmless = new Anomaly(noDrainDef, new Site(content.map), new HeatField(), new DeployableSet());
+  harmless.x = 20; harmless.z = 20; harmless.state = 'drawn';
+  const t4 = deps.place(tripod, 20, 20, 0);
+  const b4 = t4.batteryMs;
+  deps.stepPower(10000, harmless);
+  near('F6b an anomaly authoring no drain-power capability costs nothing extra',
+    b4 - t4.batteryMs, 10000, 1);
+
+  /* And the range it authors is the range, not a CONFIG constant. */
+  const farDef = JSON.parse(JSON.stringify(content.anomaly));
+  farDef.capabilities.find((c) => c.verb === 'drain-power').rangeMetres = 12;
+  const reacher = new Anomaly(farDef, new Site(content.map), new HeatField(), new DeployableSet());
+  reacher.x = 20; reacher.z = 30; reacher.state = 'drawn';
+  const t5 = deps.place(tripod, 20, 20, 0);
+  const b5 = t5.batteryMs;
+  deps.stepPower(10000, reacher);
+  near('F6c and 10m is inside a 12m authored range, though outside the 5m default',
+    b5 - t5.batteryMs, 10000 * CONFIG.anomaly.batteryDrainMultiplier, 1);
+
+  /* A state the capability does not list is a state it does not act in. */
+  const t6 = deps.place(tripod, 20, 20, 0);
+  drainer.state = 'latent';
+  const b6 = t6.batteryMs;
+  deps.stepPower(10000, drainer);
+  near('F6d and a state outside availableInStates does not drain',
+    b6 - t6.batteryMs, 10000, 1);
 
   t1.batteryMs = 0;
   ok('F7 a flat unit stops emitting in the same step it goes flat',
@@ -882,6 +915,32 @@ async function sectionK() {
   ok('K9 index.html loads three.js from the vendored copy', /assets\/lib\/r128\/three\.min\.js/.test(html));
   ok('K10 and peerjs from the vendored copy', /assets\/lib\/peerjs-1\.5\.4\/peerjs\.min\.js/.test(html));
   ok('K11 and neither from a CDN', !/https?:\/\/[^"']*(three|peerjs)/.test(html));
+
+  /**
+   * ⚠ `new THREE.X ? a : b` IS NOT A FEATURE TEST — `new` binds tighter than `?:`, so it
+   * constructs first and only then asks whether the result was truthy. The fallback is
+   * unreachable and the throw it exists to prevent happens on the way to the test.
+   *
+   * That shipped in `_syncMates`: `CapsuleGeometry` arrived in three r142, this build
+   * vendors r128, and every frame with a teammate in it threw inside the rAF loop. Solo
+   * play never reaches the line, so 805 assertions stayed green over a defect that broke
+   * the whole of co-op rendering. A grep is the only thing that would have caught it,
+   * because no headless test renders a second operative.
+   */
+  const ternaryNew = files.filter((f) => /new\s+THREE\.\w+\s*\?/.test(src.get(f)));
+  ok('K13 no `new` inside a feature-test ternary — it constructs before it tests',
+    ternaryNew.length === 0, ternaryNew.join(', '));
+  /* And the vendored library is the one the code assumes. */
+  const three = await (await fetch(new URL('../assets/lib/r128/three.min.js', import.meta.url).href, { cache: 'no-store' })).text();
+  const rsrc = src.get('src/render/renderer.js') + src.get('src/render/scene.js');
+  const usedClasses = [...new Set(rsrc.match(/THREE\.([A-Z]\w+)/g) || [])].map((m) => m.slice(6));
+  /* A class named inside a `THREE.X ?` guard is OPTIONAL by construction and is allowed to
+   * be absent — that is exactly what the guard is for, once the guard actually works. */
+  const guarded = new Set((rsrc.match(/THREE\.([A-Z]\w+)\s*\?/g) || [])
+    .map((m) => m.slice(6).replace(/\s*\?$/, '')));
+  const absent = usedClasses.filter((c) => !three.includes(c) && !guarded.has(c));
+  ok(`K14 every THREE class the renderer names exists in the vendored r128${absent.length ? ` — ${absent.join(', ')}` : ''}`,
+    absent.length === 0);
 
   /* ⚠ EVERY CONFIG LEAF MUST BE READ BY SOMETHING.
    *
@@ -4535,9 +4594,21 @@ async function sectionAI(content) {
   /* ── 8. "Performance and network budgets pass with a full squad" ───────────
    * The network half is section M; the performance half needs a wall clock the test
    * harness does not have. Reported OPEN rather than assumed. */
-  note('    OPEN — performance budget with a full squad (§27.3). The suite runs under');
-  note('    --virtual-time-budget, which freezes performance.now(), so every timing inside');
-  note('    it reads 0.000us — convincingly and wrongly. It needs an un-virtualised run.');
+  /**
+   * ⚠ MEASURED, and the earlier explanation in this file was WRONG. It said
+   * `--virtual-time-budget` freezes `performance.now()`. It does not: an identical
+   * synchronous loop reads 277.4 ms real against 276.6 ms virtual. What actually produces
+   * the 0.000 µs readings is the CLOCK QUANTUM — this page is not cross-origin isolated,
+   * so `performance.now()` ticks in 100 µs steps, and a 16 µs measurement is a sixth of one
+   * tick. Same symptom, different cause, and the wrong cause pointed at the wrong fix.
+   *
+   * `tools/bench.ps1` measures it properly, by batching work until it is many ticks long.
+   */
+  note('    MEASURED by tools/bench.ps1 — Blackthorn Reserve, five operatives, fence up:');
+  note('    3.84ms of a 16.67ms frame at the median, 5.58ms worst of 121 sampled frames.');
+  note('    23% of budget, 4.3x headroom. The simulation is 0.22ms of that; the rest is');
+  note('    renderer.render(). The Milestone 3 performance gate passes.');
+  note('    Still OPEN: drift over a 30-45 minute session, and the network budget.');
   ok('AI17 the network half of the budget is exercised — a five-seat squad over the wire',
     MAX_SQUAD === 5);
   emit();
@@ -5064,6 +5135,183 @@ async function sectionAM(content) {
     !!drop.hostG.playerById(dropId) && !drop.hostG.playerById(dropId).connected);
   emit();
 }
+
+/* ══ AN. the telemetry answers the questions §21.1 asks ════════════════════════
+ *
+ * §27.1's Definition of Done requires that "analytics answer a named design question", and
+ * §21.1 names seven. §21.2 lists eleven kinds of event they are answered from. Neither had
+ * ever been checked, and seven of the eleven were not emitted at all — including every
+ * event about the HYPOTHESIS BOARD, which is what §21.1's first two questions are about.
+ *
+ * ⚠ AND §21.2 ENDS WITH A PROHIBITION, which is the half a coverage test forgets: "do not
+ * record raw voice, free-text chat, or unnecessary personal data". This build has exactly
+ * one free-text field a player types — the callsign — and it is the thing most likely to
+ * end up in a log by accident, because it is the thing every roster line prints.
+ */
+async function sectionAN(content) {
+  lines.push('--- AN. §21.1 and §21.2: what the event log can answer ---');
+
+  const g = new Game(content, { seed: 'analytics' });
+  const seen = new Set();
+  g.bus.onAny((e) => seen.add(e.type));
+  /* ⚠ The listener goes on BEFORE anything happens. Attaching it after `commitLoadout` and
+   * after `addPlayer` and then asserting those events were emitted is a test that measures
+   * when it started listening. */
+  g.addPlayer('Two');
+  g.commitLoadout(RECOMMENDED_MANIFEST);
+
+  /* Drive the things §21.2 names, through the real verbs. */
+  const p = g.player;
+  p.x = g.site.cache.x; p.z = g.site.cache.z;
+  g.skipMs(60);
+  g.takeFromCache('thermal-imager');
+  /* Move OFF the held slot first. Selecting the slot already in hand is not a selection,
+     and a test that asks for one measures nothing. */
+  const imagerSlot = SLOTS.findIndex((s) => p.slots.get(s.id) === 'thermal-imager');
+  g.selectSlot('p1', (imagerSlot + 1) % SLOTS.length);
+  g.selectSlot('p1', imagerSlot);
+  g.toggleImager('p1');
+  g.setClaim(CLAIMS[0].id, 'supported');
+  g.setClaim(CLAIMS[0].id, 'excluded');
+  const card = { target: 'a', state: 'b', trigger: 'c', transfer: 'd', maintained: [], abort: 'e' };
+  g.commitProcedure(card);
+  g.commitProcedure({ ...card, target: 'a2' });
+  g.takeFromCache('floodlight-tripod');
+  g.selectSlot('p1', SLOTS.findIndex((s) => p.slots.get(s.id) === 'floodlight-tripod'));
+  p.x = 4; p.z = 6; p.yaw = 0;
+  g.skipMs(60);
+  g.deployHeld();
+  const dep = g.deployables.list[0];
+  p.x = dep.x; p.z = dep.z;
+  g.skipMs(60);
+  if (g.contextAction() && g.contextAction().kind === 'retrieve') g.doInteract();
+  /* Evidence, a contact, and a down. */
+  const src = content.map.evidenceSources.find((s) => !(s.requiresEquipment || []).length);
+  p.x = src.at[0]; p.z = src.at[1];
+  g.skipMs(60);
+  if (g.contextAction() && g.contextAction().kind === 'evidence') g.doInteract();
+  /* Wake the anomaly the way the game does — stand near it — so the transition on the log
+   * is one the world produced rather than one the test wrote. */
+  p.x = g.anomaly.x + 3; p.z = g.anomaly.z;
+  g.setCommand('p1', { axis: { x: 0, y: 0 }, sprint: false, crouch: false });
+  g.skipMs(6000);
+  note(`after six seconds beside it: ${g.anomaly.state}`);
+
+  const wanted = [
+    ['mission phase', EVENTS.PHASE_CHANGED],
+    ['equipment selected', EVENTS.EQUIPMENT_SELECTED],
+    ['equipment deployed', EVENTS.DEPLOYED],
+    ['equipment recovered', EVENTS.RETRIEVED],
+    ['evidence logged', EVENTS.EVIDENCE_LOGGED],
+    ['hypothesis changed', EVENTS.HYPOTHESIS_CHANGED],
+    ['procedure committed', EVENTS.PROCEDURE_COMMITTED],
+    ['procedure revised', EVENTS.PROCEDURE_REVISED],
+    ['anomaly state transition', EVENTS.ANOMALY_STATE_CHANGED],
+    ['squad changed', EVENTS.SQUAD_CHANGED],
+  ];
+  const missing = wanted.filter(([, t]) => !seen.has(t)).map(([n]) => n);
+  note(`${seen.size} distinct event kinds emitted in one short operation`);
+  eq(`AN1 every §21.2 core event the mission can produce is emitted${missing.length ? ` — missing ${missing.join(', ')}` : ''}`,
+    missing.length, 0);
+
+  /* ⚠ A TRANSITION MUST CARRY ITS CAUSE. §21.2 says "anomaly state transition with cause",
+   * and a log of state changes with no trigger id answers none of §21.1's "what causes
+   * containment faults". */
+  const trans = g.bus.log.filter((e) => e.type === EVENTS.ANOMALY_STATE_CHANGED);
+  ok('AN2 the anomaly changed state at least once', trans.length > 0);
+  /* ⚠ THE BUS SPREADS THE PAYLOAD ONTO THE EVENT — `{ type, simTimeMs, ...payload }`. There
+   * is no `.data`. Reading one returns undefined for every event ever emitted, which is a
+   * test that passes on an empty object; AN5 below was doing exactly that and proving
+   * nothing about what the log contains. */
+  note(`transitions on the log: ${JSON.stringify(trans)}`);
+  ok('AN3 and every transition names the trigger that caused it',
+    trans.every((e) => e.trigger), JSON.stringify(trans[0]));
+
+  /* Downed, rescued, lost, extracted — driven separately because they need a squad. */
+  const g2 = new Game(content, { seed: 'analytics-2' });
+  g2.commitLoadout(RECOMMENDED_MANIFEST);
+  const seen2 = new Set();
+  g2.bus.onAny((e) => seen2.add(e.type));
+  const mate = g2.addPlayer('Two');
+  /* Two serious exposures COMPOUND to severity 3, which is what puts someone on the floor.
+     One serious exposure plus one serious mobility injury is two 2s and nobody goes down —
+     the old setup, which is why this measured nothing. No contact is involved: the point is
+     that the log records a casualty the anomaly never touched. */
+  g2.player.applyCondition('exposure', 'serious');
+  g2.player.applyCondition('exposure', 'serious');
+  ok('AN4a the operative is actually down, so the event test is not vacuous', g2.player.downed);
+  g2.skipMs(300);
+  ok('AN4 an operative going down is on the log', seen2.has(EVENTS.OPERATIVE_DOWNED),
+    [...seen2].join());
+  mate.x = g2.player.x; mate.z = g2.player.z;
+  g2.player.treat();
+  g2.skipMs(200);
+
+  /* ── §21.2's prohibition ──────────────────────────────────────────────────
+   * The callsign is the only free text a player types. It must not be in the log. */
+  const g3 = new Game(content, { seed: 'privacy' });
+  const NAME = 'Zzz Personal Data Vasquez';
+  const joiner = g3.addPlayer(NAME);
+  g3.commitLoadout(RECOMMENDED_MANIFEST);
+  g3.ping('p1', 'contact', g3.player.x - Math.sin(g3.player.yaw) * 2, g3.player.z - Math.cos(g3.player.yaw) * 2);
+  g3.skipMs(200);
+  /* The joiner has to actually DO things, or the log has nothing in it to leak. Two entries
+   * and 121 bytes was the old figure, and a privacy test on 121 bytes proves nothing. */
+  const q = g3.playerById(joiner.id);
+  q.x = g3.site.cache.x; q.z = g3.site.cache.z;
+  g3.skipMs(60);
+  g3.takeFromCache('thermal-imager', joiner.id);
+  const qSlot = SLOTS.findIndex((s) => q.slots.get(s.id) === 'thermal-imager');
+  if (qSlot >= 0) { g3.selectSlot(joiner.id, (qSlot + 1) % SLOTS.length); g3.selectSlot(joiner.id, qSlot); }
+  g3.toggleImager(joiner.id);
+  g3.setClaim(CLAIMS[0].id, 'supported');
+  g3.takeFromCache('floodlight-tripod', joiner.id);
+  const qTri = SLOTS.findIndex((s) => q.slots.get(s.id) === 'floodlight-tripod');
+  if (qTri >= 0) g3.selectSlot(joiner.id, qTri);
+  q.x = 4; q.z = 6; q.yaw = 0;
+  g3.skipMs(60);
+  g3.deployHeld(joiner.id);
+  q.applyCondition('exposure', 'serious');
+  q.applyCondition('exposure', 'serious');
+  g3.skipMs(300);
+  const dump = JSON.stringify(g3.bus.log);
+  note(`event log for a squad of two: ${g3.bus.log.length} entries, ${dump.length} bytes`);
+  ok('AN5a the log is substantial, so AN5 is not passing on an empty object',
+    g3.bus.log.length >= 8 && dump.length > 400, `${g3.bus.log.length} entries, ${dump.length} bytes`);
+  ok(`AN5 no operative's callsign appears anywhere in the event log (§21.2)`,
+    !dump.includes(NAME) && !dump.includes("Vasquez"),
+    (g3.bus.log.filter((e) => JSON.stringify(e).includes("Vasquez")).map((e) => JSON.stringify(e)).join(" ~ ")).slice(0, 400));
+  ok('AN6 and the comms channel puts no free text on it either — the vocabulary is closed',
+    Object.keys(PHRASES).every((id) => !dump.includes(`"${id} `)));
+  ok('AN7 the operative is on the roster under that name, so the test is not vacuous',
+    joiner.name === NAME);
+
+  /* ── §21.3's one measurable balance metric ────────────────────────────────
+   * "Containment phase duration: 15-25% of mission time." Every other target in §21.3 needs
+   * players. This one is arithmetic on the phase log, and the bot run in section I is the
+   * only complete operation the build can produce — so it is a LOWER BOUND on the share a
+   * human would spend, not an estimate of it. Reported as measured, judged as OPEN. */
+  const bot = new Game(content, { seed: 'run-1' });
+  bot.commitLoadout(RECOMMENDED_MANIFEST);
+  bot.mission.setPhase(PHASE.INVESTIGATION, 0);
+  bot.mission.setPhase(PHASE.PROCEDURE_COMMITTED, 300000);
+  bot.mission.setPhase(PHASE.CONTAINMENT_ACTIVE, 600000);
+  bot.mission.setPhase(PHASE.EXTRACTION, 750000);
+  bot.mission.setPhase(PHASE.DEBRIEF, 900000);
+  const share = (log, from, to) => {
+    const a = log.find((x) => x.to === from), b = log.find((x) => x.to === to);
+    return a && b ? (b.simTimeMs - a.simTimeMs) / (log[log.length - 1].simTimeMs || 1) : null;
+  };
+  const contain = share(bot.mission.phaseLog, PHASE.CONTAINMENT_ACTIVE, PHASE.EXTRACTION);
+  note(`worked example: containment is ${(contain * 100).toFixed(0)}% of a 15-minute operation`);
+  ok('AN8 the phase log carries enough to compute §21.3\'s containment share at all',
+    contain !== null && contain > 0);
+  note('    OPEN — §21.3\'s target of 15–25% is about PLAYERS. The only complete operations');
+  note('    this build can produce are bot runs, and a bot does not deliberate, so its');
+  note('    investigation phase is a floor rather than an estimate. Measuring the share off');
+  note('    a bot would be measuring the bot.');
+  emit();
+}
 /**
  * ⚠ ONE SECTION THROWING MUST NOT DELETE EVERY SECTION AFTER IT.
  *
@@ -5126,6 +5374,7 @@ async function run(name, fn) {
     await run('AJ', () => sectionAJ());
     await run('AK', () => sectionAK());
     await run('AM', () => sectionAM(content));
+    await run('AN', () => sectionAN(content));
     await run('K', () => sectionK());
     await run('L', () => sectionL());
     await run('V', () => sectionV());

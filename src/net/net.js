@@ -260,12 +260,12 @@ export class NetSession {
       case ACT.INTERACT: err = g.doInteract(id); break;
       case ACT.USE: err = g.useHeld(id); break;
       case ACT.IMAGER: err = g.toggleImager(id); break;
-      case ACT.SLOT: { const p = g.playerById(id); if (p) p.selectSlot(m.n | 0); break; }
+      case ACT.SLOT: g.selectSlot(id, m.n | 0); break;
       case ACT.TAKE: err = g.takeFromCache(String(m.id || ''), id); break;
       case ACT.RETURN: err = g.returnToCache(id); break;
       case ACT.PROCEDURE: err = g.commitProcedure(m.card || {}); break;
       case ACT.ABORT: g.abortProcedure(); break;
-      case ACT.CLAIM: g.ledger.setClaim(String(m.id || ''), m.v || null); break;
+      case ACT.CLAIM: g.setClaim(String(m.id || ''), m.v || null, id); break;
       /* `id` is the seat this link is in, never a field the client sent — so a client
        * cannot put a callout on the board under somebody else's name. The refusal that
        * comes back goes to this one operative, not to the squad feed. */
@@ -380,6 +380,23 @@ export class NetSession {
       this._sinceSnapMs = 0;
       const snap = encodeSnapshot(this.game);
       for (const seat of this.seats.values()) if (seat.link.open) seat.link.send(snap);
+      /**
+       * §21.2's "match reconnect and network quality", reported as FACTS rather than as a
+       * grade: how many seats, how many are answering, how much has been refused and how
+       * much dropped as stale.
+       *
+       * ⚠ It is derived from what the host has actually seen, and it carries no names and
+       * no free text — §21.2 ends "do not record raw voice, free-text chat, or unnecessary
+       * personal data", and a callsign is personal data a player typed. Seat IDS are
+       * positional and mean nothing outside the session.
+       */
+      this.game.bus.emit('LINK_QUALITY', {
+        seats: this.seats.size,
+        connected: this.game.players.filter((p) => p.connected).length,
+        acts: this.actsReceived,
+        refused: this.actsRefused,
+        stale: this.actsDropped || 0,
+      }, this.game.clock.simTimeMs);
       return;
     }
     if (this.role === ROLE.CLIENT && this.link && this.link.open && cmd) {

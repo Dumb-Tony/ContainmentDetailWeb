@@ -1,0 +1,42 @@
+{
+  "id": "ashlar-flat-lodger",
+  "contentRevision": "0.1.0",
+  "displayName": "Flat 5",
+  "anomaly": "pinfold-lodger",
+  "map": "ashlar-house-9",
+  "difficulty": "field",
+
+  "_note": "THE SECOND INCIDENT ON THE NINTH FLOOR, and the one that spends the half of the building the first one does not touch. `ashlar-gallery-draught` is a journey: the whole floor is a corridor to the heating gallery, the answer is a fence made of heat, and every wall on the way is either a wall or a hole depending on which of the two buildings you are walking. This one never leaves one flat. GDD §15.2 — the building is the constant and the incident is the variable — and the variable here is that the map's argument gets used from the other end.\n\nASHLAR'S ARGUMENT IS THAT NINETEEN OF FIFTY-SEVEN WALLS ARE REAL AND THIRTY-EIGHT ARE NOT. The draught incident is about the thirty-eight being useless: they stop the squad and not the thing, so the operatives go the long way round the flats while it crosses them in a straight line. This incident is about the thirty-eight being USEFUL, and for a reason nobody has needed yet: `observedBy` casts its sightlines against `blockingRects()`, which is all fifty-seven. A stud-and-plasterboard partition breaks a line of sight exactly as completely as a concrete crosswall does. So on this floor a wall that stops nothing can hide you from something, and hiding from it is the entire containment.\n\nThe lodger is in the south room of Flat 5, hard against the one surviving partition in that flat — static 55, 3.2m of plasterboard with a 2.2m gap at its east end. That partition is the incident. Stand north of it and you are unseen and 1.9m away, which is inside a 2.2m reach: the wall is PRIVACY AND NOT PROTECTION, and there is nowhere else in this build where those two can be separated by eleven millimetres.\n\nNothing here is where the draught incident put anything. Different flat, different half of the loop, different anchor, and not one shared coordinate.",
+
+  "anomalySpawn": [-6.8, -1.6],
+  "_spawnNote": "The south room of Flat 5, 1.0m south of the partition's face and 1.2m west of its open east end. Checked standable against blockingRects() at the player radius, and checked against every fixture on the floor: the nearest door centre is the lift lobby's south door at 6.7m and the nearest breaker is the landing circuit at 9.9m, so the seal never competes with a fixture verb. The east end of the partition is deliberately close — 1.2m — because a squad that walks round it instead of standing behind it gets seen, and the difference between those two routes is one and a half metres.",
+
+  "briefing": {
+    "headline": "Two contractors withdrawn, condemned block, ninth floor",
+    "report": "Ashlar House was decanted eleven months ago and is due for demolition. A strip-out contractor finished five of the six flats on the ninth and pulled his crew off the sixth after the third visit. One man came off with a cold burn and a broken wrist; the other walked out and will not go back up. The watchman has kept doing his rounds and says he has never had any trouble.",
+    "known": [
+      { "text": "The site watchman is on the east landing and will give a statement.", "confidence": "probable" },
+      { "text": "Both circuits are on the contractor's temporaries and both are dead. Nothing on this floor is locked.", "confidence": "probable" },
+      { "text": "The injured man's kit is still on the ninth. His helmet camera is with it.", "confidence": "probable" },
+      { "text": "The second man puts it in Flat 5 and says it is against the middle wall.", "confidence": "disputed" }
+    ]
+  },
+
+  "_placementNote": "⚠ NEAREST-WINS, AND THIS FLOOR HAS BROKEN ON IT BEFORE. `contextAction` sorts candidates by distance, and `sourceInReach` probes reach + 0.6 = 2.8m. So a source inside 2.8m of another source can answer for it, and a source inside about 5m of a door centre or a breaker can beat the fixture from the spot an operative stands on to work it — which on the cold store took a whole containment out. Every source below was checked, by measurement rather than by eye, for four things: standable at the player radius; more than 2.8m from every other source; far enough from every door centre, breaker, the cargo cache and the extraction point that the fixture still wins from in front of it; and possessing at least one standable point at which it is the nearest interactable on the floor.\n\nTWO OF THEM ARE DELIBERATELY INSIDE THE FLAT AND NEITHER IS INSIDE THE REACH. `frost-band` sits at the west end of the partition, 2.4m from the lodger, and `glazed-ring` sits at the east end of the south room, 2.6m from it. Both are outside 2.2m and both are read from the wrong side of the thing, so a squad that walks straight at either of them arms it on the way. That is the intended cost and it is authored rather than accidental: the flat has three things worth reading in it and the price of all three is the same.\n\nThe trail otherwise reads in the order a squad walks it — the watchman on the landing where they arrive, the day book and the housing file in the flats they pass, the mate and the imager position in the north corridor outside the door, the meter cupboard note out at the far corner of the loop in the west stair, the fitter's kit at the west end of the south corridor, and the ambulance sheet in the drying room the crew were using as a mess. `battery-drain` has no entry here on purpose; it is logged from the squad's own telemetry by game.js and cannot be walked to.\n\nMEASURED, on the shipped geometry: thirteen sources, the tightest pair 3.00m apart against a 2.8m probe, and the closest any of them comes to a door centre, a breaker, the cache or the extraction point is 3.41m. Every one is standable at the player radius and every one has a standable ring position from which it is the nearest interactable on the floor.",
+
+  "evidenceSources": [
+    { "evidenceId": "watchman-statement", "at": [11.2, 6.0], "label": "Site watchman on the east landing", "prompt": "Take a statement", "requiresEquipment": [] },
+    { "evidenceId": "decant-file", "at": [5.8, 10.6], "label": "Housing decant file, Flat 4", "prompt": "Read the file", "requiresEquipment": [] },
+    { "evidenceId": "day-book", "at": [2.0, 6.6], "label": "Contractor's day book on the counter, Flat 3", "prompt": "Read the day book", "requiresEquipment": [] },
+    { "evidenceId": "lift-blower", "at": [10.9, 1.2], "label": "Lift motor-room riser, east link", "prompt": "Check the riser", "requiresEquipment": [] },
+    { "evidenceId": "mate-statement", "at": [-4.6, 4.2], "label": "The second fitter, in the north corridor", "prompt": "Take a statement", "requiresEquipment": [] },
+    { "evidenceId": "thermal-void", "at": [-7.6, 4.0], "label": "The Flat 5 door, from the corridor", "prompt": "Sweep the flat", "requiresEquipment": ["thermal-imager"] },
+    { "evidenceId": "charger-note", "at": [-10.8, 10.8], "label": "Meter cupboard note, west stair", "prompt": "Read the note", "requiresEquipment": [] },
+    { "evidenceId": "damp-logger", "at": [-9.2, 1.4], "label": "Surveyor's damp logger on the meter tails", "prompt": "Read the logger", "requiresEquipment": [] },
+    { "evidenceId": "dropped-tiles", "at": [-6.0, 1.0], "label": "The stacked tiles, Flat 5 north room", "prompt": "Examine the stack", "requiresEquipment": [] },
+    { "evidenceId": "frost-band", "at": [-9.2, -1.6], "label": "A burnt band along the partition", "prompt": "Examine the partition", "requiresEquipment": [] },
+    { "evidenceId": "glazed-ring", "at": [-4.8, -3.2], "label": "The hard edge of the polished floor", "prompt": "Follow the edge", "requiresEquipment": [] },
+    { "evidenceId": "ambulance-sheet", "at": [-6.0, -7.8], "label": "Ambulance handover sheet, in the crew's mess", "prompt": "Read the handover sheet", "requiresEquipment": [] },
+    { "evidenceId": "helmet-footage", "at": [-10.2, -5.0], "label": "The fitter's kit, west end of the south corridor", "prompt": "Review the helmet footage", "requiresEquipment": ["remote-camera"] }
+  ]
+}

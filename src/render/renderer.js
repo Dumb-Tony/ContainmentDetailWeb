@@ -516,7 +516,21 @@ export class Renderer {
       let rec = this._mateMeshes.get(p.id);
       if (!rec) {
         const g = new THREE.Group();
-        const body = new THREE.Mesh(new THREE.CapsuleGeometry
+        /**
+         * ⚠ `new THREE.CapsuleGeometry ? a : b` IS NOT A FEATURE TEST, and this one made
+         * multiplayer unrenderable.
+         *
+         * `new` binds tighter than `?:`, so it CONSTRUCTS first and only then asks whether
+         * the result was truthy — which means the fallback the guard exists to provide is
+         * unreachable, and the throw it exists to prevent happens on the way to the test.
+         * `CapsuleGeometry` arrived in three r142 and this build vendors r128, so the first
+         * frame with a second operative in it threw `THREE.CapsuleGeometry is not a
+         * constructor`, inside the rAF loop, and then every frame after it.
+         *
+         * Solo play never reaches this line, which is why 805 assertions stayed green over
+         * a defect that broke the entire co-op mode. Section K greps for the shape now.
+         */
+        const body = new THREE.Mesh(THREE.CapsuleGeometry
           ? new THREE.CapsuleGeometry(0.28, 1.0, 4, 8)
           : new THREE.CylinderGeometry(0.28, 0.28, 1.5, 8),
         new THREE.MeshLambertMaterial({ color: 0x3f4d5a }));
