@@ -26,21 +26,27 @@ import { Progression, loadSite } from './sim/progression.js';
 import { escapeHtml } from './ui/hud.js';
 import { dist } from './sim/geometry.js';
 import { CONFIG } from './config.js';
+import { installCrashBoundary } from './core/crash.js';
 
 const CONFIG_NET_HZ = CONFIG.net.snapshotHz;
 
-/* The crash banner keeps the FIRST error and tallies the rest — a page that rewrites the
- * banner on every follow-on error hides the one that started it. */
-let firstError = null, errorCount = 0;
-function showError(msg) {
-  errorCount++;
-  if (!firstError) firstError = msg;
-  const b = document.getElementById('err-banner');
-  b.style.display = 'block';
-  b.textContent = errorCount > 1 ? `${firstError}\n\n(+${errorCount - 1} further error${errorCount > 2 ? 's' : ''})` : firstError;
-}
-window.addEventListener('error', (e) => showError(`${e.message}\n  ${e.filename}:${e.lineno}`));
-window.addEventListener('unhandledrejection', (e) => showError(`Unhandled rejection: ${e.reason && e.reason.message ? e.reason.message : e.reason}`));
+/**
+ * The crash boundary — GDD §23 Milestone 6's crash threshold, installed before anything
+ * else can throw.
+ *
+ * ⚠ TWELVE LINES OF BANNER LIVED HERE AND THEY WERE NOT ENOUGH. They kept the first error
+ * and tallied the rest, which is the right instinct and only the first half of the problem:
+ * a throw INSIDE the requestAnimationFrame loop happens sixty times a second, so the tally
+ * ran to five figures while the page went on painting the last good frame — and a game that
+ * is still drawing is a game the player believes is working. §18.1 does not allow the UI to
+ * misrepresent state, and continuing to paint a frame the simulation did not produce is the
+ * most convincing misrepresentation available.
+ *
+ * `core/crash.js` deduplicates by stack signature, counts occurrences per signature, stops
+ * the frame loop rather than pretending, and prints which commit and which incident it
+ * happened in, so a screenshot is a bug report.
+ */
+installCrashBoundary();
 
 async function boot() {
   const bootNode = document.getElementById('boot');
