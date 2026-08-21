@@ -41,6 +41,7 @@ import {
   CommsWheel, WHEEL_ORDER, sectorAt, sectorPos, projectPoint, aimPoint, KIND_VARS,
 } from '../src/ui/commswheel.js';
 import { Progression, loadSite, DEPLOYMENT_COST, DEPARTMENT_IDS, migrate } from '../src/sim/progression.js';
+import { anomalyIsVisible } from '../src/render/renderer.js';
 import { Input, DEFAULT_BINDINGS, isReservedCode, PAD_BUTTONS, HOLD_MODE } from '../src/core/input.js';
 import { segmentHitsRect, moveWithWalls, dist, circleHitsRect } from '../src/sim/geometry.js';
 
@@ -1024,6 +1025,40 @@ async function sectionK() {
   }
   eq(`K15 no engine file switches on a state id one anomaly invented${byName.length ? ` — ${byName.join(', ')}` : ''}`,
     byName.length, 0);
+
+  /**
+   * ⚠ NOTHING WAS VISIBLE TO THE NAKED EYE, WHATEVER ITS FILE SAID.
+   *
+   * `renderer.js` put the anomaly mesh on layer 1 alone, with a comment reading "it is not
+   * in the visible spectrum" — true of `graybox-draught`, which the file was written
+   * against, and false of four of the six shipped now. The main camera is `layers.set(0)`,
+   * so `stillwater-figure` — whose entire containment is a squad looking at it — could not
+   * be seen by a squad looking at it. The rule still worked, because `observedBy` is
+   * geometry and does not consult the renderer; what the squad was holding was an invisible
+   * thing they were told to watch. §8.2 asks every rule to be observable, and four
+   * `perception.channels` arrays had been saying `visible` into a void.
+   *
+   * Asserted through the pure reader rather than through a WebGL context: the decision is
+   * a content question and the renderer only obeys it.
+   */
+  const eyeSays = [];
+  for (const id of INCIDENTS) {
+    const pack = await loadContent({ incident: id });
+    const ch = ((pack.anomaly.perception || {}).channels) || [];
+    eyeSays.push(`${pack.anomaly.id}:${anomalyIsVisible(pack.anomaly) ? 'eye' : 'instrument'}`);
+    /* A file may not say both. `instrument-only` and `visible` are contradictory claims
+     * about the same channel and the renderer would have to pick one. */
+    if (ch.includes('visible') && ch.includes('instrument-only')) {
+      byName.push(`${pack.anomaly.id}: claims both visible and instrument-only`);
+    }
+  }
+  note(`what the eye can see: ${[...new Set(eyeSays)].join(', ')}`);
+  const visibleOnes = new Set(eyeSays.filter((s) => s.endsWith(':eye')));
+  ok('K16 the eye can see the anomalies whose content says it can, and only those',
+    visibleOnes.size >= 3, [...visibleOnes].join());
+  ok('K17 and an anomaly with no perception block is invisible rather than a crash',
+    anomalyIsVisible({}) === false && anomalyIsVisible(null) === false
+    && anomalyIsVisible({ perception: { channels: 'visible' } }) === false);
 
   /* ⚠ EVERY CONFIG LEAF MUST BE READ BY SOMETHING.
    *

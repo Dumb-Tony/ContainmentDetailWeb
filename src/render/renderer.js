@@ -146,6 +146,21 @@ void main() {
  * composite kept per 1/60s — see `_renderPost` for why the exponent is there. */
 const POST = Object.freeze({ blurRetain: 0.55, dtClampMs: Object.freeze([4, 50]) });
 
+/**
+ * Does the content say the eye can see it?
+ *
+ * Exported and pure so the suite can drive it against every shipped anomaly without a
+ * WebGL context — the decision is a content question and does not need a renderer to
+ * answer. `perception.channels` is the anomaly's own declaration: `visible` means a person
+ * looking at it sees something, and `instrument-only` is the word the draught and the
+ * lodger use to say the opposite. An anomaly declaring neither is treated as invisible,
+ * because a thing that appears when its file did not say it would is the worse surprise.
+ */
+export function anomalyIsVisible(def) {
+  const ch = ((def && def.perception) || {}).channels;
+  return Array.isArray(ch) && ch.includes('visible');
+}
+
 export class Renderer {
   constructor(THREE, canvas, game) {
     this.THREE = THREE;
@@ -175,12 +190,24 @@ export class Renderer {
     this.lampTarget = new THREE.Object3D();
     this.scene.add(this.lamp, this.lampTarget);
     this.lamp.target = this.lampTarget;
-
-    /* The draught. Layer 1 alone — it is not in the visible spectrum and the render graph
-     * is what enforces that, not a flag. */
+    /**
+     * The anomaly's body.
+     *
+     * ⚠ THIS WAS LAYER 1 ALONE FOR EVERY ANOMALY, and the comment said "it is not in the
+     * visible spectrum" — true of `graybox-draught`, which the file was written against,
+     * and false of four of the six shipped now. The main camera is `layers.set(0)`, so
+     * NOTHING was visible to the naked eye whatever its content said, including
+     * `stillwater-figure`, whose entire containment is a squad looking at it. A rule you
+     * cannot see the subject of is not observable (§8.2), and the file already answered
+     * the question: `perception.channels` says which channels register it.
+     *
+     * `visible` means the eye sees it. The halo stays on layer 1 whatever happens: it is
+     * the thermal bloom around a cold mass, not a thing in the room.
+     */
     const geo = new THREE.IcosahedronGeometry(0.78, 2);
     this.anomalyMesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0x2b0f4a }));
     this.anomalyMesh.layers.set(1);
+    if (this._anomalyIsVisible()) this.anomalyMesh.layers.enable(0);
     this.scene.add(this.anomalyMesh);
     this.anomalyHalo = new THREE.Mesh(
       new THREE.IcosahedronGeometry(1.18, 2),
@@ -404,6 +431,11 @@ export class Renderer {
       g.visible = inst.loose;
       if (inst.loose) g.position.set(inst.x, 0, inst.z);
     }
+  }
+
+  /** This instance's anomaly, through the pure reader above. */
+  _anomalyIsVisible() {
+    return anomalyIsVisible(this.game && this.game.anomaly && this.game.anomaly.def);
   }
 
   _syncDeployables() {
