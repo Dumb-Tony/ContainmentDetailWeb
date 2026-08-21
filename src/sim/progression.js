@@ -832,6 +832,18 @@ function sanitiseHistory(arr, keep) {
       dims: Array.isArray(h.dims)
         ? h.dims.slice(0, 12).map((d) => ({ name: String(d.name || '').slice(0, 40), word: String(d.word || '').slice(0, 24) }))
         : [],
+      /* ⚠ AND THE SANITISER HAS TO KNOW ABOUT IT, or the night survives exactly until the
+       * save is reloaded. Everything this function does not name is dropped, deliberately —
+       * that is what makes a save from a future version safe — so a new field added to the
+       * record and not added here is a field that works all session and is gone tomorrow,
+       * which is the hardest kind of loss to notice. */
+      scenario: h.scenario && typeof h.scenario === 'object' ? {
+        seed: h.scenario.seed ? String(h.scenario.seed).slice(0, 48) : null,
+        weather: h.scenario.weather ? String(h.scenario.weather).slice(0, 32) : null,
+        time: h.scenario.time ? String(h.scenario.time).slice(0, 24) : null,
+        faulted: Array.isArray(h.scenario.faulted) ? h.scenario.faulted.slice(0, 4).map((x) => String(x).slice(0, 40)) : [],
+        shut: Array.isArray(h.scenario.shut) ? h.scenario.shut.slice(0, 4).map((x) => String(x).slice(0, 40)) : [],
+      } : null,
     });
   }
   return out.slice(-Math.max(1, keep));
@@ -1335,6 +1347,17 @@ export class Progression {
       research: earnings.research,
       minutes,
       dims: ((result && result.dims) || []).map((d) => ({ name: d.name, word: String(d.word) })),
+      /**
+       * WHICH NIGHT THIS WAS (GDD §14.4).
+       *
+       * ⚠ Without it the archive cannot compare two operations on the same floor, and §13's
+       * whole reason for keeping a history is that it should be comparable. "The cold store,
+       * Costly" twice over is two identical lines describing a hard frost with a jammed
+       * freight door and a still night with everything open — and a squad reading their own
+       * record would conclude the floor is simply like that, which is the one thing
+       * controlled variation exists to stop them believing.
+       */
+      scenario: opts.scenario || null,
     };
     p.history.push(history);
     p.history = p.history.slice(-Math.max(1, effects.historyKept));

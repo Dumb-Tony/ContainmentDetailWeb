@@ -355,6 +355,28 @@ export class BaseScreen {
 
   /* ── archive terminal (§13.2) ────────────────────────────────────────────── */
 
+  /**
+   * Which night an archived operation was (GDD §14.4).
+   *
+   * ⚠ §13 keeps a history so that it can be COMPARED, and two rows reading "the cold store,
+   * Costly" describe a hard frost with the freight door jammed and a still night with
+   * everything open. A squad reading their own record would conclude the floor is simply
+   * like that — the one thing controlled variation exists to stop them believing. An
+   * operation recorded before variation existed has no scenario and prints nothing rather
+   * than pretending.
+   */
+  _nightLine(h) {
+    const s = h.scenario;
+    if (!s) return '';
+    const bits = [];
+    if (s.weather) bits.push(escapeHtml(s.weather));
+    if (s.time) bits.push(escapeHtml(s.time.toLowerCase()));
+    for (const id of s.shut || []) bits.push(`${escapeHtml(id.replace(/^door-/, '').replace(/-/g, ' '))} jammed`);
+    for (const id of s.faulted || []) bits.push(`${escapeHtml(id.replace(/^circuit-/, ''))} circuit faulted`);
+    if (!bits.length) return '';
+    return `<p class="small night">${bits.join(' · ')}</p>`;
+  }
+
   _archive(room) {
     const pr = this.progression;
     const hist = pr.profile.history.slice().reverse();
@@ -366,6 +388,7 @@ export class BaseScreen {
           <span class="rel ${pill}">${escapeHtml(h.overall)}</span>
           <span class="when">${h.minutes ? `${Number(h.minutes).toFixed(1)} min` : '—'} · ${escapeHtml(h.mapId || 'unrecorded')}</span></div>
         <p>${escapeHtml(h.failReason || 'Operation closed.')}</p>
+        ${this._nightLine(h)}
         <div class="prov">requisition ${signed(h.requisition)} · research ${signed(h.research)} · ${escapeHtml(dims)}</div>
       </li>`;
     }).join('');

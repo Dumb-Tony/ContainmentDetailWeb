@@ -193,6 +193,16 @@ async function boot() {
       minutes: game.clock.simTimeMs / 60000,
       observations: game.ledger.entries.length,
       squad: game.players,
+      /* Which night it was (§14.4), so the archive can tell two operations on the same
+       * floor apart. Without it "the cold store, Costly" twice over describes a hard frost
+       * with a jammed freight door and a still night with everything open. */
+      scenario: content.variation ? {
+        seed: content.variation.seed,
+        weather: content.weather ? content.weather.label : null,
+        time: content.time ? content.time.label : null,
+        faulted: content.variation.faults.slice(),
+        shut: content.variation.routesShut.slice(),
+      } : null,
     });
     panels.showDebrief(e.result);
   });

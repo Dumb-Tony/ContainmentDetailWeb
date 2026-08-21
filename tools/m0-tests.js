@@ -39,7 +39,7 @@ import {
 import {
   CommsWheel, WHEEL_ORDER, sectorAt, sectorPos, projectPoint, aimPoint, KIND_VARS,
 } from '../src/ui/commswheel.js';
-import { Progression, loadSite, DEPLOYMENT_COST, DEPARTMENT_IDS } from '../src/sim/progression.js';
+import { Progression, loadSite, DEPLOYMENT_COST, DEPARTMENT_IDS, migrate } from '../src/sim/progression.js';
 import { Input, DEFAULT_BINDINGS, isReservedCode, PAD_BUTTONS, HOLD_MODE } from '../src/core/input.js';
 import { segmentHitsRect, moveWithWalls, dist, circleHitsRect } from '../src/sim/geometry.js';
 
@@ -4813,6 +4813,69 @@ async function sectionAJ() {
     gn.anomaly.speedMps, noBand.anomaly.states.find((s) => s.id === 'closing').speedMps);
   emit();
 }
+
+/* ══ AK. the archive can tell two nights apart ═════════════════════════════════
+ *
+ * §13 keeps a mission history so that it can be COMPARED, and §14.4 makes two operations
+ * on the same floor genuinely different. Those two only combine if the record says which
+ * night it was — otherwise "the cold store, Costly" twice over describes a hard frost with
+ * the freight door jammed and a still night with everything open, and a squad reading their
+ * own archive concludes the floor is simply like that.
+ */
+async function sectionAK() {
+  lines.push('--- AK. the archive records which night it was ---');
+  const site = await loadSite();
+  const pr = new Progression({ site });
+  const mk = async (seed) => {
+    const pack = await loadContent({ incident: 'cold-storage-draught', seed });
+    const g = new Game(pack, { seed });
+    g.commitLoadout(RECOMMENDED_MANIFEST);
+    for (const p of g.players) p.extracted = true;
+    const result = g.mission.grade({
+      custody: 'verified', extracted: true, players: g.players, player: g.player,
+      ledger: g.ledger, deployables: g.deployables, simTimeMs: 1200000,
+      cargoIssued: g.cargoIssued, cargoRecovered: g.cargoIssued, instances: g.instances,
+    });
+    pr.applyDebrief(result, g.mission, {
+      anomalyId: pack.anomaly.id, mapId: pack.map.id, operationId: 'op-cold-storage-2',
+      custody: 'verified', minutes: 20, observations: 4, squad: g.players,
+      scenario: {
+        seed: pack.variation.seed,
+        weather: pack.weather.label, time: pack.time.label,
+        faulted: pack.variation.faults.slice(), shut: pack.variation.routesShut.slice(),
+      },
+    });
+    return pack;
+  };
+  const p1 = await mk('night-one');
+  const p2 = await mk('night-two');
+  const hist = pr.profile.history.slice(-2);
+  note(`night one: ${p1.weather.label}, ${p1.time.label}, faults [${p1.variation.faults}], shut [${p1.variation.routesShut}]`);
+  note(`night two: ${p2.weather.label}, ${p2.time.label}, faults [${p2.variation.faults}], shut [${p2.variation.routesShut}]`);
+  eq('AK1 both operations are on the record', hist.length, 2);
+  ok('AK2 and each carries the night it was', hist.every((h) => h.scenario && h.scenario.seed));
+  ok('AK3 which are different nights on the same floor',
+    JSON.stringify(hist[0].scenario) !== JSON.stringify(hist[1].scenario),
+    JSON.stringify(hist[0].scenario));
+  eq('AK4 on the same map', hist[0].mapId, hist[1].mapId);
+
+  /* ⚠ AND IT HAS TO SURVIVE A SAVE. Everything the sanitiser does not name is dropped —
+   * which is what makes a save from a future version safe, and what makes a new field that
+   * works all session and vanishes overnight the hardest kind of loss to notice. */
+  const json = JSON.stringify(pr.profile);
+  const back = migrate(JSON.parse(json));
+  const rehydrated = back.history.slice(-2);
+  ok('AK5 a profile round-trips through a save with the night intact',
+    rehydrated.every((h) => h.scenario && h.scenario.seed),
+    JSON.stringify(rehydrated.map((h) => h.scenario)));
+  eq('AK6 and the weather with it', rehydrated[1].scenario.weather, hist[1].scenario.weather);
+
+  /* An operation recorded before variation existed has no scenario, and that is fine. */
+  const old = migrate({ ...JSON.parse(json), history: [{ operation: 1, overall: 'Costly' }] });
+  eq('AK7 a history row from before variation is kept, without inventing one',
+    old.history[0].scenario, null);
+  emit();
+}
 /**
  * ⚠ ONE SECTION THROWING MUST NOT DELETE EVERY SECTION AFTER IT.
  *
@@ -4873,6 +4936,7 @@ async function run(name, fn) {
     await run('AH', () => sectionAH(content));
     await run('AI', () => sectionAI(content));
     await run('AJ', () => sectionAJ());
+    await run('AK', () => sectionAK());
     await run('K', () => sectionK());
     await run('L', () => sectionL());
     await run('V', () => sectionV());
