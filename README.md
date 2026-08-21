@@ -161,6 +161,23 @@ effect verbs in `src/sim/senses.js`. A JSON key may name a *quantity*, never an 
 The suite proves it by renaming every state in the shipped anomaly to `q0`–`q4` and running
 the whole sequence through anyway.
 
+**And it does not know what they are evidence *of*, either.** The hypothesis board — the
+half of the tablet where you mark a rule supported or excluded — was seven claims written
+for the draught, frozen in code, and shown for every anomaly. Measured: it cited two of the
+lodger's fourteen observations, and hung four of the *draught's* claims on them. A board
+that asserts something false about the thing you are standing in front of is worse than no
+board. Claims are content now, one set per anomaly, and the loader refuses a claim that
+names an observation its own anomaly does not have.
+
+The same went for discovery. Three evidence ids could be *earned* by doing rather than
+found lying about — `thermal-void`, `frost-boundary`, `battery-drain` — because those three
+were spelled into the engine. Anything a designer wanted the squad to work out had to
+borrow one of those three names. There is a closed vocabulary of three operators now
+(`instrument-held-on-it`, `held-at-a-barrier`, `powered-kit-draining`); content names the
+operator and supplies the metres and the seconds, and the id it hangs on is the designer's.
+No evidence id appears anywhere in `game.js`, and the suite fails the build if one comes
+back.
+
 ## The site
 
 Between operations you are at Regional Site 19: a mission board, an armory counter, an
@@ -225,8 +242,16 @@ hesitate.
 It has found real gaps rather than confirming what was already believed. §27.2 asks for at
 least two evidence paths per required rule; measured, the build had **3 of 12**. With one
 path a squad that walks past a single pickup can never learn that rule — not "finds it
-harder", cannot — which fails Pillar 1's design test outright. It is 25 of 25 now, across
+harder", cannot — which fails Pillar 1's design test outright. It is 25 of 25 now across
 six anomalies.
+
+And then the same check found itself counting the wrong denominator. A squad does not play
+an anomaly, it plays an *incident package*, and a package places only the subset of an
+anomaly's observations that makes sense on its floor — the draught ships twelve and Ashlar
+places seven, because the other five are cold-store fiction and a chart recorder on a plant
+wall does not exist in a condemned flat block. On that denominator it was **24 of 30**, with
+five of the draught's rules carrying exactly one path on the floor a squad was standing on.
+Reported as a pass by a check that was looking at the anomaly file instead of the operation.
 
 ## One to five operatives
 

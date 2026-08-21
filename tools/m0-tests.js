@@ -3709,6 +3709,40 @@ async function sectionAC() {
   if (thin.length) note(`    single-path rules: ${thin.join(', ')}`);
   eq(`AC1b every required rule is revealed by at least two evidence paths (§27.2)`, thin.length, 0);
 
+  /**
+   * ⚠ AND THAT COUNTS THE WRONG DENOMINATOR. AC1b counts paths per ANOMALY, over every
+   * evidence rule the anomaly file ships. A squad does not play an anomaly; it plays an
+   * INCIDENT PACKAGE, and a package places only the subset of those rules that makes sense
+   * on its floor. `graybox-draught` ships twelve entries and `ashlar-gallery-draught`
+   * placed seven of them, because the other five are cold-store fiction — a chart recorder
+   * on a plant wall, two lamps in an aisle, a charging rack in the bay — and none of those
+   * things exist in a condemned crosswall block. So AC1b read 25 of 25 while five of the
+   * draught's rules had exactly ONE path on the floor a squad was standing on, which is
+   * the failure §27.2 exists to prevent, reported as a pass.
+   *
+   * Reachable means PLACED as a map evidence source or carrying an `earnedBy` block.
+   * Anything else is an entry in a file that the operation cannot reach.
+   */
+  const thinHere = [];
+  let pkgRules = 0;
+  for (const id of INCIDENTS) {
+    const pack = await loadContent({ incident: id });
+    const placed = new Set((pack.map.evidenceSources || []).map((s) => s.evidenceId));
+    const reachable = new Set((pack.anomaly.evidenceRules || [])
+      .filter((e) => placed.has(e.id) || e.earnedBy).map((e) => e.id));
+    const here = new Map();
+    for (const e of pack.anomaly.evidenceRules || []) {
+      if (!e.revealsRule) continue;
+      here.set(e.revealsRule, (here.get(e.revealsRule) || 0) + (reachable.has(e.id) ? 1 : 0));
+    }
+    pkgRules += here.size;
+    for (const [rule, n] of here) if (n < 2) thinHere.push(`${id}/${rule} (${n})`);
+  }
+  note(`rules with two reachable paths IN THEIR OWN PACKAGE: ${pkgRules - thinHere.length} of ${pkgRules}, across ${INCIDENTS.length} packages`);
+  if (thinHere.length) note(`    thin on the floor they are played on: ${thinHere.join(', ')}`);
+  eq(`AC1c and two of them are reachable in the package that ships them, not merely in the anomaly file${thinHere.length ? ` — ${thinHere.join(', ')}` : ''}`,
+    thinHere.length, 0);
+
   /* ── the three families are actually three ────────────────────────────────
    * §26.2 asks for distinct procedure FAMILIES, and the way that fails quietly is three
    * anomalies with the same verbs and different numbers. Compare the verb sets. */
