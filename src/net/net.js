@@ -26,6 +26,7 @@ import {
   DEFAULT_REASON, ROOM_PREFIX, roomIdFor, roomIdForCode, roomSlug,
 } from './lobby.js';
 import { PHASE } from '../sim/mission.js';
+import { CONFIG } from '../config.js';
 
 /* Signalling only: the broker introduces two browsers and then gets out of the way — no
  * game traffic passes through it. It is the one network host this build contacts, and the
@@ -514,8 +515,25 @@ export class NetSession {
       return;
     }
     if (this.game.players.length >= MAX_SQUAD) {
-      this._refuse(link, `Squad is full (${MAX_SQUAD}).`);
-      return;
+      /**
+       * ⚠ A HELD SEAT IS RELEASED ONLY WHEN SOMEBODY ELSE WANTS IT.
+       *
+       * §11.5 wants a drop to hold the slot, and the obvious implementation holds it until
+       * the session ends — which is a squad of five with two dead laptops that can never
+       * refill, for the rest of the operation, with the board saying "full". A drop is not
+       * a departure and it is not a permanent claim either.
+       *
+       * Expiring on a TIMER would be the other mistake: it would take a dropped
+       * operative's kit off the floor in a room where nothing was waiting for it, and a
+       * squad of two would lose a seat it was not competing for. So the sweep runs HERE,
+       * at the only moment the answer matters, and only far enough to make room for the
+       * one person asking.
+       */
+      const reclaimed = this._reclaimHeldSeats(1);
+      if (!reclaimed) {
+        this._refuse(link, `Squad is full (${MAX_SQUAD}).`);
+        return;
+      }
     }
 
     const p = this.game.addPlayer((m.name || '').trim().slice(0, 14) || `Operative ${this.game.players.length + 1}`);
@@ -616,10 +634,54 @@ export class NetSession {
     } else {
       this.game.notice(`${p.name}'s radio went out. Their slot is being held.`);
     }
+    /* When the radio went out, so a seat that is genuinely gone can be told from one that
+     * blinked. See `_reclaimHeldSeats`. */
+    found.seat.droppedAtMs = this.now();
     this.lobby.setConnected(found.id, false, this.now());
     this._say(`${p.name} dropped`);
     this._roster();
     this._broadcastLobby();
+  }
+
+  /**
+   * Free up to `want` seats whose operative has been gone longer than the hold.
+   *
+   * Oldest drop first, because the person who has been away longest is the least likely to
+   * be coming back — and because "we took the seat of whoever left most recently" is the
+   * rule that punishes the reconnect it is supposed to protect.
+   *
+   * Returns how many were freed. Everything the seat was holding is already on the floor:
+   * `_seatDropped` put the case down and released the instances at the moment the radio
+   * went out, so releasing the seat here loses nothing that was not already lost.
+   *
+   * @param {number} want   how many seats the caller needs
+   * @returns {number}      how many it got
+   */
+  _reclaimHeldSeats(want = 1) {
+    const now = this.now();
+    const hold = CONFIG.net.seatHoldMs;
+    const candidates = [];
+    for (const [id, seat] of this.seats) {
+      const p = this.game.playerById(id);
+      if (!p || p.connected) continue;
+      const since = seat.droppedAtMs;
+      if (since === undefined || now - since < hold) continue;
+      candidates.push({ id, since });
+    }
+    candidates.sort((a, b) => a.since - b.since);
+    let freed = 0;
+    for (const c of candidates) {
+      if (freed >= want) break;
+      const p = this.game.playerById(c.id);
+      const away = Math.round((now - c.since) / 60000);
+      this.game.notice(`${p.name} has been off the air for ${away} minutes. Their seat has gone to somebody who is here.`);
+      this.seats.delete(c.id);
+      this.lobby.release(c.id, now);
+      this.game.removePlayer(c.id);
+      freed++;
+    }
+    if (freed) { this._roster(); this._broadcastLobby(); }
+    return freed;
   }
 
   /** A deliberate goodbye, rather than a drop: the seat is released and the kit returned. */

@@ -193,6 +193,23 @@ export const CONFIG = Object.freeze({
     snapshotHz: 12,
     snapErrorM: 1.2,
     blend: 0.25,
+    /**
+     * How long a dropped operative's seat is held before somebody else may take it.
+     *
+     * ⚠ HELD-FOR-EVER IS THE OTHER BUG. §11.5 wants a drop to hold the slot — "reconnect
+     * restores character state and inventory" — and the obvious implementation holds it
+     * until the session ends, which is a squad of five with two dead laptops that can never
+     * refill. A drop is not a departure and it is not a permanent claim either.
+     *
+     * Four minutes is a reconnect, a router reboot, or a laptop lid closed and reopened. It
+     * is not long enough to cover somebody who has gone out, which is the point: past that,
+     * the operation needs the pair of hands more than it needs to keep the name.
+     *
+     * A HELD SEAT IS ONLY RELEASED WHEN SOMEBODY ELSE WANTS IT. Expiring on a timer would
+     * take an operative's kit off the floor in a room where nothing was waiting for it, and
+     * a squad of two would lose a seat it was not competing for.
+     */
+    seatHoldMs: 240000,
     /* ⚠ `assumedRttMs: 120` sat here, unread, under a comment about §8.2 "fair under
      * latency". The principle is real and the constant was not doing it: every trigger in
      * the content file carries its own `latencyToleranceMs`, which is what actually keeps

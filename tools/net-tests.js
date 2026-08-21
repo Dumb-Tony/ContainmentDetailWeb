@@ -921,6 +921,75 @@ async function sectionT() {
   emit();
 }
 
+
+/* ── W. a held seat is not a permanent claim ─────────────────────────────── */
+async function sectionW(content) {
+  heading('W. a dropped seat is held, and held is not held for ever');
+
+  /**
+   * ⚠ HELD-FOR-EVER IS THE OTHER BUG. §11.5 wants a drop to hold the slot — "reconnect
+   * restores character state and inventory" — and the obvious implementation holds it until
+   * the session ends. That is a squad of five with two dead laptops that can never refill,
+   * for the rest of the operation, with the board reading "full". A drop is not a departure
+   * and it is not a permanent claim either.
+   *
+   * AND THE SWEEP RUNS ONLY WHEN SOMEBODY WANTS A SEAT. Expiring on a timer is the other
+   * mistake: it would take a dropped operative's kit off the floor in a room where nothing
+   * was waiting for it, and a squad of two would lose a seat it was not competing for.
+   */
+  /* rig() carries its own injected clock; tick() moves it. */
+  const host = rig(content, { seed: 'hold' });
+  host.tick(1000);
+  host.n.host();
+  host.g.commitLoadout(RECOMMENDED_MANIFEST);
+
+  /* Fill the squad. */
+  const joiners = [];
+  while (host.g.players.length < MAX_SQUAD) {
+    const c = mkClient(content, { seed: `hold-${host.g.players.length}` });
+    c.links = seatOn(host, c, `Op${host.g.players.length}`);
+    joiners.push(c);
+  }
+  eq('W1 the squad is full, so the next join has to compete for a seat', host.g.players.length, MAX_SQUAD);
+
+  /* One drops. The seat is held. */
+  const dropped = joiners[0];
+  const droppedId = dropped.n.localPlayerId;
+  dropped.links.hl.close();
+  eq('W2 a drop holds the seat rather than freeing it', host.g.players.length, MAX_SQUAD);
+  ok('W3 and the operative is marked off the air rather than removed',
+    host.g.playerById(droppedId) && host.g.playerById(droppedId).connected === false);
+
+  /* Somebody asks for a seat before the hold is up. */
+  const early = mkClient(content, { seed: 'early' });
+  seatOn(host, early, 'Early');
+  eq('W4 a newcomer inside the hold window is refused, because the seat is still theirs',
+    host.g.players.length, MAX_SQUAD);
+  ok('W5 and told why', /full/i.test(early.n.refusedWhy || ''), early.n.refusedWhy);
+
+  /* Nothing has been swept, because nobody wanted a seat badly enough yet. */
+  host.tick(CONFIG.net.seatHoldMs + 1000);
+  eq('W6 the hold expiring on its own frees nothing, because nothing was waiting for it',
+    host.g.players.length, MAX_SQUAD);
+  ok('W7 and the operative is still on the roster, with their kit where it fell',
+    !!host.g.playerById(droppedId));
+
+  /* Now somebody asks. */
+  const late = mkClient(content, { seed: 'late' });
+  seatOn(host, late, 'Late');
+  eq('W8 a newcomer after the hold gets the seat', host.g.players.length, MAX_SQUAD);
+  ok('W9 and it is the seat of the one who has been gone longest', !host.g.playerById(droppedId));
+  ok('W10 and the new operative is really on the roster',
+    !!host.g.playerById(late.n.localPlayerId), late.n.refusedWhy || 'seated');
+  note(`seat hold is ${CONFIG.net.seatHoldMs / 60000} minutes`);
+
+  /* ⚠ AND THE SQUAD IS TOLD. A seat changing hands silently is the version of this that
+   * generates a bug report: the squad sees a name they do not recognise and no explanation
+   * anywhere. §18.1 again. */
+  const said = host.g.notices.map((n) => n.text).join(' | ');
+  ok('W11 and the squad is told whose seat went and why', /off the air/i.test(said), said.slice(-160));
+  emit();
+}
 /* ── run ─────────────────────────────────────────────────────────────────── */
 await suite('net-tests', async () => {
   const content = await loadContent({ incident: 'cold-storage-draught' });
@@ -932,4 +1001,5 @@ await suite('net-tests', async () => {
   await run('S', () => sectionS(content));
   await run('U', () => sectionU());
   await run('T', () => sectionT());
+  await run('W', () => sectionW(content));
 });
