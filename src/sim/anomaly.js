@@ -72,6 +72,7 @@ export class Anomaly {
   }
 
   reset() {
+    this._gradC = undefined;   // re-read from content, in case a variation rewrote a trigger
     this.x = this.site.anomalySpawn.x;
     this.z = this.site.anomalySpawn.z;
     /* ⚠ The starting state is the content's FIRST state, not a state called "latent".
@@ -215,11 +216,38 @@ export class Anomaly {
     return Array.isArray(b) ? b : ['insulation', 'gradient'];
   }
 
+  /**
+   * The gradient figure THIS anomaly obeys, in Celsius.
+   *
+   * ⚠ THE CONTENT AUTHORED IT AND NOTHING READ IT. `graybox-draught` says
+   * `"thresholdCelsius": 40` on both of its gradient triggers, and every consumer —
+   * `blocksPath`, `hottestOnPath`, `contourRadius`, the thermal floor, the imager bezel —
+   * took `CONFIG.heat.gradientThresholdC` instead. The comment in `senses.js` said the
+   * field was "carried in the content and consumed by the heat field", which was worse
+   * than silence: it told the next reader not to look. A second anomaly that wanted a
+   * different figure could author one, load clean, and obey forty.
+   *
+   * It is read off the triggers rather than from a new `presence` key because that is
+   * where it already is, and because moving it would make every shipped file wrong to
+   * make one getter tidier. One anomaly, one figure: two triggers naming different
+   * numbers is a content error, and the suite refuses it rather than silently picking.
+   */
+  get gradientThresholdC() {
+    if (this._gradC !== undefined) return this._gradC;
+    let found;
+    for (const t of this.def.triggers || []) {
+      const c = t.when && t.when.thresholdCelsius;
+      if (typeof c === 'number') { found = c; break; }
+    }
+    this._gradC = found === undefined ? CONFIG.heat.gradientThresholdC : found;
+    return this._gradC;
+  }
+
   /** The full rule for THIS anomaly: whichever of the two its content says stops it. */
   pathBlocked(ax, az, bx, bz) {
     const by = this.blockedBy;
     if (by.includes('insulation') && this.solidBlocksPath(ax, az, bx, bz)) return true;
-    if (by.includes('gradient') && this.heat.blocksPath(ax, az, bx, bz)) return true;
+    if (by.includes('gradient') && this.heat.blocksPath(ax, az, bx, bz, this.gradientThresholdC)) return true;
     return false;
   }
 
@@ -253,7 +281,7 @@ export class Anomaly {
       const a = (i / n) * Math.PI * 2;
       const ex = this.x + Math.cos(a) * R, ez = this.z + Math.sin(a) * R;
       if (solidStops && this.solidBlocksPath(this.x, this.z, ex, ez)) continue;
-      if (gradientStops && this.heat.blocksPath(this.x, this.z, ex, ez)) {
+      if (gradientStops && this.heat.blocksPath(this.x, this.z, ex, ez, this.gradientThresholdC)) {
         const hot = this.heat.hottestOnPath(this.x, this.z, ex, ez).c;
         if (hot < weakestHeat) { weakestHeat = hot; weakestBearing = a; }
         continue;
@@ -304,7 +332,7 @@ export class Anomaly {
     const gradientStops = this.blockedBy.includes('gradient');
     let best = null, bestKey = -Infinity;
     for (const s of sources) {
-      if (gradientStops && this.heat.blocksPath(this.x, this.z, s.x, s.z)) continue;
+      if (gradientStops && this.heat.blocksPath(this.x, this.z, s.x, s.z, this.gradientThresholdC)) continue;
       const d = dist(this.x, this.z, s.x, s.z);
       const key = s.peakC * 1000 - d;
       if (key > bestKey) { bestKey = key; best = s; }

@@ -49,8 +49,13 @@ export const SENSES = Object.freeze({
    * with more than one way out is: every way out is spanned. `isFenced` casts the rays;
    * this sense just reports the answer.
    *
-   * ⚠ `thresholdCelsius` is carried in the content and consumed by the heat field, not
-   * here. If you ever make this sense read it directly, the two will drift.
+   * ⚠ `thresholdCelsius` IS THE ANOMALY'S FIGURE, NOT THE ENGINE'S, and this comment used
+   * to claim it was "carried in the content and consumed by the heat field" when nothing
+   * consumed it at all. Every gradient test took `CONFIG.heat.gradientThresholdC`, so an
+   * anomaly that authored a different number loaded clean and obeyed forty. A comment
+   * asserting a thing that is false is worse than no comment: it tells the next reader not
+   * to look. It is now read by `Anomaly.gradientThresholdC` and passed to `blocksPath` —
+   * still not here, because `isFenced` casts the rays and this sense only reports.
    */
   'path-blocked-by-gradient': { poll: (a) => a.fenced },
 
