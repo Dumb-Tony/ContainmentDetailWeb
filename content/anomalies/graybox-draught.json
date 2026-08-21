@@ -2,6 +2,7 @@
   "id": "graybox-draught",
   "contentRevision": "0.6.0",
   "licensingRecordId": null,
+  "_licensingNote": "Original, not an SCP. GDD §25 makes an attribution record a prerequisite for implementing SCP-derived content, and §25.7's questions about how ShareAlike applies to game code are unsettled. Nothing here is derived from anyone's work.",
   "incidentPremise": "A maintenance crew sealed a basement plant room after reporting 'cold that moves'. Two of the three came back. The site has been without mains power for six days and the anomaly has spread as far as the stairwell.",
 
   "_engineNote": "This file is now read by a generic engine: src/sim/anomaly.js switches on nothing this anomaly is called. `presence.field` says how it disturbs the scalar field, each trigger names a `sense` from the closed vocabulary in src/sim/senses.js, and each capability names a `verb` from the same file. A JSON key may name a QUANTITY, never an OPERATOR (GDD 20.6).",
