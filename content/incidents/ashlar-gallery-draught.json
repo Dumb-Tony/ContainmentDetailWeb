@@ -38,12 +38,20 @@
     ]
   },
 
+  "_evidenceNote": "GDD §27.2 wants two evidence paths per required rule, and the count that matters is the one taken ON THIS FLOOR. The first six sources here are the six the cold store's list could honestly be re-sited into; the other five of the anomaly's twelve are cold-store fiction — a chart recorder on a plant wall, two lamps eleven metres apart in an aisle, a four-way charging rack in the bay — and a condemned crosswall block stripped to its frame contains none of those things. Placing them anyway would have turned the scorecard green by writing something false into the floor, so the five below were AUTHORED instead, out of what this building actually has: a strip-out contractor's paperwork, his fire point, his temporary alarm, and the block's own frost protection.\n\nMEASURED, against the real Site with EVERY DOOR SHUT and an operative radius of 0.34m. Each of the five is standable, at least 2.8m from every other source on the floor so two prompts never compete for one keypress, at least 3m from every door centre, breaker, the cargo cache and the extraction point so the evidence verb never competes with a fixture verb, outside the authored pen and off every authored origin. Wall clearance / nearest source / nearest fixture, in metres: permit book 1.34 / 7.41 / 3.85 · frost heaters 0.83 / 4.62 / 3.45 · accident book 1.44 / 3.40 / 4.00 · fire-watch camera 1.44 / 3.20 / 4.39 · call point 1.10 / 5.98 / 3.86. All five are walkable from the squad's spawn with the doors as the map ships them.\n\nThe spread is deliberate and it is the map's own argument: the permit book, the heaters and the fire point are down in the store rooms on the way to the gallery, and the accident book and the call point are at the far north end. This floor charges for the WALK, so a squad that wants a second path on every rule pays a full circuit for it.",
+
   "evidenceSources": [
     { "evidenceId": "frost-bloom", "at": [-8.8, 11.4], "label": "Frost on a radiator bracket, Flat 1", "prompt": "Examine the frost", "requiresEquipment": [] },
     { "evidenceId": "survivor-account", "at": [9.6, 6.6], "label": "Site watchman on the east landing", "prompt": "Take a statement", "requiresEquipment": [] },
     { "evidenceId": "maintenance-log", "at": [-9.8, -10.8], "label": "Contractor's day book at the temporary board", "prompt": "Read the day book", "requiresEquipment": [] },
     { "evidenceId": "stairwell-draught", "at": [-10.8, 9.8], "label": "Draught in the west stair", "prompt": "Note the draught", "requiresEquipment": [] },
     { "evidenceId": "frost-boundary", "at": [-6.0, -10.8], "label": "A frost line across the gallery floor", "prompt": "Follow the frost line", "requiresEquipment": [] },
-    { "evidenceId": "thermal-void", "at": [-0.6, 3.4], "label": "The north corridor, from the crosswall gap", "prompt": "Sweep the corridor", "requiresEquipment": ["thermal-imager"] }
+    { "evidenceId": "thermal-void", "at": [-0.6, 3.4], "label": "The north corridor, from the crosswall gap", "prompt": "Sweep the corridor", "requiresEquipment": ["thermal-imager"] },
+
+    { "evidenceId": "hot-works-permit", "at": [6.0, -7.6], "label": "Permit book on the bench, plant store", "prompt": "Read the permits", "requiresEquipment": [] },
+    { "evidenceId": "tubular-heaters", "at": [-1.4, -7.2], "label": "Frost heaters and a fan heater, tank room", "prompt": "Follow the track past the heaters", "requiresEquipment": [] },
+    { "evidenceId": "accident-book", "at": [6.2, 6.6], "label": "First-aid tin in Flat 4", "prompt": "Read the accident book", "requiresEquipment": [] },
+    { "evidenceId": "fire-watch-camera", "at": [-6.0, -7.6], "label": "Fire point in the drying room", "prompt": "Play back the camera's card", "requiresEquipment": [] },
+    { "evidenceId": "alarm-cells", "at": [-9.0, 4.1], "label": "Call point at the head of the west stair", "prompt": "Open the call point", "requiresEquipment": [] }
   ]
 }

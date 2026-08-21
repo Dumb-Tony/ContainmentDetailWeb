@@ -1,6 +1,6 @@
 {
   "id": "graybox-draught",
-  "contentRevision": "0.5.0",
+  "contentRevision": "0.6.0",
   "licensingRecordId": null,
   "incidentPremise": "A maintenance crew sealed a basement plant room after reporting 'cold that moves'. Two of the three came back. The site has been without mains power for six days and the anomaly has spread as far as the stairwell.",
 
@@ -195,7 +195,7 @@
     }
   ],
 
-  "_evidenceNote": "GDD §27.2 asks for at least two evidence paths per required rule. This file shipped with exactly one each, which meant a squad that walked past a single pickup could never learn that rule at all — not found it harder, could not. The five entries added at revision 0.5.0 are second paths, not second copies, and the list is now read in PAIRS: each rule's two entries sit together, and each pair is two different kinds of observation.\n\nThe reliabilities inside a pair are deliberately mismatched. §7.3 grades an observation confirmed, probable or disputed, and two confirmed sources for one rule is one source written twice. A squad holding the frost bloom AND the chart recorder knows something a squad holding two frost blooms does not: that a second, weaker channel agrees. The heat-wall pair is the sharpest case — a frost edge you can put a hand across, and a hypothermic man in an ambulance saying the same four words eleven times with his core at 31.4C.\n\n`thermal-visibility` is the one rule whose first path costs cargo, so its second path is the dead crew's own imager, lying on the floor with its review buffer still full. It teaches the rule without granting live coverage, which is exactly the distinction the loadout wager is made of.",
+  "_evidenceNote": "GDD §27.2 asks for at least two evidence paths per required rule. This file shipped with exactly one each, which meant a squad that walked past a single pickup could never learn that rule at all — not found it harder, could not. The five entries added at revision 0.5.0 are second paths, not second copies, and the list is now read in PAIRS: each rule's two entries sit together, and each pair is two different kinds of observation.\n\nThe reliabilities inside a pair are deliberately mismatched. §7.3 grades an observation confirmed, probable or disputed, and two confirmed sources for one rule is one source written twice. A squad holding the frost bloom AND the chart recorder knows something a squad holding two frost blooms does not: that a second, weaker channel agrees. The heat-wall pair is the sharpest case — a frost edge you can put a hand across, and a hypothermic man in an ambulance saying the same four words eleven times with his core at 31.4C.\n\n`thermal-visibility` is the one rule whose first path costs cargo, so its second path is the dead crew's own imager, lying on the floor with its review buffer still full. It teaches the rule without granting live coverage, which is exactly the distinction the loadout wager is made of.\n\n⚠ AND TWO PATHS PER ANOMALY IS THE WRONG DENOMINATOR, which is what revision 0.6.0 is about. A squad does not play an anomaly, it plays an incident package, and a package places only the subset of these entries that makes sense on its floor. `ashlar-gallery-draught` placed seven of the twelve, because the other five are cold-store fiction — a chart recorder on a plant wall, two lamps in an aisle, a charging rack in the bay — and none of those things exists in a condemned crosswall block. So five of these rules had exactly ONE path on the floor a squad was standing on while the per-anomaly count read a clean 25 of 25.\n\nThe five added at 0.6.0 — `hot-works-permit`, `tubular-heaters`, `accident-book`, `fire-watch-camera`, `alarm-cells` — are ASHLAR's second paths, and the fix was to author them rather than to move the cold store's. They are all the same building's paperwork and plant: a permit book, a fire point, an accident book, frost heaters on a tank room wall, a temporary alarm running off cells. Nothing was relocated, because relocating a chart recorder into a stripped-out flat would have been a lie that passed the test. Each rule is therefore read as a TRIPLE now — one entry the cold store places, one the gallery places, and one either shared or earned — and the reliabilities still disagree inside each set.",
 
   "evidenceRules": [
     {
@@ -221,6 +221,17 @@
       "isFalseLead": false
     },
     {
+      "id": "hot-works-permit",
+      "type": "documentary",
+      "dimension": "trigger",
+      "rawObservation": "Hot-works permit book on the bench in the plant store, carbons still in it. Five permits raised for burning brackets off the ninth floor, and all five signed off after the fire-watch hour. On four of them the watchman has written the same thing in the box where his initials go — CAME OVER COLD, PACKED UP. The fifth is scored through, torch never lit, and its box is empty.",
+      "reliability": "probable",
+      "revealsRule": "heat-detected",
+      "requiredEquipment": [],
+      "channel": "document",
+      "isFalseLead": false
+    },
+    {
       "id": "survivor-account",
       "type": "testimonial",
       "dimension": "trigger",
@@ -236,6 +247,17 @@
       "type": "environmental",
       "dimension": "trigger",
       "rawObservation": "Two lamps lie eleven metres apart in the same aisle, both flat now: a floodlight head on a stand, and a hand torch on the floor. The frost path runs the full eleven metres, passes the torch within a hand's width without turning, and ends in a bloom that has lifted the paint off the floodlight's housing.",
+      "reliability": "confirmed",
+      "revealsRule": "lock-on",
+      "requiredEquipment": [],
+      "channel": "visual",
+      "isFalseLead": false
+    },
+    {
+      "id": "tubular-heaters",
+      "type": "environmental",
+      "dimension": "trigger",
+      "rawObservation": "Three tubular frost heaters run along the tank room wall, warm to the back of the hand, still fed off the contractor's temporaries. The fitters' fan heater lies five metres past them on its side, casing split, element white with frost. The track through eleven months of screed dust runs the length of the room, passes under the tubulars without turning, and ends at the fan heater.",
       "reliability": "confirmed",
       "revealsRule": "lock-on",
       "requiredEquipment": [],
@@ -266,6 +288,17 @@
       "isFalseLead": false
     },
     {
+      "id": "accident-book",
+      "type": "documentary",
+      "dimension": "constraint",
+      "rawObservation": "Accident book out of the first-aid tin in Flat 4, where the crew took their breaks. One entry for the ninth floor: cold burn to the back of the left hand, fractured left wrist, treated at the Royal, off since. The description is in the injured fitter's own block capitals, written with the wrong hand — BEHIND THE LAMPS. REACHED OUT PAST THEM. The supervisor has put 'not witnessed' underneath it and countersigned that.",
+      "reliability": "disputed",
+      "revealsRule": "heat-wall",
+      "requiredEquipment": [],
+      "channel": "document",
+      "isFalseLead": false
+    },
+    {
       "id": "thermal-void",
       "type": "instrumental",
       "dimension": "form",
@@ -282,6 +315,17 @@
       "type": "instrumental",
       "dimension": "form",
       "rawObservation": "The crew's own thermal imager, face down on the floor with eleven percent of its cell left. The review buffer holds ninety seconds: a sub-ambient mass crosses the frame twice, once against the racking and once against open floor, and its outline measures the same across on both passes.",
+      "reliability": "probable",
+      "revealsRule": "thermal-visibility",
+      "requiredEquipment": [],
+      "channel": "instrument",
+      "isFalseLead": false
+    },
+    {
+      "id": "fire-watch-camera",
+      "type": "instrumental",
+      "dimension": "form",
+      "rawObservation": "The thermal camera off the fire point in the drying room, signed out for the hour after every burn and back on its charger since. Its card holds fourteen stills. Eleven are brackets cooling. Three were taken eight minutes apart on the same night and are the same sub-ambient shape three times: once in a doorway against the crosswall, once in open corridor, once low against the gallery's north face. It measures the same across in all three.",
       "reliability": "probable",
       "revealsRule": "thermal-visibility",
       "requiredEquipment": [],
@@ -312,6 +356,17 @@
       "isFalseLead": false
     },
     {
+      "id": "alarm-cells",
+      "type": "environmental",
+      "dimension": "capability",
+      "rawObservation": "Wireless call point at the head of the west stair, part of the contractor's temporary fire alarm, every device on it running off its own cell. Its fault lamp is lit and the cell behind the cover is flat. So are the other two on this floor. The spares taped inside each cover, same box and same date code, all read full.",
+      "reliability": "confirmed",
+      "revealsRule": "drain-battery",
+      "requiredEquipment": [],
+      "channel": "visual",
+      "isFalseLead": false
+    },
+    {
       "id": "maintenance-log",
       "type": "documentary",
       "dimension": "anchor",
@@ -335,7 +390,7 @@
     }
   ],
 
-  "_claimsNote": "The hypothesis board, and it is content now. It was seven claims frozen into src/sim/evidence.js and every incident got them, so the lodger's board asserted that a 40C gradient stops a thing that has never been recorded moving. This set is the draught's own board, unchanged in wording, id and order from the array it replaces — src/sim/evidence.js keeps that array as the fallback for a definition that ships no board, and section AP asserts the two have not drifted.\n\nRead in the same PAIRS the evidence list is read in: each required rule's two entries sit on one claim, so a squad holding both has a claim that can go strong. The two false claims each hang off one false lead and neither can, which is what makes them leads rather than a second right answer.",
+  "_claimsNote": "The hypothesis board, and it is content now. It was seven claims frozen into src/sim/evidence.js and every incident got them, so the lodger's board asserted that a 40C gradient stops a thing that has never been recorded moving. This set is the draught's own board, unchanged in wording, id and order from the array it replaces — src/sim/evidence.js keeps that array as the fallback for a definition that ships no board, and section AP asserts the two have not drifted.\n\nRead in the same SETS the evidence list is read in: every entry that reveals a rule sits on the one claim about that rule, so a squad holding any two of them has a claim that can go strong — whichever floor it found them on. That is the property the suite asserts, not 'the claim names one of the sources': a claim citing one source of a set and reaching strong on unrelated ones is a claim that goes green while the rule it is about is still half unlearned. The two false claims each hang off one false lead and neither can go strong, which is what makes them leads rather than a second right answer.",
 
   "claims": [
     {
@@ -343,14 +398,14 @@
       "dimension": "trigger",
       "text": "It moves toward the strongest heat it can reach.",
       "truth": true,
-      "supportedBy": ["survivor-account", "thermal-void", "frost-bloom", "lantern-pair", "chart-recorder"]
+      "supportedBy": ["survivor-account", "thermal-void", "frost-bloom", "lantern-pair", "chart-recorder", "hot-works-permit", "tubular-heaters"]
     },
     {
       "id": "claim-gradient-blocks",
       "dimension": "constraint",
       "text": "A sustained heat gradient above 40C stops it dead.",
       "truth": true,
-      "supportedBy": ["frost-boundary", "frost-bloom", "ambulance-transcript"]
+      "supportedBy": ["frost-boundary", "frost-bloom", "ambulance-transcript", "accident-book"]
     },
     {
       "id": "claim-insulation-blocks",
@@ -364,14 +419,14 @@
       "dimension": "form",
       "text": "Thermal imaging sees it in every state. There is no stealth phase.",
       "truth": true,
-      "supportedBy": ["thermal-void", "crew-imager"]
+      "supportedBy": ["thermal-void", "crew-imager", "fire-watch-camera"]
     },
     {
       "id": "claim-drains-batteries",
       "dimension": "capability",
       "text": "It drains battery-powered equipment near it.",
       "truth": true,
-      "supportedBy": ["battery-drain", "spent-cells"]
+      "supportedBy": ["battery-drain", "spent-cells", "alarm-cells"]
     },
     {
       "id": "claim-chiller-anchor",
