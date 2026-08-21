@@ -221,7 +221,22 @@ export class BaseScreen {
     const warns = [];
     if (handicap.cargoVolume < 0) warns.push(`Injuries on the roster reduce what the squad can carry by ${Math.abs(handicap.cargoVolume)} volume.`);
     if (handicap.stabiliseFactor > 1) warns.push(`Field stabilisation will take ${Math.round((handicap.stabiliseFactor - 1) * 100)}% longer with the current roster.`);
-    if (pr.profile.containment.length >= pr.cells().length) warns.push('Every holding position in the corridor is occupied. A new capture has nowhere to go.');
+    /* Occupancy is one warning and RATING is a different one. The corridor can have a cell
+     * free and still have nothing the selected operation's anomaly is rated for, which is
+     * the case the requisition upgrade exists to solve — so say which of the two it is
+     * rather than reporting "full" when it is not, or silence when it may as well be. */
+    const cellsNow = pr.cells();
+    const takenNow = new Set(pr.profile.containment.map((c) => c.cellId));
+    const freeNow = cellsNow.filter((c) => !takenNow.has(c.id));
+    if (!freeNow.length) {
+      warns.push('Every holding position in the corridor is occupied. A new capture has nowhere rated to go and will be held on the bay bus.');
+    } else if (op) {
+      const d = pr.dossierFor(op.anomalyId);
+      const need = d && d.cellRequirement;
+      if (need && !freeNow.some((c) => !c.capability || c.capability === need)) {
+        warns.push(`Nothing free in the corridor is rated ${need}, which is what this one needs. It can still be brought back; it will be logged in an improvised position.`);
+      }
+    }
 
     return `<div class="cols">
       <section>
@@ -481,13 +496,29 @@ export class BaseScreen {
 
     const cells = pr.cells().map((cell) => {
       const held = byCell.get(cell.id);
+      const rating = cell.capability ? ` · rated ${escapeHtml(cell.capability)}` : '';
       if (!held) {
-        return `<li class="vacant"><b>${escapeHtml(cell.label || cell.id)}</b><span>vacant</span>
+        return `<li class="vacant"><b>${escapeHtml(cell.label || cell.id)}</b><span>vacant${rating}</span>
           <div class="hist">${escapeHtml(cell.holding)}</div></li>`;
       }
       const hist = held.history.map((h) => `<div>${escapeHtml(h)}</div>`).join('');
-      return `<li><b>${escapeHtml(held.designation)}</b><span>${escapeHtml(cell.label || cell.id)}</span>
+      const flag = held.improvised ? ' — improvised' : '';
+      return `<li${held.improvised ? ' class="improvised"' : ''}><b>${escapeHtml(held.designation)}</b><span>${escapeHtml(cell.label || cell.id)}${rating}${flag}</span>
         <div class="hist">${escapeHtml(cell.holding)}${hist}</div></li>`;
+    }).join('');
+
+    /**
+     * ⚠ SOMETHING HELD WITH NO CELL WAS INVISIBLE HERE. The list was built by walking the
+     * CELLS, so an entry allocated `cellId: null` — which is what happens once the corridor
+     * is full — matched no row and simply did not appear. The site held it, the profile
+     * recorded it, and the one screen whose job is to say what is in the building showed
+     * nothing at all. §18.1 does not allow the UI to misrepresent what is true, and an
+     * omission is the most persuasive misrepresentation available.
+     */
+    const unplaced = pr.profile.containment.filter((c) => !c.cellId).map((held) => {
+      const hist = held.history.map((h) => `<div>${escapeHtml(h)}</div>`).join('');
+      return `<li class="unplaced"><b>${escapeHtml(held.designation)}</b><span>no holding position</span>
+        <div class="hist">Held on the vehicle bay bus. The corridor has nothing free${held.cellRequirement ? `, and nothing rated ${escapeHtml(held.cellRequirement)}` : ''}.${hist}</div></li>`;
     }).join('');
 
     const maint = pr.profile.containment.flatMap((c) => c.maintenance.map((m) => `<li>${escapeHtml(m)}</li>`)).join('');
@@ -495,7 +526,7 @@ export class BaseScreen {
     return `<div class="cols">
       <section>
         <h2>Holding positions</h2>
-        <ul class="cells">${cells || '<li class="empty">The corridor has no cells on file.</li>'}</ul>
+        <ul class="cells">${cells + unplaced || `<li class="empty">The corridor has no cells on file.</li>`}</ul>
       </section>
       <section>
         <h2>How this corridor is written</h2>

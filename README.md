@@ -225,7 +225,8 @@ hesitate.
 It has found real gaps rather than confirming what was already believed. §27.2 asks for at
 least two evidence paths per required rule; measured, the build had **3 of 12**. With one
 path a squad that walks past a single pickup can never learn that rule — not "finds it
-harder", cannot — which fails Pillar 1's design test outright. It is 16 of 16 now.
+harder", cannot — which fails Pillar 1's design test outright. It is 25 of 25 now, across
+six anomalies.
 
 ## One to five operatives
 

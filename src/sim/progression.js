@@ -1476,19 +1476,48 @@ export class Progression {
       existing.lastCheckedOperation = opN;
       return existing;
     }
+    /**
+     * ⚠ `cellRequirement` AND `capability` WERE BOTH DECORATIVE.
+     *
+     * A dossier says what kind of position the thing needs — `thermal`, `general`,
+     * `object` — and a cell says what kind it is. Neither was ever read: allocation took
+     * the first cell that was free, so the site's only thermal-rated position could be
+     * spent on a locker of brass discs and a thermal negative could be filed in the locker.
+     * Two content fields that looked like rules and were comments, which is the same defect
+     * this build has now found in `drain-power`, in `hunts`, in `blockedBy` and in
+     * `field.kind`.
+     *
+     * It does NOT refuse. GDD §13 wants the site under-resourced, not punitive, and losing
+     * a capture the squad carried up nine floors because the right cell is occupied is a
+     * different game. An unrated position is recorded as improvised and says what it is
+     * missing, which is the honest thing to print and the thing that makes the requisition
+     * upgrade legible. Built overflow storage declares no capability and therefore takes
+     * anything — that is what it is for.
+     */
     const cells = this.cells();
     const taken = new Set(this.profile.containment.map((c) => c.cellId));
-    const cell = cells.find((c) => !taken.has(c.id)) || null;
+    const need = (dossier && dossier.cellRequirement) || null;
+    const free = cells.filter((c) => !taken.has(c.id));
+    const rated = free.find((c) => !need || !c.capability || c.capability === need);
+    const cell = rated || free[0] || null;
+    const improvised = !!cell && !!need && !!cell.capability && cell.capability !== need;
     const entry = {
       anomalyId,
       designation: (dossier && dossier.designation) || anomalyId,
       cellId: cell ? cell.id : null,
+      cellRequirement: need,
+      improvised,
       custody: 'verified',
       sinceOperation: opN,
       lastCheckedOperation: opN,
       history: [line],
       maintenance: [],
     };
+    if (improvised) {
+      entry.history.push(`Placed in ${cell.label || cell.id}, which is not rated ${need}. Logged as an improvised position pending a rated one.`);
+    } else if (!cell) {
+      entry.history.push('No holding position was free. Held on the vehicle bay bus and recorded as unplaced.');
+    }
     this.profile.containment.push(entry);
     return entry;
   }
