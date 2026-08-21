@@ -4876,6 +4876,194 @@ async function sectionAK() {
     old.history[0].scenario, null);
   emit();
 }
+
+/* ══ AM. the wire when it is bad ═══════════════════════════════════════════════
+ *
+ * GDD §21.4 asks for "network tests with latency, loss, reconnect, and out-of-order
+ * events". Section M covers reconnect and the happy path; the other three have never been
+ * tested at all, on a build whose §8.2 promises every rule is "fair under latency".
+ *
+ * ⚠ THE LOOPBACK ALREADY HAD THE SEAM AND NOBODY HAD USED IT. `loopbackPair` takes a
+ * `schedule` callback, so a bad wire is a scheduler rather than a change to net.js — which
+ * means these tests drive the same transport code a real WebRTC link drives, with the
+ * delivery order rearranged underneath it.
+ */
+function badWire({ seed = 'wire', jitterMs = 0, lossPct = 0, reorder = false } = {}) {
+  const rand = mulberry32(hashStr(seed));
+  let queue = [];
+  let now = 0;
+  let dropped = 0, delivered = 0;
+  let clean = false;
+  /* ⚠ PLAIN METHODS, NOT GETTERS THROUGH `Object.assign`. The first version exposed
+   * `get dropped()` on an object literal and merged it — and `Object.assign` copies a
+   * getter's RESULT, not the getter, so every counter froze at the zero it had when the
+   * rig was built. The wire worked perfectly and reported nothing, which read as a wire
+   * that was not running. */
+  return {
+    schedule(fn, latencyMs) {
+      if (!clean && lossPct > 0 && rand() * 100 < lossPct) { dropped++; return; }
+      const jitter = jitterMs ? rand() * jitterMs : 0;
+      queue.push({ at: now + (latencyMs || 0) + jitter, fn, tie: rand() });
+    },
+    setClean(v) { clean = !!v; },
+    stats() { return { dropped, delivered, pending: queue.length }; },
+    /** Advance the wire. Everything due is delivered — in time order, or shuffled. */
+    flush(ms = 1000) {
+      now += ms;
+      const due = queue.filter((q) => q.at <= now);
+      queue = queue.filter((q) => q.at > now);
+      /* ⚠ Out-of-order means DELIVERED out of order, not merely jittered. A jitter that
+       * happens to preserve order proves nothing about a protocol's ordering assumptions. */
+      due.sort((a, b) => (reorder ? a.tie - b.tie : a.at - b.at));
+      for (const q of due) { delivered++; q.fn(); }
+      return due.length;
+    },
+  };
+}
+
+async function sectionAM(content) {
+  lines.push('--- AM. latency, loss and reordering (GDD §21.4) ---');
+
+  /**
+   * ⚠ THE JOIN HANDSHAKE IS BUILT ON A CLEAN WIRE, and the loss is switched on afterwards.
+   *
+   * The first version applied the loss from the first byte, and a 35% wire ate the HELLO —
+   * so the "lossy" test measured a session that had never connected, reported `0 delivered,
+   * 1 dropped`, and read as a devastating result about packet loss when it was a result
+   * about a handshake with no retry. A real client retries a connection; a real client does
+   * not retry a mission that is already running. What is worth testing is the second thing.
+   */
+  const rig = (opts) => {
+    const wire = badWire(opts);
+    const hostG = new Game(content, { seed: 'wire-host' });
+    hostG.commitLoadout(RECOMMENDED_MANIFEST);
+    const host = new NetSession(hostG);
+    const clientG = new Game(content, { seed: 'wire-client' });
+    const client = new NetSession(clientG);
+    const [hl, cl] = loopbackPair({ latencyMs: opts.latencyMs || 0, schedule: wire.schedule });
+    host.accept(hl);
+    wire.setClean(true);
+    client.join(cl, { name: 'Vasquez' });
+    /* ⚠ FLUSH REPEATEDLY. A delivery ENQUEUES the reply, so one pass carries the HELLO and
+     * leaves the WELCOME sitting in the queue — the client keeps its default seat id of
+     * 'p1', which is the host's own operative, and every later assertion passes on a
+     * session that never connected. A handshake is a conversation, not a message. */
+    for (let i = 0; i < 8; i++) { wire.flush(400); host.pump(50, null); client.pump(50, null); }
+    wire.setClean(false);
+    return { wire, hostG, host, clientG, client, hl, cl };
+  };
+
+  /* ── 1. a quarter-second of latency ───────────────────────────────────────
+   * §8.2: "fair under latency". The client's action still lands; it lands late. */
+  const slow = rig({ latencyMs: 250, seed: 'slow' });
+  /* ⚠ ASSERT THE SEAT IS NOT p1. `localPlayerId` defaults to 'p1', which is the HOST's own
+   * operative — so "the client has a seat" is trivially true of a client that never
+   * connected at all, and three assertions in this section were passing on a session that
+   * had failed to hand out a seat. */
+  ok('AM1 a client joins across a quarter-second link and is given its OWN seat',
+    slow.client.localPlayerId !== 'p1' && !!slow.hostG.playerById(slow.client.localPlayerId),
+    `seat ${slow.client.localPlayerId}`);
+  const meId = slow.client.localPlayerId;
+  const hostMe = slow.hostG.playerById(meId);
+  hostMe.x = slow.hostG.site.cache.x; hostMe.z = slow.hostG.site.cache.z;
+  slow.hostG.skipMs(50);
+  slow.client.act(ACT.TAKE, { id: 'thermal-imager' });
+  ok('AM2 and the action has NOT arrived yet, because the wire is slow', !hostMe.carrying('thermal-imager'));
+  slow.wire.flush(400);
+  slow.host.pump(100, null);
+  ok('AM3 it arrives when the wire delivers it', hostMe.carrying('thermal-imager'),
+    `${slow.wire.stats().delivered} delivered`);
+
+  /* ── 2. duplicates and reordering ─────────────────────────────────────────
+   * ⚠ THIS IS THE ONE THAT WAS BROKEN. `act()` stamps a sequence number and the host
+   * ignored it, so a duplicated ACT took a second item out of cargo. On a reliable ordered
+   * channel that never happens, which is exactly why it survived. */
+  const dup = rig({ seed: 'dup' });
+  const dupId = dup.client.localPlayerId;
+  const dupMe = dup.hostG.playerById(dupId);
+  dupMe.x = dup.hostG.site.cache.x; dupMe.z = dup.hostG.site.cache.z;
+  dup.hostG.skipMs(50);
+  const before = dup.hostG.cache.get('floodlight-tripod') || 0;
+  /* One intent, delivered twice — a retransmit, or a wire that echoes. */
+  dup.cl.send({ t: MSG.ACT, sq: 1, k: ACT.TAKE, id: 'floodlight-tripod' });
+  dup.cl.send({ t: MSG.ACT, sq: 1, k: ACT.TAKE, id: 'floodlight-tripod' });
+  dup.wire.flush(100);
+  const after = dup.hostG.cache.get('floodlight-tripod') || 0;
+  note(`cargo before ${before}, after one intent delivered twice: ${after}`);
+  eq('AM4 an action delivered twice is applied once', before - after, 1);
+  ok('AM5 and the duplicate is counted rather than silently swallowed',
+    (dup.host.actsDropped || 0) >= 1, `${dup.host.actsDropped || 0} dropped`);
+
+  /* A stale action arriving after a newer one is dropped, not applied backwards. */
+  dup.cl.send({ t: MSG.ACT, sq: 9, k: ACT.SLOT, n: 0 });
+  dup.wire.flush(50);
+  const droppedBefore = dup.host.actsDropped || 0;
+  dup.cl.send({ t: MSG.ACT, sq: 4, k: ACT.SLOT, n: 0 });
+  dup.wire.flush(50);
+  ok('AM6 an action older than one already applied is dropped',
+    (dup.host.actsDropped || 0) > droppedBefore);
+
+  /* ── 3. loss ──────────────────────────────────────────────────────────────
+   * Snapshots are FULL rather than delta, and this is what that buys: a client that misses
+   * one is repaired by the next, with no state-tracking and nothing to resynchronise. */
+  const lossy = rig({ lossPct: 35, seed: 'lossy', jitterMs: 40 });
+  const lossId = lossy.client.localPlayerId;
+  const lossHostMe = lossy.hostG.playerById(lossId);
+  lossHostMe.x = 3.5; lossHostMe.z = -6.5;
+  for (let i = 0; i < 40; i++) {
+    lossy.host.pump(100, null);
+    lossy.wire.flush(120);
+  }
+  note(`lossy wire: ${lossy.wire.stats().delivered} delivered, ${lossy.wire.stats().dropped} dropped (${Math.round(100 * lossy.wire.stats().dropped / (lossy.wire.stats().delivered + lossy.wire.stats().dropped))}%)`);
+  ok('AM7 a third of the traffic is genuinely lost', lossy.wire.stats().dropped > 5);
+  const seen = lossy.clientG.playerById(lossId);
+  ok('AM8 and the client still converges on the host\'s truth, because snapshots are full',
+    seen && Math.hypot(seen.netX - lossHostMe.x, seen.netZ - lossHostMe.z) < 0.05,
+    seen ? `${seen.netX},${seen.netZ} vs ${lossHostMe.x},${lossHostMe.z}` : 'no seat');
+
+  /* ── 4. no rule is decided on an exact frame ──────────────────────────────
+   * §8.2, and the content's half of it: every trigger carries a `latencyToleranceMs`, and
+   * it has to be bigger than the wire is bad. A trigger with a 400ms tolerance on a link
+   * with 250ms of latency and 200ms of jitter is a rule that can be decided by the wire. */
+  const worstWire = 250 + 200;
+  const tight = [];
+  for (const id of INCIDENTS) {
+    const pack = await loadContent({ incident: id });
+    for (const t of pack.anomaly.triggers) {
+      if (t.latencyToleranceMs < worstWire) tight.push(`${pack.anomaly.id}/${t.id} ${t.latencyToleranceMs}ms`);
+    }
+  }
+  note(`worst modelled wire is ${worstWire}ms; triggers with less tolerance than that: ${tight.length}`);
+  if (tight.length) note(`    ${tight.join(' · ')}`);
+  /* ⚠ THE SEAL IS ALLOWED TO BE TIGHT, and it is the only one. It is `performed` — an
+   * operative presses a key and the host answers — so it is not polled against a moving
+   * world and the latency it is exposed to is one round trip, not a race between two
+   * observations. Every POLLED trigger must clear the wire. */
+  const polledTight = [];
+  for (const id of INCIDENTS) {
+    const pack = await loadContent({ incident: id });
+    for (const t of pack.anomaly.triggers) {
+      if (t.when.sense === 'enclosed-by') continue;
+      if (t.latencyToleranceMs < worstWire) polledTight.push(`${pack.anomaly.id}/${t.id} ${t.latencyToleranceMs}ms`);
+    }
+  }
+  eq(`AM9 every polled trigger tolerates more delay than the worst wire${polledTight.length ? ` — ${polledTight.join(', ')}` : ''}`,
+    polledTight.length, 0);
+
+  /* ── 5. a drop mid-operation, on a bad wire ───────────────────────────────
+   * Section M does this on a clean link. The thing that changes on a bad one is that the
+   * close arrives late, so the host has been simulating a seat whose operator is gone. */
+  const drop = rig({ latencyMs: 180, jitterMs: 120, seed: 'drop' });
+  const dropId = drop.client.localPlayerId;
+  const dropMe = drop.hostG.playerById(dropId);
+  ok('AM10 the seat exists before the drop', !!dropMe && dropMe.connected);
+  drop.hl.close();
+  drop.wire.flush(500);
+  drop.host.pump(200, null);
+  ok('AM11 and is reserved rather than removed when the radio dies (§11.5)',
+    !!drop.hostG.playerById(dropId) && !drop.hostG.playerById(dropId).connected);
+  emit();
+}
 /**
  * ⚠ ONE SECTION THROWING MUST NOT DELETE EVERY SECTION AFTER IT.
  *
@@ -4937,6 +5125,7 @@ async function run(name, fn) {
     await run('AI', () => sectionAI(content));
     await run('AJ', () => sectionAJ());
     await run('AK', () => sectionAK());
+    await run('AM', () => sectionAM(content));
     await run('K', () => sectionK());
     await run('L', () => sectionL());
     await run('V', () => sectionV());

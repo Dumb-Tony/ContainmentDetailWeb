@@ -212,7 +212,7 @@ export class NetSession {
     const p = this.game.addPlayer((m.name || '').trim().slice(0, 14) || `Operative ${this.game.players.length + 1}`);
     p.remote = true;
     const token = `${p.id}-${randCode(() => (this.game.rng.float()))}`;
-    this.seats.set(p.id, { link, token });
+    this.seats.set(p.id, { link, token, lastAct: 0 });
     link.send(this._welcome(p.id, token));
     this._say(`${p.name} joined`);
     this._roster();
@@ -233,6 +233,26 @@ export class NetSession {
    * whole of §20.9 in one sentence.
    */
   _hostAct(id, m) {
+    /**
+     * ⚠ THE SEQUENCE NUMBER WAS SENT AND NEVER READ, which made every action replayable.
+     *
+     * `act()` has always stamped `n: ++this._actSeq` and the host has always ignored it. On
+     * a reliable ordered data channel that costs nothing and looks harmless — which is why
+     * it survived. It is not harmless: a duplicated ACT takes a second item out of cargo, a
+     * reordered one applies a stale intent after a newer one, and §20.9 says never trust
+     * client claims. A field that is sent and unread is the same defect as a config value
+     * nothing reads, one layer further out.
+     *
+     * Strictly increasing per seat. An action arriving with a sequence we have already
+     * passed is a duplicate or a stale retransmit, and dropping it is the only safe answer:
+     * applying it would be acting on an intent the operative has already moved on from.
+     */
+    const seat = this.seats.get(id);
+    const n = Number(m.sq);
+    if (seat && Number.isFinite(n)) {
+      if (n <= seat.lastAct) { this.actsDropped = (this.actsDropped || 0) + 1; return; }
+      seat.lastAct = n;
+    }
     this.actsReceived++;
     const g = this.game;
     let err = null;
@@ -342,7 +362,7 @@ export class NetSession {
   /** Queue a discrete request. Reliable and ordered, so it needs no retry of its own. */
   act(kind, extra = {}) {
     if (this.role !== ROLE.CLIENT || !this.link || !this.link.open) return false;
-    this.link.send({ t: MSG.ACT, n: ++this._actSeq, k: kind, ...extra });
+    this.link.send({ t: MSG.ACT, sq: ++this._actSeq, k: kind, ...extra });
     return true;
   }
 

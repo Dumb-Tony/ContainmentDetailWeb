@@ -66,7 +66,10 @@
     }
   ],
 
+  "_latencyNote": "⚠ THE OBSERVATION TRIGGERS TOLERATE 900ms AND THEY USED TO TOLERATE 300. §8.2 requires every rule to be fair under latency, and this is the anomaly where that costs the most: whether it is being watched is decided by where five people are looking, and a client's report of where it is looking is exactly the thing a bad wire delays. Section AM models a worst wire of 250ms of latency plus 200ms of jitter, and at 300ms these two rules could have been decided by the network rather than by the squad — the figure moving because a snapshot was late, on the one anomaly whose whole rule is that it does not move while you look at it. Nothing in the world is slower for it; the sustains in the content are unchanged. What changed is how much wire the rule survives.",
   "triggers": [
+
+
     {
       "id": "seen",
       "from": "*",
@@ -75,7 +78,7 @@
       "condition": "at least one operative or powered remote camera has it in view, unobstructed",
       "telegraph": "It stops mid-stride, without decelerating, the instant coverage is established.",
       "pressureDelta": -2,
-      "latencyToleranceMs": 300
+      "latencyToleranceMs": 900
     },
     {
       "id": "unwatched",
@@ -85,7 +88,7 @@
       "condition": "no operative and no powered camera has held it in view for longer than 1.5s",
       "telegraph": "The room noise drops away about three quarters of a second before it moves — the only warning, and it is the same one the night supervisor described.",
       "pressureDelta": 3,
-      "latencyToleranceMs": 300
+      "latencyToleranceMs": 900
     },
     {
       "id": "roused",
@@ -117,7 +120,7 @@
       "effect": "It arrives at arm's length and takes hold. Serious mobility injury and cognitive stress; survivable once, and nobody has been recorded surviving it twice.",
       "rangeMetres": 1.4,
       "cooldownMs": 4000,
-      "latencyToleranceMs": 300,
+      "latencyToleranceMs": 900,
       "compounding": true,
       "applies": [
         { "condition": "mobility-injury", "severity": "serious" },
