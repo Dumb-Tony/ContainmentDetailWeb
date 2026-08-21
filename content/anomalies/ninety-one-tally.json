@@ -5,6 +5,8 @@
   "licensingRecordId": null,
   "_licensingNote": "Original, not an SCP. GDD §25 makes an attribution record a prerequisite for implementing SCP-derived content, and §25.7's questions about how ShareAlike applies to game code are unsettled. Nothing here is derived from anyone's work.",
 
+  "incidentPremise": "The level 2 stocktake was run twice in one week by two clerks who did not speak to each other, and it came back the same wrong number both times: ninety-one brass tallies against a book that says otherwise. The second clerk wrote 'again' under the first count, ran it anyway, got ninety-one, and then reported a shelf that was cold in a way the chiller does not do. The floor was sealed that afternoon. Nothing on it has been reported as moving and nobody has been hurt. A torch left on that shelf overnight was flat by morning; one carried off the floor was not.",
+
   "_designNote": "GDD §26.2's THIRD PROCEDURE FAMILY: distributed-object recovery and verification. The first two families are one thing in one place — build a wall out of heat, or keep it in view — and both end with a case closing around it. This one is not a thing, it is a SET, and the difference has to be procedure rather than numbers or §24's 'scope expands through anomaly uniqueness' risk has been paid for nothing.\n\nSo: nothing hunts you. There is no fence, there is no lure, and no operative is ever in danger from it. What there is instead is arithmetic under a clock, in the dark, with an instrument that only half works — and the failure state is not being caught, it is being WRONG and not finding out until the debrief.\n\nTHE TELL IS THE HEAT FIELD, WHICH IS THE POINT. Each object is a four-degree sink at 0.9m of falloff, so the thermal imager the squad brought to fence a draught is the instrument that reads them. Superposition does the rest without a line of code: one on its own is a smudge you have to stand over, three in a drawer add up and are obvious from the doorway. The field that is a WALL in the cold store is an INSTRUMENT here. That is the strongest argument this build makes for having exactly one field.\n\nTHE VERIFICATION IS THE CASE, NOT A LABEL. The case counts what answers. Put a real one in and the count moves; put a mundane one in and the case takes it silently and the count does not. The game never says 'that one was wrong', because a game that told you would be asking you to read a label instead of keeping an account — and §7.4 wants confidence rather than checklist completion. Noticing that the number did not move IS the mechanic.\n\nAND THE COUNT IS NOT GIVEN. How many there are is on the evidence trail, not on the HUD. A squad that seals at what it assumes is the total has established custody of a subset and will find out at the debrief. Nothing in the field stops them: `gathering` is the vulnerable state and it arrives on the FIRST clean deposit, not on completion. An earlier version had an `accounted` state that arrived when the count matched the total, which made the case check the answer — the game refused to let you seal until you were right, and the sheet in the office became decoration.",
 
   "presence": {
@@ -18,13 +20,30 @@
     }
   },
 
+  "perception": {
+    "channels": ["instrumental", "visible", "physical-trace"],
+    "recordingInterference": "None, and there is nothing for it to interfere with. The set emits nothing, makes no sound and does not move, so a camera left looking at one records a brass tally on a shelf — which is exactly what it is and exactly what the six mundane ones are. The whole incident lives in the gap between what a recording holds and what an instrument reads: the imager separates a member of the set from a candidate before it is lifted, and the case's own count is the only record that decides anything.",
+    "accessibilityAlternatives": [
+      "The case's count is a written number in two places at once — the notice feed ('The case answers. 3 logged.' / 'The case takes it. 3 logged.') and the objective line ('Logged: 3. Seal when the sheet is satisfied.'). The mechanic is noticing that the number did not move, which is a reading task and is never carried by a tone.",
+      "A verified object renames its own interaction prompt: 'Take the brass tally' becomes 'Take the brass tally — reads cold'. That difference is words rather than colour, and it is the only thing on this floor that tells a real one from a mundane one before it goes in the case.",
+      "On the imager the set sits at the sub-ambient end of the ramp and renders near-black against a floor drawn in bright teal, so it is a BRIGHTNESS difference before it is a colour one — and superposition makes three together darker still rather than a different hue.",
+      "The trace one leaves is a SHAPE: a ring of frost about the size of a hand with a clean unfrosted patch in the middle of it. An occupied place and an emptied one are told apart by outline, not by fine colour discrimination.",
+      "Cumulative handling is reported in the condition strip as a name and a count of blocks ('Exposure ▮▮'), so 'that operative has carried too many of these' is legible at a glance and does not depend on hearing anybody breathe."
+    ]
+  },
+
   "states": [
     {
       "id": "dispersed",
       "kind": "latent",
       "speedMps": 0,
       "displayName": "Dispersed",
-      "description": "The set is distributed across the floor and no part of it is doing anything. This is what it looks like for as long as the squad is wrong about where it is."
+      "description": "The set is distributed across the floor and no part of it is doing anything. This is what it looks like for as long as the squad is wrong about where it is.",
+      "presentation": {
+        "visualTell": "Nothing to the eye — eleven brass tallies of the same shape, the same weight and the same colour, and five of them are the set. On thermal a lone one is a two-degree smudge you have to stand within about three metres of, and the three left together in the office superpose and are obvious from the doorway",
+        "audioCue": "None at all. The floor is a floor, and it goes on being a floor for as long as the squad is wrong about where the set is",
+        "environmentalTell": "A ring of frost about the size of a hand, with a clean unfrosted patch in the middle of it, on every surface one has been standing on long enough"
+      }
     },
     {
       "id": "gathering",
@@ -32,6 +51,11 @@
       "speedMps": 0,
       "displayName": "Gathering",
       "description": "Something of the set is in the case and the case is clean. It can be sealed at any point from here, whether or not the account is finished — which is the entire wager of the incident.",
+      "presentation": {
+        "visualTell": "The case is the coldest thing on the floor and gets colder with every clean deposit; on thermal five inside it read as one large sink rather than five small ones",
+        "audioCue": "The case answers each real deposit once, flatly, the way a scale settles. It says nothing at all for a wrong one",
+        "environmentalTell": "Frost rings on the shelves where the set was. An emptied place reads as an emptied place, which is the only reason a swept lane is worth marking"
+      },
       "_kindNote": "⚠ VULNERABLE FROM THE FIRST DEPOSIT, NOT FROM COMPLETION, and the difference is the whole design. There WAS an `accounted` state that arrived when the count matched the total, and it made the case check the answer: the game refused to let a squad seal until they were right, which meant the arithmetic did not matter and the stocktake sheet in the office was decoration. Nothing tells you when you are finished. You seal when you believe you are done, and the debrief is where you find out."
     },
     {
@@ -39,14 +63,24 @@
       "kind": "active",
       "speedMps": 0,
       "displayName": "Adulterated",
-      "description": "Something is in the case that does not belong to the set. It will not seal, and the only way back is to turn the case out and start the account again."
+      "description": "Something is in the case that does not belong to the set. It will not seal, and the only way back is to turn the case out and start the account again.",
+      "presentation": {
+        "visualTell": "Nothing changes. The case looks exactly as it looked and reads exactly as cold, because everything that was already in it is still in it",
+        "audioCue": "Silence where the answer should have been. That absence is the entire tell and nothing is going to point it out",
+        "environmentalTell": "None. The floor does not care what is in the box and neither does the frost. The only place the mistake exists is the account"
+      }
     },
     {
       "id": "contained",
       "kind": "contained",
       "speedMps": 0,
       "displayName": "Contained",
-      "description": "Sealed, complete, and leaving the floor."
+      "description": "Sealed, complete, and leaving the floor.",
+      "presentation": {
+        "visualTell": "Latches over, and the case noticeably lighter than the sum of what went into it",
+        "audioCue": "The count read once more against the sheet, and then nothing. The case does not confirm that the account was right and it never will",
+        "environmentalTell": "Every place the set was standing comes back up to the floor's own temperature over a few minutes, and the rings go with it"
+      }
     }
   ],
 
@@ -274,6 +308,8 @@
   ],
 
   "containment": {
+    "goal": "Every member of the set inside one sealed transit case, with nothing in it that is not part of the set, sealed against a total the squad found rather than one the game gave them. Custody is the account. A case sealed on four of five is a case with four in it, and nothing on this floor will say so.",
+
     "procedures": [
       {
         "id": "full-account",
@@ -317,6 +353,57 @@
         "statement": "Carrying them bare is cumulative. Sharing the walk is the counter, not a warmer glove.",
         "value": null
       }
+    ],
+
+    "integrityConditions": [
+      {
+        "id": "account-uncontaminated",
+        "measure": "case-count",
+        "failureSignal": "The notice reads 'The case takes it' and prints the number it printed last time. Then the seal stops being offered at the case, and the refusal when somebody forces it is the second and last thing said about it.",
+        "recoveryWindowMs": 45000,
+        "_note": "Forty-five thousand because that is `cold-to-the-touch`'s own cooldown, and it is the only clock on this floor. Nothing in the engine closes this window — the purge verb stays available until the seal — so what the number measures is the cost of not answering it: one more minor exposure on whoever is still walking the set over, every forty-five seconds."
+      },
+      {
+        "id": "count-against-the-sheet",
+        "measure": "case-count",
+        "failureSignal": "Nothing, and that is the condition. The case seals on a subset exactly as readily as on the set and the objective line goes on reading 'Logged: 4'. The signal is the difference between that number and the sheet's, and reading it is the operation.",
+        "recoveryWindowMs": 30000,
+        "_note": "CONFIG.anomaly.custodyVerifySeconds is thirty, so a sealed case is holding rather than held for thirty seconds and the HUD counts them out. That is the window in which a squad that goes back to the sheet can still turn the case out; after it the operation is over and the debrief is where they find out."
+      },
+      {
+        "id": "handling-rotation",
+        "measure": "exposure",
+        "failureSignal": "The same name in the condition strip goes from 'Exposure ▮' to 'Exposure ▮▮'. It is cumulative and it is per operative, so the tell is a name repeating rather than an event happening.",
+        "recoveryWindowMs": 45000,
+        "_note": "The interval between one tick and the next, exactly: `cold-to-the-touch` has cooldownMs 45000 and compounds. Hand the walk on inside it and the second block never arrives."
+      }
     ]
-  }
+  },
+
+  "difficultyProfiles": [
+    {
+      "preset": "orientation",
+      "squadSize": { "min": 1, "max": 4 },
+      "timingScale": 1.6,
+      "evidenceAvailability": "generous",
+      "automationAllowed": ["automated-observation-unit"]
+    },
+    {
+      "preset": "field",
+      "squadSize": { "min": 1, "max": 5 },
+      "timingScale": 1,
+      "evidenceAvailability": "standard",
+      "automationAllowed": ["automated-observation-unit"]
+    },
+    {
+      "preset": "severe",
+      "squadSize": { "min": 2, "max": 5 },
+      "timingScale": 0.8,
+      "evidenceAvailability": "sparse",
+      "automationAllowed": []
+    }
+  ],
+  "_profilesNote": "The floor is the same size for one operative and for four; what changes is how many candidate sites a person has to hold in their head at once. `sweep-and-lift` needs one pair of hands and one case, which is why field opens at a squad of one — and it is the trap grade, so opening it there is honest rather than generous. Severe starts at two because a sparse evidence trail can lose the stocktake sheet, and recovering the total from the clerk instead means somebody is at the stair head while somebody else is on the floor.",
+
+  "behaviourModule": null
 }
