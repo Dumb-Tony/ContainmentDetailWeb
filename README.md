@@ -42,7 +42,7 @@ power puzzle matters — the office breaker is out on the bay wall, the storage 
 The mission ends when the case is sealed, has held for thirty seconds, and is carried up
 the stairs. It can be lost at any point in that sentence.
 
-## Five incidents, three buildings, four things
+## Seven incidents, three buildings, six things
 
 The content unit is an **Incident Package**, not a map — an anomaly file holds rules and
 nothing about where; a map holds geometry and nothing about what happened;
@@ -112,8 +112,48 @@ Crouch stops being a way to be shorter. At two metres: 29.6 dB standing still, 3
 crouch-walking, 48.0 walking, against a 46 dB threshold. Walk at a stilled caller and it is
 running within a second. Crouch and you can get to arm's reach and close the case.
 
+**What was left running.** The fourth operation on the cold-store floor, and the one that
+punishes knowing it. A contractor went down on the Tuesday to replace a failed heater and
+did not come back up. He is at the north end of the west run and he was warm when they
+found him on the Wednesday.
+
+It does not move at all. It takes whatever warm object comes within a metre and a half of
+it, and it will not be watched while it holds one. So the squad arrives with three
+operations' worth of correct knowledge about this floor and every piece of it is aimed at
+the wrong thing: nothing here is fenced by anything, ever; a camera left pointing anywhere
+near the case makes the whole operation stutter on a three-and-a-half second cycle and
+burns five of the case's twelve minutes; and restoring the mains does exactly one thing,
+which is make the floor bright enough to look at things by. Looking at things is the
+failure mode.
+
+It reads at ambient on every instrument in the manifest, in every state, from every
+distance. An imager pointed at it shows the floor. The only habit that survives is the one
+nobody thinks of as a habit: get the case out of cargo and get it powered first.
+
+**Flat 5.** The second operation on Ashlar's ninth floor, and the inversion of what the
+first one taught. The gallery draught is a journey and a fence; this never leaves one flat
+and there is nothing to build.
+
+Ashlar's argument is that nineteen of fifty-seven walls are real and thirty-eight are not.
+The draught incident is about the thirty-eight being *useless* — they stop the squad and
+not the thing. This one is about the thirty-eight being *useful*, for a reason nobody has
+needed yet: a sightline is cast against all fifty-seven, so eleven millimetres of
+plasterboard breaks a line of sight exactly as completely as a concrete crosswall does. On
+this floor a wall that stops nothing can hide you from something, and hiding is the whole
+containment.
+
+Watching it holds it rigid, instantly, from any state. Slackening takes five continuous
+seconds of nobody and no camera seeing it. So the climax is one operative standing beside
+the case with their back to something they cannot see, pressing a verb they cannot aim —
+and a squad that deploys a camera out of habit holds it rigid for that camera's whole
+battery with no seal verb available at all.
+
+Same sense as the figure in aisle B, opposite sign. That is the argument the closed
+vocabulary exists to make: a key names a quantity, and the content decides what it means.
+
 That is GDD §26.2's three procedure families — perception, auditory, distributed-object —
-plus the heat fence the build started with, over three buildings.
+plus the heat fence the build started with, over three buildings — and then two more that
+use the same words for the opposite purpose.
 
 **The engine does not know what either of them is called.** States, triggers, capabilities
 and field disturbance are all read from content, through a closed vocabulary of senses and

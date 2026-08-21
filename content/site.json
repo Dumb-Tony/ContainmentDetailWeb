@@ -393,6 +393,146 @@
           "grants": "The archive files this as a procedure note rather than a hard-won field lesson."
         }
       ]
+    },
+    {
+      "anomalyId": "stillwater-figure",
+      "designation": "SW-11 (provisional)",
+      "classFraming": "Stationary under observation and fast without it. It reads at ambient in every band the site can instrument, so the only channel that records it is a person or a camera looking at it, and the record ends the moment the looking does.",
+      "holding": "two channels of continuous coverage on independent supplies, corridor cleared, three operatives",
+      "cellRequirement": "general",
+      "operationalCost": "Holding it costs two camera channels that must never both be down, and the cell's own draw is what its capability reaches for. The wing runs the corridor bus off the second supply for this reason and not for redundancy.",
+      "insights": [
+        {
+          "id": "sw-11-ambient",
+          "requires": { "rules": 2 },
+          "text": "It reads at ambient on thermal, in every state, at every distance. An imager pointed at it shows the aisle. The imager is not the wrong instrument for this floor; there is no right one.",
+          "grants": "The briefing stops listing the imager as a detection asset for this incident."
+        },
+        {
+          "id": "sw-11-coverage-is-a-resource",
+          "requires": { "rules": 4, "operations": 2 },
+          "text": "Coverage is a resource the squad also needs for carrying, placing, powering and sealing. A camera holds it exactly as well as a person does and does not need to stand there, which is the whole procedure and the reason the cameras are the first thing its capability browns out.",
+          "grants": "A line on the operation card before the squad deploys."
+        },
+        {
+          "id": "sw-11-release-window",
+          "requires": { "rules": 5, "research": 200 },
+          "text": "A moment of lost coverage does not release it. A second and a half does. The gap between those two figures is the entire margin a handover has, and it does not widen with practice.",
+          "grants": "The figure appears on the briefing instead of being learned at the cost of a contact."
+        }
+      ]
+    },
+    {
+      "anomalyId": "ninety-one-tally",
+      "designation": "NT-91 (provisional)",
+      "classFraming": "A discrepancy rather than an object: five items in a set of eleven that are indistinguishable from the other six by eye, by weight and by every hand instrument the site issues. Nothing about it moves and nobody has been hurt by it.",
+      "holding": "the set held complete in one locker, count verified against the sheet at every check",
+      "cellRequirement": "object",
+      "operationalCost": "Holding it costs nothing but an accurate count, and that is the expensive part. A check that reports eleven without recounting is not a check, and the wing has been asked twice to explain why the interval is per-item.",
+      "insights": [
+        {
+          "id": "nt-91-superposition",
+          "requires": { "rules": 2 },
+          "text": "Each one is a four-degree sink. Three together read nearly eight degrees below ambient and are obvious from a doorway; one on its own reads under four and has to be stood over. The instrument the squad brought to fence a draught is the instrument that finds these, used the other way round.",
+          "grants": "A line on the operation card before the squad deploys."
+        },
+        {
+          "id": "nt-91-silent-refusal",
+          "requires": { "rules": 4 },
+          "text": "The case takes a mundane one silently and the count does not move. Nothing announces the mistake. Noticing that the number stayed still is the whole verification, and a squad that seals on a number it did not watch change has sealed on a guess.",
+          "grants": "The archive files this as a procedure note rather than a debrief finding."
+        },
+        {
+          "id": "nt-91-the-sheet",
+          "requires": { "rules": 3, "operations": 2 },
+          "text": "The total is on the stocktake sheet in the office and has never been on the HUD. Sealing on three of five is a legal, survivable, wrong answer that the operation does not report until the debrief.",
+          "grants": "The briefing names where the sheet is."
+        }
+      ]
+    },
+    {
+      "anomalyId": "blackthorn-caller",
+      "designation": "BC-07 (provisional)",
+      "classFraming": "It moves toward sound and stops in silence. Heat does not stop it and walls do, which makes a building the only fence available and makes every powered object the site owns a lure.",
+      "holding": "escort with all carried equipment off, cell on the isolated corridor spur, two operatives",
+      "cellRequirement": "general",
+      "operationalCost": "Holding it costs the wing's extract fans on the north corridor, which have been switched to the manual schedule since the transfer. The consumable draw is trivial and the noise budget is not.",
+      "insights": [
+        {
+          "id": "bc-07-your-kit-is-the-lure",
+          "requires": { "rules": 2 },
+          "text": "A heater carries twenty-two metres, a floodlight ballast eleven, a power pack seven. On a cold-store floor those numbers are the fence and the bait. Here every one of them is a beacon, and a squad running the draught playbook has built a perfect lure around itself and switched it on.",
+          "grants": "A line on the operation card before the squad deploys."
+        },
+        {
+          "id": "bc-07-two-lures-mask",
+          "requires": { "rules": 4 },
+          "text": "Two sources of comparable level at comparable range do not make a stronger lure. They make an unresolvable one, and it stops in the wrong place, which looks exactly like the rule failing and is the rule working.",
+          "grants": "The archive files this as a procedure note rather than a field lesson paid for with a contact."
+        },
+        {
+          "id": "bc-07-crouch",
+          "requires": { "rules": 5, "research": 160 },
+          "text": "At two metres: 29.6 dB standing still, 35.1 crouch-walking, 48.0 walking, against a 46 dB threshold. Crouch stops being a way to be shorter and becomes the approach.",
+          "grants": "The figures appear on the briefing instead of being found by walking at it once."
+        }
+      ]
+    },
+    {
+      "anomalyId": "coldharbour-passenger",
+      "designation": "CH-02 (provisional)",
+      "classFraming": "It does not move and it does not choose. Anything warm that comes within a metre and a half of it is taken, and it will not be observed while it is holding something. The site records one fatality and one serious burn, neither of them the result of being approached deliberately.",
+      "holding": "sealed transit case on continuous supply, no camera on the cell interior, two operatives",
+      "cellRequirement": "general",
+      "operationalCost": "Holding it costs a case that is never allowed to go flat and a cell whose interior channel stays off. The monitor bus records the door and the corridor and nothing else, which is a documented exception and not an outage.",
+      "insights": [
+        {
+          "id": "ch-02-no-signature",
+          "requires": { "rules": 2 },
+          "text": "It reads at ambient on every instrument in the manifest, in every state, from every distance. What the imager is for on this floor is the wake it leaves: a band of thawed and refrozen floor, and boot prints in it that are not the squad's.",
+          "grants": "A line on the operation card before the squad deploys."
+        },
+        {
+          "id": "ch-02-watching-costs",
+          "requires": { "rules": 4 },
+          "text": "A camera left pointing near the case does not stall the operation, it makes it stutter: take, let go, take, on a three-and-a-half second cycle, with the drain running through half of it. The seal is genuinely available in the other half. The case's twelve minutes come out at about five.",
+          "grants": "The archive files this as a procedure note rather than a debrief arithmetic problem."
+        },
+        {
+          "id": "ch-02-case-first",
+          "requires": { "rules": 3, "operations": 2 },
+          "text": "Three operations' worth of correct knowledge about this floor is aimed at the wrong thing. The only habit that survives is the one nobody thinks of as a habit: get the case out of cargo and get it powered before anything else happens.",
+          "grants": "The briefing carries the sequence rather than the squad reconstructing it."
+        }
+      ]
+    },
+    {
+      "anomalyId": "pinfold-lodger",
+      "designation": "PL-05 (provisional)",
+      "classFraming": "Attention sets it rigid and inattention slackens it. Being watched is not a restraint here, it is the condition under which nothing can be done: the opposite of SW-11, on the same quantity, and the wing has asked twice that the two not be filed together.",
+      "holding": "sealed case, cell interior channel off, door channel only, two operatives",
+      "cellRequirement": "general",
+      "operationalCost": "Holding it costs the same interior channel CH-02 costs, for the opposite reason: a camera on this one holds it rigid indefinitely and there is then no way to open the cell. The extract fan is on the list.",
+      "insights": [
+        {
+          "id": "pl-05-asymmetry",
+          "requires": { "rules": 2 },
+          "text": "Setting is instantaneous and from any state. Slackening takes five continuous seconds of nobody and no camera holding it in view. An operative who glances round to check where the case is has spent five seconds they have to buy again.",
+          "grants": "A line on the operation card before the squad deploys."
+        },
+        {
+          "id": "pl-05-the-partition",
+          "requires": { "rules": 4 },
+          "text": "A sightline is stopped by eleven millimetres of plasterboard exactly as completely as by a concrete crosswall. On the ninth floor of Ashlar that means a wall which stops nothing at all can hide you from this, and hiding is the entire containment.",
+          "grants": "The archive files the standing position rather than the squad finding it by being seen."
+        },
+        {
+          "id": "pl-05-one-contact",
+          "requires": { "rules": 5, "research": 180 },
+          "text": "The five-second figure sits inside the seven-second contact cooldown, so an operative who takes station correctly eats exactly one contact and not two. A squad that does not know the figure is five will turn back round at three and buy nothing.",
+          "grants": "Both figures appear on the briefing."
+        }
+      ]
     }
   ],
 

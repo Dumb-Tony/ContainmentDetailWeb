@@ -699,40 +699,24 @@ async function run() {
   /* E. the frame. A new canvas per incident: `new WebGLRenderer({canvas})` on a canvas
    * that already has a context gets the SAME context back, so reusing one would have
    * every incident after the first drawing the first one's scene. */
-  /* ⚠ FOUND WHILE MEASURING, AND IT BLOCKS THE GATE THIS FILE EXISTS TO REPORT ON:
-   * `renderer.js` _syncMates builds a teammate body as
+  /* ⚠ THIS USED TO SHIM `THREE.CapsuleGeometry` AND NO LONGER HAS TO, which is worth the
+   * paragraph because the shim is how the bug was found. `renderer.js` _syncMates built a
+   * teammate body as
    *
-   *     new THREE.Mesh(new THREE.CapsuleGeometry ? new THREE.CapsuleGeometry(...) : new THREE.CylinderGeometry(...), mat)
+   *     new THREE.Mesh(new THREE.CapsuleGeometry ? new THREE.CapsuleGeometry(...) : ..., mat)
    *
    * and `new THREE.CapsuleGeometry ? a : b` is not a feature test — `new` binds tighter
    * than `?:`, so it CONSTRUCTS first and only then asks whether the result is truthy.
    * CapsuleGeometry arrived in three r142 and this build ships r128, so the guard's own
-   * fallback is unreachable and the first frame with a second operative in it throws
-   * `THREE.CapsuleGeometry is not a constructor` — inside the rAF loop, so it throws again
-   * every frame. Solo play never touches it. The fix is to drop one `new`:
+   * fallback was unreachable and the first frame with a second operative in it threw
+   * `THREE.CapsuleGeometry is not a constructor` — inside the rAF loop, so every frame.
+   * Solo play never touched it, which is why it survived. Fixed by dropping one `new`.
    *
-   *     THREE.CapsuleGeometry ? new THREE.CapsuleGeometry(0.28, 1.0, 4, 8) : new THREE.CylinderGeometry(0.28, 0.28, 1.5, 8)
-   *
-   * Until then a full squad cannot be drawn at all, and the five-operative frame cost
-   * below could not be measured. So the harness supplies the geometry the guard MEANT to
-   * fall back to — the same cylinder, on the same code path — and says so, rather than
-   * printing a dash where the number the milestone gate needs should be. */
-  let capsuleShimmed = false;
-  if (!window.THREE.CapsuleGeometry) {
-    window.THREE.CapsuleGeometry = class extends window.THREE.CylinderGeometry {
-      constructor(radius = 1, length = 1, capSeg = 4, radialSeg = 8) {
-        super(radius, radius, length + radius * 2, radialSeg);
-      }
-    };
-    capsuleShimmed = true;
-  }
+   * The shim went with it. On r128 the guard now falls through to CylinderGeometry on its
+   * own, so section E measures the shipped path with nothing supplied — which is what it
+   * was always supposed to be measuring. Section K13 in the suite greps for the shape. */
 
   say('--- E. frame cost, five operatives (ms; median / worst) ---');
-  if (capsuleShimmed) {
-    say('  ⚠ renderer.js _syncMates throws on r128 (see the note in this file). Measured with');
-    say('    the cylinder its own guard meant to fall back to, so these are the shipped path');
-    say('    with the crash removed — not a different renderer.');
-  }
   say(`  thermal floor is a fixed ${THERMAL_FLOOR_RESOLUTION}x${THERMAL_FLOOR_RESOLUTION} grid = ${THERMAL_FLOOR_RESOLUTION * THERMAL_FLOOR_RESOLUTION} samples per update, 10 Hz`);
   say('                                render, imager off      render, imager on     hud.update    thermalFloor');
   say('  incident                     med     p95     max     med     p95     max     med    p95      med    p95');
