@@ -336,8 +336,37 @@ function knownCaps(game) {
    * new kinds of event are still happening for the first time, which on a long operation is
    * most of the way through. Reported as filling, which is what it is. */
   caps['certification.counts'] = Object.keys(EVENTS).length;
+
+  /**
+   * ⚠ THREE COUNTERS THAT THIS TOOL REPORTED AS LEAKS AND ARE RAMPS TO A CAP — the exact
+   * false positive the paragraph above describes, caught a second time by the same run.
+   *
+   * `anomaly.transitions` genuinely had no cap when the soak first ran and now has one; the
+   * entry stays so the ramp toward it is reported as filling rather than re-reported as a
+   * leak the next time somebody plays a flickering anomaly for half an hour.
+   *
+   * The other two are the SAME LIST seen through two lenses, which is why they climbed
+   * together at four a minute and sixty-two bytes a minute on the gallery draught:
+   * `_iceMeshes` grows to match `icePatches` and never shrinks — deliberately, it is a pool
+   * and the surplus is hidden, not deleted — and every patch it draws is also a row in the
+   * snapshot's `an.ic`. Both are bounded by the same forty. A soak reporting a mesh pool and
+   * the wire field it mirrors as two independent leaks is a soak double-counting one number.
+   */
+  try { caps['anomaly.transitions'] = CONFIG.anomaly.transitionLogMax; } catch { /* older build */ }
+  caps['gpu.sceneChildren'] = SCENE_FURNITURE + 40;
+  caps['wire.snap.an'] = AN_BASE_BYTES + 40 * AN_ICE_BYTES;
   return caps;
 }
+
+/* The scene's fixed contents — lamp, target, anomaly body and halo, the map's own meshes —
+ * measured on the largest shipped map rather than counted by hand, and rounded up. What is
+ * being asserted is that the ICE POOL is bounded, not that the furniture is a specific
+ * number, so a generous figure is the honest one. */
+const SCENE_FURNITURE = 400;
+/* `an` with no ice is 46-47 bytes; each `ic` row is three quantised numbers and a pair of
+ * brackets. Both measured against `encodeSnapshot` rather than counted off the source. */
+const AN_BASE_BYTES = 47;
+const AN_ICE_BYTES = 22;
 
 /**
  * ⚠ ONE ABSOLUTE THRESHOLD CANNOT SERVE A LIST AND A BYTE COUNT. Four entries a minute

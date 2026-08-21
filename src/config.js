@@ -116,6 +116,10 @@ export const CONFIG = Object.freeze({
   anomaly: {
     /* Speeds come from the content file's states; this is the pressure multiplier band. */
     pressureSpeedGain: 0.16,      // +16% per pressure stage above Latent
+    /* The debrief prints every state change, so a list with no cap is a page nobody can
+     * read. Forty is the same figure `icePatches` uses and the same reasoning: the last
+     * forty are the ones an after-action report is about. Found unbounded by tools/soak.ps1. */
+    transitionLogMax: 40,
     batteryDrainRadiusM: 5,
     batteryDrainMultiplier: 4,
     /* ⚠ `contactRadiusM`, `contactCooldownMs` and `reacquireGraceMs` used to live here and

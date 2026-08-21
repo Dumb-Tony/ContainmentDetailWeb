@@ -26,6 +26,7 @@
 import { CONFIG } from '../config.js';
 import { dist, segmentHitsRect } from './geometry.js';
 import { SENSES, isPerformed } from './senses.js';
+import { t as msg } from '../core/i18n.js';
 
 /**
  * ⚠ THESE ARE THE GRAYBOX-DRAUGHT'S STATE NAMES, KEPT ONLY FOR READABILITY AT CALL SITES.
@@ -456,6 +457,23 @@ export class Anomaly {
       telegraph: t ? t.telegraph : '',
       pressureDelta: t ? (t.pressureDelta || 0) : 0,
     });
+    /**
+     * ⚠ THE ONLY LIST IN THE BUILD WITH NO CAP, found by the soak: nine incidents, thirty
+     * simulated minutes, and this one climbing at 1.43 rows a minute on `cold-storage-toll`
+     * and 0.40 on `blackthorn-caller` while every other counter plateaued — `bus.log` at
+     * 256, `notices` at 40, `icePatches` at 40, `comms.list` at three per operative.
+     *
+     * It is small: about forty rows over a long session. It matters because `panels.js`
+     * renders ALL of them on the debrief, so an anomaly that flickers between two states —
+     * which the caller does by design, every time somebody moves — writes a page nobody can
+     * read out of a list nobody trimmed. And because a list with no cap is a list whose
+     * ceiling is the length of the session, which is not a number this build knows.
+     *
+     * A ring rather than a refusal: the LAST forty are the ones a debrief is about, and the
+     * step that lost custody is always near the end. `AN3` reads the newest entry and
+     * `applyPressureDelta` reads it in the same step it is pushed, so neither is affected.
+     */
+    if (this.transitions.length > CONFIG.anomaly.transitionLogMax) this.transitions.shift();
     this.state = stateId;
     this.stateEnteredMs = simTimeMs;
     /* ⚠ Every sustain resets on a transition. Carrying one across means a trigger that was
@@ -586,14 +604,19 @@ export class Anomaly {
 
   trySeal(caseDep, simTimeMs) {
     const t = this.performedTrigger;
-    if (!t) return 'This anomaly has no custody procedure.';
-    if (t.from !== '*' && this.state !== t.from) return 'It is not held. Close the fence first.';
-    if (!caseDep) return 'No transit case deployed.';
-    if (caseDep.itemId !== t.when.itemId) return `That is not the ${t.when.itemId.replace(/-/g, ' ')}.`;
-    if (!caseDep.hasPower) return 'The case heater is dead. It will not hold.';
+    if (!t) return msg('mission.refuse.noCustodyProcedure');
+    if (t.from !== '*' && this.state !== t.from) return msg('mission.refuse.notHeld');
+    if (!caseDep) return msg('mission.refuse.noCaseDeployed');
+    /* The vessel's id is CONTENT — the trigger names the item the package requires — so it
+     * is interpolated. The sentence around it is the engine's and is keyed. */
+    if (caseDep.itemId !== t.when.itemId) return msg('mission.refuse.wrongVessel', { name: t.when.itemId.replace(/-/g, ' ') });
+    if (!caseDep.hasPower) return msg('mission.refuse.caseNoPower');
     /* A set is already inside the box; there is no distance to check. See `isDistributed`. */
     if (!this.isDistributed && dist(this.x, this.z, caseDep.x, caseDep.z) > t.when.radiusMetres) {
-      return `The case is ${dist(this.x, this.z, caseDep.x, caseDep.z).toFixed(1)}m away. It must be within ${t.when.radiusMetres}m.`;
+      return msg('mission.refuse.caseTooFar', {
+        distance: dist(this.x, this.z, caseDep.x, caseDep.z).toFixed(1),
+        radius: t.when.radiusMetres,
+      });
     }
     caseDep.sealed = true;
     caseDep.custodyHeldMs = 0;
