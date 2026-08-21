@@ -33,8 +33,67 @@
 
 import { ContentError } from './content.js';
 
-export const PROGRESSION_VERSION = 1;
+/**
+ * ⚠ THE VERSION NUMBER MEANT NOTHING FOR THE FIRST THREE SHAPES OF THIS FILE, and that is
+ * why it is 2 now.
+ *
+ * `git log -p src/sim/progression.js` has three commits and the profile's shape changed in
+ * all three, while `PROGRESSION_VERSION` stayed at 1 throughout:
+ *
+ *   05c3f7d  the original: history rows with no `scenario`, containment entries with no
+ *            `cellId`, `cellRequirement` or `improvised`
+ *   ea2ca74  `history[].scenario` added — and the sanitiser was updated, with a comment
+ *            warning that a field the sanitiser does not name works all session and is
+ *            gone tomorrow
+ *   2054db5  `containment[].cellRequirement` and `containment[].improvised` added — AND
+ *            THE SANITISER WAS NOT UPDATED, one commit after that comment was written.
+ *            Measured: capture something needing a `thermal` cell into a `general` one,
+ *            and the corridor says "— improvised" for the rest of the session. Reload and
+ *            it is a normal rated placement, because `sanitiseContainment` never named
+ *            either field. §18.1 does not allow the UI to misrepresent state, and a screen
+ *            that tells the truth until you reload is the worst version of that.
+ *
+ * Three distinct shapes, all claiming version 1, none distinguishable from the others.
+ * Version 2 is the shape as of this commit; `MIGRATIONS` below is where the next one goes,
+ * and an old save is now UPGRADED rather than discarded.
+ */
+export const PROGRESSION_VERSION = 2;
+
+/** The storage slot. Deliberately NOT bumped with the schema — a new key orphans every
+ *  save that exists, which is the loss the version number is there to prevent. */
 export const SAVE_KEY = 'cd.profile.v1';
+
+/** Where a save this build could not read is put, so that it is never simply overwritten.
+ *  One slot; the newest unreadable save wins. */
+export const QUARANTINE_KEY = 'cd.profile.unreadable';
+
+/**
+ * Ceilings, because a floor alone is not a bound.
+ *
+ * ⚠ `Math.max(0, Math.round(Number(x) || 0))` LOOKS TOTAL AND IS NOT. `JSON.parse` maps
+ * `1e999` to `Infinity`, `Infinity || 0` is `Infinity`, `Math.round(Infinity)` is
+ * `Infinity` and `Math.max(0, Infinity)` is `Infinity` — so a one-character edit to
+ * localStorage bought infinite requisition. It then survived exactly one session, because
+ * `JSON.stringify(Infinity)` is `null` and the next load read it back as 0: infinite money
+ * followed by a wiped balance, which is a worse outcome than either.
+ *
+ * These are not balance numbers. They are the point past which a value can only have come
+ * from an editor, chosen far above anything a campaign reaches — the largest debrief in
+ * `DIMENSION_YIELD` pays under 300 requisition, so 9,999,999 is about thirty thousand
+ * perfect operations.
+ */
+export const CEILINGS = Object.freeze({
+  requisition: 9999999,
+  research: 9999999,
+  operations: 999999,
+  knowledgeEntries: 64,     // six anomalies ship; this is room for a decade of them
+  historyEntries: 24,
+  containmentEntries: 12,
+  rosterEntries: 5,
+  siteUpgradeIds: 24,
+  upgradeIds: 64,
+  insightsPerAnomaly: 40,
+});
 
 /* ── §12.2 resources ──────────────────────────────────────────────────────────
  * Four, and no more. §12.2: "Avoid multiple premium-like currencies and randomized loot."
@@ -422,6 +481,24 @@ const wordKey = (word) => String(word === undefined || word === null ? '' : word
 export const DIMENSION_YIELD = Object.freeze({
   containmentintegrity: {
     established: { req: 140, res: 45, st: { research: 3, security: 3, logistics: 1 } },
+    /**
+     * ⚠ THIS ROW WAS MISSING AND THE HIGHEST-VALUE DIMENSION IN THE GAME PAID ZERO FOR IT.
+     *
+     * `mission.grade()` reports `partial` ahead of everything else — `partial ? 'partial'
+     * : custody === 'verified' ? 'established' : …` — so a distributed set sealed on an
+     * incomplete count grades Partial EVEN WHEN CUSTODY WAS VERIFIED. The table had
+     * `established`, `unverified` and `none` and no `partial`, so the lookup missed, `if
+     * (!y) continue` skipped the row, and the operation was paid nothing at all for the
+     * one thing it is about. Found by cross-checking every word `grade()` can emit against
+     * every key this table holds; there is no comment anywhere claiming it was meant to
+     * pay nothing, unlike `civilianoutcome.notapplicable` below, which says so explicitly.
+     *
+     * The figures are `unverified`'s, unchanged, and that is a PLACEHOLDER rather than a
+     * judgement: a case sealed on an incomplete set is a custody that is not the whole
+     * thing, which is the nearest existing row. §21.3 wants balance evidence-led, and
+     * nobody has playtested this outcome because until now it was worth nothing.
+     */
+    partial: { req: 55, res: 25, st: { research: 1 } },
     unverified: { req: 55, res: 25, st: { research: 1 } },
     none: { req: 0, res: 8, st: { security: -2 } },
   },
@@ -461,6 +538,11 @@ export const DIMENSION_YIELD = Object.freeze({
     poor: { req: 0, res: 0, st: { logistics: -3, engineering: -1 } },
   },
   infrastructuredamage: {
+    /* `grade()` emits the word id `damageNone` here rather than `none`, because `none` is
+     * already the containment table's word for something quite different and one locale
+     * file cannot hold two keys with the same name. Both spellings pay the same row, so
+     * the lookup does not depend on which end of the pair the caller happens to have. */
+    damagenone: { req: 30, res: 0, st: { engineering: 3, logistics: 1 } },
     none: { req: 30, res: 0, st: { engineering: 3, logistics: 1 } },
     minor: { req: 10, res: 0, st: { engineering: 1 } },
     major: { req: 0, res: 0, st: { engineering: -3, logistics: -2 } },
@@ -468,8 +550,35 @@ export const DIMENSION_YIELD = Object.freeze({
   researchcompletion: {
     substantial: { req: 0, res: 55, st: { research: 3, engineering: 1 } },
     partial: { req: 0, res: 25, st: { research: 1 } },
+    /* ⚠ `grade()` says `thin` and this table said `minimal`, so the bottom tier of research
+     * completion paid nothing and `minimal` was unreachable. Same defect as
+     * `containmentintegrity.partial` above and found the same way. `minimal` is kept as an
+     * alias so a debrief result stored under the old word still pays. */
+    thin: { req: 0, res: 8, st: {} },
     minimal: { req: 0, res: 8, st: {} },
   },
+});
+
+/**
+ * The stable dimension id `mission.grade()` emits, mapped to this table's key.
+ *
+ * ⚠ THE TABLE IS KEYED ON A NORMALISED ENGLISH DISPLAY NAME, WHICH IS NOW A TRANSLATED
+ * STRING. `dimKey('Containment integrity')` is `containmentintegrity`; in any second locale
+ * it is something else entirely and every row misses, so the whole debrief pays zero —
+ * silently, and with the suite green because the suite runs in English. The ids are the
+ * contract; the display names are the rendering. Keyed both ways below, id first.
+ */
+export const DIMENSION_KEY_BY_ID = Object.freeze({
+  containment: 'containmentintegrity',
+  personnel: 'personnelsurvival',
+  conduct: 'squadconduct',
+  civilian: 'civilianoutcome',
+  evidence: 'evidencequality',
+  secrecy: 'secrecyandexposure',
+  equipment: 'equipmentstewardship',
+  infrastructure: 'infrastructuredamage',
+  research: 'researchcompletion',
+  time: 'timetostabilisation',
 });
 
 /* Behaviours, not outcomes — §12.3 says standing is "earned through behavior aligned with
@@ -572,12 +681,18 @@ export function earningsFor(result, mission = null, opts = {}) {
     { req: -DEPLOYMENT_COST });
 
   for (const d of dims) {
-    const key = dimKey(d && d.name);
+    /* Id first, display name second. See DIMENSION_KEY_BY_ID: the name is translated and
+     * the id is not, and a result stored before ids existed only has a name. */
+    const key = (d && DIMENSION_KEY_BY_ID[d.id]) || dimKey(d && d.name);
     /* Time to stabilisation reports a measurement, not a verdict, so it cannot live in
      * the word table. Under the target the operation cost less to run; over it, or never
      * stabilised at all, it simply pays nothing. */
     if (key === 'timetostabilisation') {
-      const mins = Number(String((d && d.word) || '').replace(/[^0-9.]/g, ''));
+      /* The number travels beside the word now; the regex is the fallback for a result
+       * graded by an older build. Stripping non-digits reads "12,4 min" as 124. */
+      const mins = typeof (d && d.value) === 'number' && Number.isFinite(d.value)
+        ? d.value
+        : Number(String((d && d.word) || '').replace(/[^0-9.]/g, ''));
       if (!Number.isFinite(mins) || mins <= 0) continue;
       if (mins <= TIME_TARGET_MINUTES) {
         const under = Math.min(TIME_TARGET_MINUTES, TIME_TARGET_MINUTES - mins);
@@ -591,8 +706,11 @@ export function earningsFor(result, mission = null, opts = {}) {
     }
     const table = DIMENSION_YIELD[key];
     if (!table) continue;
-    const y = table[wordKey(d.word)];
+    /* Same order and the same reason: `wordId` is the contract, `word` is what a locale
+     * chose to print. `damageNone` and `none` both reach the infrastructure row this way. */
+    const y = table[wordKey(d.wordId)] || table[wordKey(d.word)];
     if (!y) continue;
+    /* `d.name` is the LABEL on the debrief line and is meant to be the translated one. */
     credit(d.name, (d && d.why) || d.word, y);
   }
 
@@ -741,96 +859,278 @@ export function defaultProfile() {
   };
 }
 
-function sanitiseStanding(obj) {
+/* ── the migration report ─────────────────────────────────────────────────────
+ *
+ * ⚠ A PROFILE IS THE ONLY THING IN THIS BUILD A PLAYER CAN LOSE, AND LOSING IT USED TO BE
+ * SILENT. Every path through the old `migrate` that could not use a save returned
+ * `defaultProfile()` and said nothing: a version it did not recognise, a truncated string,
+ * a field of the wrong type. A player with thirty operations behind them opened the game,
+ * saw Provisional clearance and 340 requisition, and had no way to tell whether they had
+ * been robbed or had opened the wrong browser profile — and the first autosave then wrote
+ * over the evidence.
+ *
+ * So every drop is now recorded, the ones a player would notice are turned into sentences,
+ * and a save this build cannot read is copied to `QUARANTINE_KEY` before anything else
+ * happens. §18.1 again: the UI may not misrepresent state, and a fresh profile presented
+ * as if it were yours is a misrepresentation.
+ */
+
+/** `outcome` is one of: fresh | loaded | upgraded | repaired | refused. */
+export function emptyReport() {
+  return {
+    outcome: 'fresh',
+    fromVersion: null,
+    toVersion: PROGRESSION_VERSION,
+    dropped: [],          // {field, why, was} — for a developer
+    notices: [],          // whole sentences — for the player
+    preservedAs: null,    // the key an unreadable save was copied to, if any
+  };
+}
+
+/** A short, safe rendering of whatever was in the file. Never trusted, never long. */
+function brief(v) {
+  if (typeof v === 'string') return JSON.stringify(v.slice(0, 60));
+  try {
+    const s = JSON.stringify(v);
+    return s === undefined ? String(v) : s.slice(0, 80);
+  } catch { return String(v).slice(0, 80); }
+}
+
+function drop(report, field, why, was) {
+  if (!report) return;
+  /* Bounded: a hostile save with ten thousand bad fields must not produce a ten-thousand
+   * line report, which is the same unbounded-list defect this milestone went looking for
+   * everywhere else. */
+  if (report.dropped.length < 60) report.dropped.push({ field, why, was: brief(was) });
+  else if (report.dropped.length === 60) report.dropped.push({ field: '…', why: 'further problems not listed', was: '' });
+}
+
+function tell(report, sentence) {
+  if (!report || report.notices.includes(sentence)) return;
+  if (report.notices.length < 8) report.notices.push(sentence);
+}
+
+/**
+ * A whole number out of a save, with both ends bounded and every rejection recorded.
+ *
+ * `absent` is returned when the key is genuinely missing — a shape change is this file's
+ * fault and the player should not be charged for it — while a key that is present and
+ * unusable falls to `min`, because somebody wrote that.
+ */
+function counted(value, { min = 0, max = CEILINGS.operations, absent = 0, field, report }) {
+  if (value === undefined) {
+    if (absent !== 0) drop(report, field, `not in the save; restored to the default of ${absent}`, value);
+    return absent;
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    const r = Math.floor(value);
+    if (r < min) { drop(report, field, `was ${r}, below the floor of ${min}`, value); return min; }
+    if (r > max) { drop(report, field, `was ${r}, above the ceiling of ${max}`, value); return max; }
+    return r;
+  }
+  /* Infinity, NaN, null, a string, an object, an array. `Number(x) || 0` turned every one
+   * of these into 0 without a word, and turned Infinity into Infinity. */
+  drop(report, field, `is ${typeof value === 'number' ? String(value) : typeof value}, not a finite number`, value);
+  return min;
+}
+
+/**
+ * ⚠ `__proto__` IS AN OWN PROPERTY AFTER `JSON.parse` AND AN ACCESSOR ON THE WAY OUT.
+ * `JSON.parse('{"__proto__":{"x":1}}')` produces an object whose OWN keys include
+ * `__proto__`, so `Object.entries` hands it over — and `out['__proto__'] = v` on a plain
+ * object does not create a key, it calls the setter and replaces the prototype. The result
+ * is a `knowledge` map that reads as empty for the rest of the session: silent total loss
+ * of everything the player has learned, from one word in a text file.
+ */
+const POISON_KEYS = Object.freeze(['__proto__', 'constructor', 'prototype']);
+
+function sanitiseStanding(obj, report) {
   const out = emptyStanding();
-  if (!obj || typeof obj !== 'object') return out;
+  if (obj === undefined) return out;
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) {
+    drop(report, 'standing', `is ${Array.isArray(obj) ? 'an array' : typeof obj}, not a table of departments`, obj);
+    return out;
+  }
   for (const id of DEPARTMENT_IDS) {
-    const v = Number(obj[id]);
-    out[id] = Number.isFinite(v) ? clamp(Math.round(v), STANDING_FLOOR, STANDING_CEILING) : 0;
+    const v = obj[id];
+    if (v === undefined) continue;
+    if (typeof v !== 'number' || !Number.isFinite(v)) {
+      drop(report, `standing.${id}`, 'is not a finite number', v);
+      continue;
+    }
+    const r = Math.round(v);
+    if (r < STANDING_FLOOR || r > STANDING_CEILING) {
+      drop(report, `standing.${id}`, `was ${r}, outside the ${STANDING_FLOOR}..${STANDING_CEILING} ladder`, v);
+    }
+    out[id] = clamp(r, STANDING_FLOOR, STANDING_CEILING);
+  }
+  for (const k of Object.keys(obj)) {
+    if (!DEPARTMENT_IDS.includes(k)) drop(report, `standing.${k}`, 'is not one of the six departments', obj[k]);
   }
   return out;
 }
 
-function sanitiseKnowledge(obj) {
+function sanitiseKnowledge(obj, report) {
   const out = {};
-  if (!obj || typeof obj !== 'object') return out;
+  if (obj === undefined) return out;
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) {
+    drop(report, 'knowledge', `is ${Array.isArray(obj) ? 'an array' : typeof obj}, not a table of anomalies`, obj);
+    return out;
+  }
+  let kept = 0;
   for (const [id, rec] of Object.entries(obj)) {
-    if (!rec || typeof rec !== 'object') continue;
-    out[id] = {
-      observations: Math.max(0, Math.floor(Number(rec.observations) || 0)),
-      rulesRead: Math.max(0, Math.floor(Number(rec.rulesRead) || 0)),
-      rulesMisread: Math.max(0, Math.floor(Number(rec.rulesMisread) || 0)),
-      operations: Math.max(0, Math.floor(Number(rec.operations) || 0)),
-      insights: Array.isArray(rec.insights) ? rec.insights.filter((s) => typeof s === 'string').slice(0, 40) : [],
+    if (POISON_KEYS.includes(id)) { drop(report, `knowledge.${id}`, 'is a reserved key and cannot be an anomaly id', rec); continue; }
+    if (!rec || typeof rec !== 'object' || Array.isArray(rec)) { drop(report, `knowledge.${id}`, 'is not a record', rec); continue; }
+    if (kept >= CEILINGS.knowledgeEntries) { drop(report, `knowledge.${id}`, `past the ceiling of ${CEILINGS.knowledgeEntries} anomalies`, null); continue; }
+    kept++;
+    const at = `knowledge.${String(id).slice(0, 48)}`;
+    out[String(id).slice(0, 48)] = {
+      observations: counted(rec.observations, { max: CEILINGS.operations, field: `${at}.observations`, report }),
+      rulesRead: counted(rec.rulesRead, { max: CEILINGS.operations, field: `${at}.rulesRead`, report }),
+      rulesMisread: counted(rec.rulesMisread, { max: CEILINGS.operations, field: `${at}.rulesMisread`, report }),
+      operations: counted(rec.operations, { max: CEILINGS.operations, field: `${at}.operations`, report }),
+      insights: strings(rec.insights, CEILINGS.insightsPerAnomaly, `${at}.insights`, report, false),
     };
   }
   return out;
 }
 
-function sanitiseRoster(arr) {
-  const base = defaultProfile().roster;
-  if (!Array.isArray(arr) || !arr.length) return base;
+/**
+ * A bounded array of strings. Anything else in it is dropped and said so.
+ *
+ * ⚠ THE WINDOW IS TAKEN BEFORE THE FILTER, NOT AFTER. The old code read
+ * `arr.filter(...).slice(-8)`, which walks the whole array first — so a hand-edited save
+ * carrying a million-entry `history` did a million iterations and allocated a
+ * million-entry intermediate before throwing all but eight of them away. Slicing first
+ * makes the work proportional to what is kept, whatever the file claims to hold.
+ *
+ * `fromEnd` because the two kinds of list disagree about which end is precious: an
+ * operational history is newest-last and the recent lines are the ones worth keeping,
+ * while insights and commendations are a set and the order is arbitrary.
+ */
+function strings(arr, keep, field, report, fromEnd = true) {
+  if (arr === undefined) return [];
+  if (!Array.isArray(arr)) { drop(report, field, `is ${typeof arr}, not a list`, arr); return []; }
+  const window = keep * 2;
+  const slice = fromEnd ? arr.slice(-window) : arr.slice(0, window);
   const out = [];
-  for (const r of arr.slice(0, 5)) {
-    if (!r || typeof r !== 'object' || !r.id) continue;
+  let bad = 0;
+  for (const s of slice) {
+    if (typeof s === 'string') out.push(s.slice(0, 240));
+    else bad++;
+  }
+  if (bad) drop(report, field, `${bad} entr${bad === 1 ? 'y was' : 'ies were'} not text`, null);
+  if (arr.length > keep) drop(report, field, `held ${arr.length}; ${keep} were kept`, null);
+  return fromEnd ? out.slice(-keep) : out.slice(0, keep);
+}
+
+function sanitiseRoster(arr, report) {
+  const base = defaultProfile().roster;
+  if (arr === undefined) return base;
+  if (!Array.isArray(arr)) { drop(report, 'roster', `is ${typeof arr}, not a list`, arr); return base; }
+  if (!arr.length) { drop(report, 'roster', 'was empty; the starting operative was restored', null); return base; }
+  const out = [];
+  const seen = new Set();
+  for (const r of arr.slice(0, CEILINGS.rosterEntries * 2)) {
+    if (out.length >= CEILINGS.rosterEntries) break;
+    if (!r || typeof r !== 'object' || Array.isArray(r)) { drop(report, 'roster[]', 'is not a record', r); continue; }
+    if (typeof r.id !== 'string' || !r.id) { drop(report, 'roster[].id', 'is missing or not text', r.id); continue; }
+    const id = r.id.slice(0, 12);
+    /* ⚠ TWO OPERATIVES CANNOT SHARE AN ID. `conditionOf` and `treat` both find by id and
+     * would silently address the first of them, so a duplicated id is a second operative
+     * who can never be injured, treated or commended. */
+    if (seen.has(id)) { drop(report, `roster[${id}]`, 'is a duplicate id', r); continue; }
+    seen.add(id);
     let condition = null;
-    if (r.condition && INJURY_BY_ID.has(r.condition.id)) {
+    if (r.condition && typeof r.condition === 'object' && INJURY_BY_ID.has(r.condition.id)) {
       condition = {
         id: r.condition.id,
-        operationsRemaining: clamp(Math.floor(Number(r.condition.operationsRemaining) || 0), 0, 6),
+        operationsRemaining: clamp(counted(r.condition.operationsRemaining, { max: 6, field: `roster[${id}].condition.operationsRemaining`, report }), 0, 6),
         /* ⚠ Carried across a save on purpose. Without it, reloading the page frees every
          * isolation bed and a second treatment can be bought in the same rotation. */
         treatedThisRotation: !!r.condition.treatedThisRotation,
       };
       if (condition.operationsRemaining <= 0) condition = null;
+    } else if (r.condition !== null && r.condition !== undefined) {
+      drop(report, `roster[${id}].condition`, 'names no injury this build ships', r.condition);
     }
     out.push({
-      id: String(r.id).slice(0, 12),
-      name: String(r.name || 'Operative').slice(0, 14),
-      operations: Math.max(0, Math.floor(Number(r.operations) || 0)),
+      id,
+      name: typeof r.name === 'string' && r.name ? r.name.slice(0, 14) : 'Operative',
+      operations: counted(r.operations, { max: CEILINGS.operations, field: `roster[${id}].operations`, report }),
       condition,
-      commendations: Array.isArray(r.commendations) ? r.commendations.filter((s) => typeof s === 'string').slice(0, 8) : [],
+      commendations: strings(r.commendations, 8, `roster[${id}].commendations`, report, false),
     });
   }
+  if (!out.length) drop(report, 'roster', 'held no usable operative; the starting one was restored', null);
   return out.length ? out : base;
 }
 
-function sanitiseContainment(arr) {
-  if (!Array.isArray(arr)) return [];
+/**
+ * ⚠ THIS FUNCTION IS THE ONE THAT DROPPED TWO FIELDS ONE COMMIT AFTER THE COMMENT WARNING
+ * ABOUT EXACTLY THAT. `cellRequirement` and `improvised` were added to the entry in
+ * 2054db5 and never added here, so the corridor said "— improvised" and "nothing rated
+ * thermal" for as long as the tab stayed open and then quietly stopped. Every field the
+ * entry carries is named below; adding one to `_recordCapture` and not to this list is
+ * still the way to lose it, and the only defence is `tools/audit-tests.js` section B,
+ * which round-trips a real capture and compares the keys.
+ */
+function sanitiseContainment(arr, report) {
+  if (arr === undefined) return [];
+  if (!Array.isArray(arr)) { drop(report, 'containment', `is ${typeof arr}, not a list`, arr); return []; }
   const out = [];
-  for (const c of arr.slice(0, 12)) {
-    if (!c || typeof c !== 'object' || !c.anomalyId) continue;
+  const seen = new Set();
+  for (const c of arr.slice(0, CEILINGS.containmentEntries * 2)) {
+    if (out.length >= CEILINGS.containmentEntries) { drop(report, 'containment', `held more than ${CEILINGS.containmentEntries} entries`, null); break; }
+    if (!c || typeof c !== 'object' || Array.isArray(c)) { drop(report, 'containment[]', 'is not a record', c); continue; }
+    if (typeof c.anomalyId !== 'string' || !c.anomalyId) { drop(report, 'containment[].anomalyId', 'is missing or not text', c.anomalyId); continue; }
+    const anomalyId = c.anomalyId.slice(0, 48);
+    /* One entry per anomaly: `_recordCapture` finds by anomalyId and would append history
+     * to the first of two, leaving the second frozen at the operation that made it. */
+    if (seen.has(anomalyId)) { drop(report, `containment[${anomalyId}]`, 'is a duplicate entry for one anomaly', null); continue; }
+    seen.add(anomalyId);
     out.push({
-      anomalyId: String(c.anomalyId).slice(0, 48),
-      designation: String(c.designation || c.anomalyId).slice(0, 48),
-      cellId: c.cellId ? String(c.cellId).slice(0, 24) : null,
+      anomalyId,
+      designation: typeof c.designation === 'string' && c.designation ? c.designation.slice(0, 48) : anomalyId,
+      cellId: typeof c.cellId === 'string' && c.cellId ? c.cellId.slice(0, 24) : null,
+      /* Added 2054db5. Read by src/ui/base.js to print what a holding position is missing. */
+      cellRequirement: typeof c.cellRequirement === 'string' && c.cellRequirement ? c.cellRequirement.slice(0, 24) : null,
+      /* Added 2054db5. Read by src/ui/base.js to mark the row and flag the requisition. */
+      improvised: !!c.improvised,
       custody: c.custody === 'verified' ? 'verified' : 'unverified',
-      sinceOperation: Math.max(0, Math.floor(Number(c.sinceOperation) || 0)),
-      lastCheckedOperation: Math.max(0, Math.floor(Number(c.lastCheckedOperation) || 0)),
-      history: Array.isArray(c.history) ? c.history.filter((s) => typeof s === 'string').slice(-8) : [],
-      maintenance: Array.isArray(c.maintenance) ? c.maintenance.filter((s) => typeof s === 'string').slice(-4) : [],
+      sinceOperation: counted(c.sinceOperation, { max: CEILINGS.operations, field: `containment[${anomalyId}].sinceOperation`, report }),
+      lastCheckedOperation: counted(c.lastCheckedOperation, { max: CEILINGS.operations, field: `containment[${anomalyId}].lastCheckedOperation`, report }),
+      history: strings(c.history, 8, `containment[${anomalyId}].history`, report),
+      maintenance: strings(c.maintenance, 4, `containment[${anomalyId}].maintenance`, report),
     });
   }
   return out;
 }
 
-function sanitiseHistory(arr, keep) {
-  if (!Array.isArray(arr)) return [];
+function sanitiseHistory(arr, keep, report) {
+  if (arr === undefined) return [];
+  if (!Array.isArray(arr)) { drop(report, 'history', `is ${typeof arr}, not a list`, arr); return []; }
+  if (arr.length > keep) drop(report, 'history', `held ${arr.length} operations; the most recent ${keep} were kept`, null);
   const out = [];
-  for (const h of arr) {
-    if (!h || typeof h !== 'object') continue;
+  /* The window before the walk — see `strings`. A truncated or padded save must not be
+   * able to make a load take proportional to what it claims. */
+  for (const h of arr.slice(-Math.max(1, keep) * 2)) {
+    if (!h || typeof h !== 'object' || Array.isArray(h)) { drop(report, 'history[]', 'is not a record', h); continue; }
     out.push({
-      operation: Math.max(0, Math.floor(Number(h.operation) || 0)),
-      operationId: h.operationId ? String(h.operationId).slice(0, 48) : null,
-      mapId: h.mapId ? String(h.mapId).slice(0, 48) : null,
-      anomalyId: h.anomalyId ? String(h.anomalyId).slice(0, 48) : null,
-      overall: String(h.overall || 'Unassessed').slice(0, 24),
-      failReason: h.failReason ? String(h.failReason).slice(0, 200) : null,
-      requisition: Math.round(Number(h.requisition) || 0),
-      research: Math.round(Number(h.research) || 0),
-      minutes: Number.isFinite(Number(h.minutes)) ? Number(h.minutes) : null,
+      operation: counted(h.operation, { max: CEILINGS.operations, field: 'history[].operation', report }),
+      operationId: typeof h.operationId === 'string' && h.operationId ? h.operationId.slice(0, 48) : null,
+      mapId: typeof h.mapId === 'string' && h.mapId ? h.mapId.slice(0, 48) : null,
+      anomalyId: typeof h.anomalyId === 'string' && h.anomalyId ? h.anomalyId.slice(0, 48) : null,
+      overall: typeof h.overall === 'string' && h.overall ? h.overall.slice(0, 24) : 'Unassessed',
+      failReason: typeof h.failReason === 'string' && h.failReason ? h.failReason.slice(0, 200) : null,
+      /* A debrief line may legitimately be negative — §12.6 lets an operation cost more
+       * than it returns — so this one has a floor below zero rather than at it. */
+      requisition: counted(h.requisition, { min: -CEILINGS.requisition, max: CEILINGS.requisition, field: 'history[].requisition', report }),
+      research: counted(h.research, { min: -CEILINGS.research, max: CEILINGS.research, field: 'history[].research', report }),
+      minutes: typeof h.minutes === 'number' && Number.isFinite(h.minutes) ? clamp(h.minutes, 0, 100000) : null,
       dims: Array.isArray(h.dims)
-        ? h.dims.slice(0, 12).map((d) => ({ name: String(d.name || '').slice(0, 40), word: String(d.word || '').slice(0, 24) }))
+        ? h.dims.slice(0, 12).filter((d) => d && typeof d === 'object')
+          .map((d) => ({ name: String(d.name || '').slice(0, 40), word: String(d.word || '').slice(0, 24) }))
         : [],
       /* ⚠ AND THE SANITISER HAS TO KNOW ABOUT IT, or the night survives exactly until the
        * save is reloaded. Everything this function does not name is dropped, deliberately —
@@ -849,65 +1149,253 @@ function sanitiseHistory(arr, keep) {
   return out.slice(-Math.max(1, keep));
 }
 
-/** Future versions land here. An unknown or damaged save falls back to a fresh profile
- *  rather than half-applying itself. */
-export function migrate(data) {
-  if (!data || typeof data !== 'object') return defaultProfile();
-  if (data.version !== PROGRESSION_VERSION) return defaultProfile();
+/**
+ * The upgrade chain. One entry per version step, applied in order.
+ *
+ * ⚠ A STEP MAY ONLY ADD OR RESHAPE. It must never need a field that a later sanitiser
+ * would have supplied, because the sanitiser runs AFTER the whole chain — a step that
+ * reads `data.containment[0].history` has to cope with `history` being a number, since
+ * nothing has cleaned it yet. Keep steps to renames and defaults; put judgement in the
+ * sanitisers, where the report is.
+ *
+ * 1 → 2 is a no-op on the data. Every v1 field survives verbatim; what changed is that
+ * `containment[].cellRequirement` and `containment[].improvised` are now KEPT by
+ * `sanitiseContainment`, and a v1 save simply does not have them. `null` and `false` are
+ * the right answers for a capture made before the corridor was rated, and those are what
+ * the sanitiser supplies for an absent field — so the step exists to record the boundary
+ * rather than to move anything.
+ */
+export const MIGRATIONS = Object.freeze([
+  { from: 1, to: 2, note: 'containment entries gained a cell rating; older captures have none', apply: (d) => d },
+]);
+
+/**
+ * Read a save, whatever state it is in, and say what happened to it.
+ *
+ * ⚠ WHAT THIS REPLACED. The old first two lines were
+ *
+ *     if (!data || typeof data !== 'object') return defaultProfile();
+ *     if (data.version !== PROGRESSION_VERSION) return defaultProfile();
+ *
+ * — which is a total, silent wipe for every save not written by this exact build. The
+ * comment above it said "an unknown or damaged save falls back to a fresh profile rather
+ * than half-applying itself", and half-applying is indeed the wrong answer; discarding
+ * thirty operations without a word is not the right one. There are three cases and they
+ * are not the same case:
+ *
+ *   OLDER  — this build knows the shape and can carry it forward. Upgrade it.
+ *   NEWER  — this build cannot know what a future field means, so it does not guess. The
+ *            session starts fresh, and `loadProfile` copies the newer save aside first so
+ *            that opening the newer build again gets it all back.
+ *   BROKEN — not an object, no version, nonsense in every field. Salvage what can be
+ *            read, say what could not, and keep the original.
+ */
+export function migrateWithReport(data) {
+  const report = emptyReport();
+
+  if (data === null || data === undefined) return { profile: defaultProfile(), report };
+  if (typeof data !== 'object' || Array.isArray(data)) {
+    report.outcome = 'repaired';
+    drop(report, '(root)', `the save is ${Array.isArray(data) ? 'an array' : typeof data}, not a profile`, data);
+    tell(report, 'The stored profile was not readable, so this session starts fresh. The original has not been deleted.');
+    return { profile: defaultProfile(), report };
+  }
+
+  /* An absent version is a save from before this file had one. All three historical
+   * shapes wrote `version: 1`, so 1 is the only honest guess and it is recorded as one. */
+  let version = data.version;
+  if (typeof version !== 'number' || !Number.isFinite(version)) {
+    drop(report, 'version', 'is missing or not a number; read as 1', version);
+    version = 1;
+  }
+  report.fromVersion = version;
+
+  if (version > PROGRESSION_VERSION) {
+    report.outcome = 'refused';
+    drop(report, 'version', `is ${version}; this build understands up to ${PROGRESSION_VERSION}`, version);
+    tell(report, `This profile was written by a newer build (save format ${version}; this one reads ${PROGRESSION_VERSION}).`
+      + ' It has been left exactly as it was and this session starts fresh — open the newer build to pick it up where you left off.');
+    return { profile: defaultProfile(), report };
+  }
+
+  let d = data;
+  if (version < PROGRESSION_VERSION) {
+    report.outcome = 'upgraded';
+    for (const step of MIGRATIONS) {
+      if (step.from < version) continue;
+      try {
+        d = step.apply(d) || d;
+        drop(report, 'version', `upgraded ${step.from} → ${step.to}: ${step.note}`, null);
+      } catch (e) {
+        /* A step that throws must not take the profile with it. Stop the chain, keep what
+         * the last good step produced, and say so. */
+        report.outcome = 'repaired';
+        drop(report, 'version', `upgrade ${step.from} → ${step.to} failed: ${e && e.message}`, null);
+        break;
+      }
+    }
+    tell(report, 'Your profile was saved by an older build and has been brought forward. Nothing was lost.');
+  } else {
+    report.outcome = 'loaded';
+  }
 
   const base = defaultProfile();
-  const upgrades = Array.isArray(data.upgrades) ? data.upgrades.filter((id) => UPGRADES_BY_ID.has(id)) : [];
+
+  /* Duplicates removed: `owns()` is an `includes`, so a save listing one id four hundred
+   * times behaves identically and costs four hundred times as much to search. */
+  const rawUpgrades = Array.isArray(d.upgrades) ? d.upgrades : [];
+  if (d.upgrades !== undefined && !Array.isArray(d.upgrades)) drop(report, 'upgrades', `is ${typeof d.upgrades}, not a list`, d.upgrades);
+  const upgrades = [];
+  for (const id of rawUpgrades.slice(0, CEILINGS.upgradeIds * 4)) {
+    if (upgrades.length >= CEILINGS.upgradeIds) break;
+    if (!UPGRADES_BY_ID.has(id)) { drop(report, 'upgrades[]', 'names an upgrade this build does not ship', id); continue; }
+    if (upgrades.includes(id)) { drop(report, 'upgrades[]', 'is listed more than once', id); continue; }
+    upgrades.push(id);
+  }
+
   const fitted = {};
-  if (data.fitted && typeof data.fitted === 'object') {
-    for (const [itemId, upId] of Object.entries(data.fitted)) {
+  if (d.fitted && typeof d.fitted === 'object' && !Array.isArray(d.fitted)) {
+    for (const [itemId, upId] of Object.entries(d.fitted)) {
+      if (POISON_KEYS.includes(itemId)) { drop(report, `fitted.${itemId}`, 'is a reserved key and cannot be an item id', upId); continue; }
       const up = UPGRADES_BY_ID.get(upId);
       /* Only a variant that is OWNED and belongs to that family survives a load. A save
        * edited by hand cannot fit a scanner to a trauma kit. */
       if (up && up.family === itemId && upgrades.includes(upId)) fitted[itemId] = upId;
+      else drop(report, `fitted.${itemId}`, up ? 'is not owned, or belongs to another family' : 'names no upgrade this build ships', upId);
     }
+  } else if (d.fitted !== undefined) {
+    drop(report, 'fitted', `is ${typeof d.fitted}, not a table`, d.fitted);
   }
+
+  const siteUpgrades = [];
+  if (Array.isArray(d.siteUpgrades)) {
+    for (const s of d.siteUpgrades.slice(0, CEILINGS.siteUpgradeIds * 4)) {
+      if (siteUpgrades.length >= CEILINGS.siteUpgradeIds) break;
+      if (typeof s !== 'string' || !s) { drop(report, 'siteUpgrades[]', 'is not text', s); continue; }
+      if (siteUpgrades.includes(s)) { drop(report, 'siteUpgrades[]', 'is listed more than once', s); continue; }
+      siteUpgrades.push(s.slice(0, 48));
+    }
+  } else if (d.siteUpgrades !== undefined) {
+    drop(report, 'siteUpgrades', `is ${typeof d.siteUpgrades}, not a list`, d.siteUpgrades);
+  }
+
   const profile = {
     version: PROGRESSION_VERSION,
-    siteId: String(data.siteId || base.siteId).slice(0, 48),
-    operationsCompleted: Math.max(0, Math.floor(Number(data.operationsCompleted) || 0)),
-    custodiesVerified: Math.max(0, Math.floor(Number(data.custodiesVerified) || 0)),
-    requisition: Math.max(0, Math.round(Number(data.requisition) || 0)),
-    research: Math.max(0, Math.round(Number(data.research) || 0)),
-    researchTotalEarned: Math.max(0, Math.round(Number(data.researchTotalEarned) || 0)),
-    requisitionTotalEarned: Math.max(0, Math.round(Number(data.requisitionTotalEarned) || 0)),
+    siteId: typeof d.siteId === 'string' && d.siteId ? d.siteId.slice(0, 48) : base.siteId,
+    operationsCompleted: counted(d.operationsCompleted, { max: CEILINGS.operations, field: 'operationsCompleted', report }),
+    custodiesVerified: counted(d.custodiesVerified, { max: CEILINGS.operations, field: 'custodiesVerified', report }),
+    requisition: counted(d.requisition, { max: CEILINGS.requisition, absent: base.requisition, field: 'requisition', report }),
+    research: counted(d.research, { max: CEILINGS.research, field: 'research', report }),
+    researchTotalEarned: counted(d.researchTotalEarned, { max: CEILINGS.research, field: 'researchTotalEarned', report }),
+    requisitionTotalEarned: counted(d.requisitionTotalEarned, { max: CEILINGS.requisition, field: 'requisitionTotalEarned', report }),
     clearance: 0,
-    standing: sanitiseStanding(data.standing),
-    knowledge: sanitiseKnowledge(data.knowledge),
+    standing: sanitiseStanding(d.standing, report),
+    knowledge: sanitiseKnowledge(d.knowledge, report),
     upgrades,
     fitted,
-    siteUpgrades: Array.isArray(data.siteUpgrades)
-      ? data.siteUpgrades.filter((s) => typeof s === 'string').slice(0, 24) : [],
-    roster: sanitiseRoster(data.roster),
-    containment: sanitiseContainment(data.containment),
-    history: sanitiseHistory(data.history, 24),
+    siteUpgrades,
+    roster: sanitiseRoster(d.roster, report),
+    containment: sanitiseContainment(d.containment, report),
+    history: sanitiseHistory(d.history, CEILINGS.historyEntries, report),
   };
   /* Clearance is DERIVED, always. A save claiming Level 3 with no operations behind it
    * gets Provisional, because the milestone is the fact and not the number. */
   profile.clearance = clearanceFor(profile);
-  return profile;
+  if (typeof d.clearance === 'number' && Number.isFinite(d.clearance) && d.clearance !== profile.clearance) {
+    drop(report, 'clearance', `claimed ${d.clearance}; it is derived from operations, custodies and research, and is ${profile.clearance}`, d.clearance);
+  }
+
+  /* One sentence, only when something a player would actually miss went missing. A
+   * message about a duplicate upgrade id teaches nobody anything. */
+  const noticeable = report.dropped.filter((x) => /^(requisition|research|standing|knowledge|roster|containment|history|upgrades|siteUpgrades|fitted)/.test(x.field));
+  if (noticeable.length && report.outcome !== 'refused') {
+    if (report.outcome === 'loaded') report.outcome = 'repaired';
+    tell(report, `Part of your saved profile could not be read and was repaired: ${noticeable.length} field${noticeable.length === 1 ? '' : 's'} were reset. Everything else was kept.`);
+  }
+  return { profile, report };
 }
 
-export function loadProfile() {
-  const s = storage();
-  if (!s) return defaultProfile();
-  let raw;
-  try { raw = s.getItem(SAVE_KEY); } catch { return defaultProfile(); }
-  if (!raw) return defaultProfile();
-  let data;
-  try { data = JSON.parse(raw); } catch { return defaultProfile(); }
-  return migrate(data);
+/**
+ * The shape every existing caller uses. Kept returning a bare profile on purpose —
+ * `Progression`, `loadProfile` and `tools/m0-tests.js` section AK all assign it directly,
+ * and a boundary this important is not the place to break three call sites for tidiness.
+ * `migrateWithReport` is where the detail is, and `Progression.migration` carries it.
+ */
+export function migrate(data) { return migrateWithReport(data).profile; }
+
+/**
+ * ⚠ AN UNREADABLE SAVE IS COPIED ASIDE BEFORE ANYTHING CAN OVERWRITE IT.
+ *
+ * The old path returned a fresh profile from a `JSON.parse` failure and the first autosave
+ * then wrote over the damaged text — so a save that a later build, or a person with a text
+ * editor, could have salvaged was destroyed by the act of noticing it was broken. One slot,
+ * the newest loser wins, and it is never read automatically: it exists so that "my campaign
+ * vanished" has an answer other than "it is gone".
+ *
+ * A save written by a NEWER build takes the same route for a different reason. It is not
+ * damaged and this build must not overwrite it, so the copy is what makes starting fresh
+ * survivable.
+ */
+function quarantine(s, raw, report, why) {
+  if (!s || typeof raw !== 'string') return;
+  try {
+    /* Never let the rescue be the thing that fills the quota. */
+    if (raw.length > 512 * 1024) { drop(report, '(quarantine)', 'the unreadable save was too large to copy aside', raw.length); return; }
+    s.setItem(QUARANTINE_KEY, raw);
+    report.preservedAs = QUARANTINE_KEY;
+    drop(report, '(quarantine)', `${why}; the original was copied to ${QUARANTINE_KEY}`, null);
+  } catch {
+    drop(report, '(quarantine)', 'the original could not be copied aside (storage refused)', null);
+  }
 }
+
+/** The profile, plus what had to be done to it. */
+export function loadProfileWithReport() {
+  const report = emptyReport();
+  const s = storage();
+  if (!s) {
+    report.outcome = 'fresh';
+    drop(report, '(storage)', 'localStorage is unavailable; nothing will be saved this session', null);
+    tell(report, 'This browser is not allowing local storage, so nothing from this session will be kept. Private-browsing windows do this.');
+    return { profile: defaultProfile(), report };
+  }
+  let raw;
+  try { raw = s.getItem(SAVE_KEY); } catch { return { profile: defaultProfile(), report }; }
+  if (!raw) return { profile: defaultProfile(), report };
+
+  let data;
+  try {
+    data = JSON.parse(raw);
+  } catch (e) {
+    report.outcome = 'repaired';
+    drop(report, '(root)', `the save is not valid JSON (${e && e.message})`, null);
+    quarantine(s, raw, report, 'the save could not be parsed');
+    tell(report, 'The stored profile was damaged and could not be read, so this session starts fresh.'
+      + ' The damaged copy has been kept rather than deleted.');
+    return { profile: defaultProfile(), report };
+  }
+
+  const out = migrateWithReport(data);
+  if (out.report.outcome === 'refused') quarantine(s, raw, out.report, 'the save is from a newer build');
+  return out;
+}
+
+export function loadProfile() { return loadProfileWithReport().profile; }
 
 export function saveProfile(profile) {
   const s = storage();
   if (!s) return false;
   try {
-    s.setItem(SAVE_KEY, JSON.stringify({ ...profile, version: PROGRESSION_VERSION }));
+    /* ⚠ `migration` IS NOT PART OF THE SAVE, and this strip is what keeps it that way.
+     * The load report lives on the `Progression` instance rather than on the profile
+     * precisely so it cannot be written back — but the base screen is going to want it
+     * next to the data it describes, and the obvious way to hand it over is to attach it.
+     * If anybody does, it stops here: a report written into localStorage is a field the
+     * next load does not recognise, drops, and reports having dropped. A report about the
+     * report, growing by one layer per session. */
+    const { migration, ...rest } = profile;
+    void migration;
+    s.setItem(SAVE_KEY, JSON.stringify({ ...rest, version: PROGRESSION_VERSION }));
     return true;
   } catch { return false; }   // quota, or a profile that went read-only mid-session
 }
@@ -916,6 +1404,68 @@ export function clearSave() {
   const s = storage();
   if (!s) return false;
   try { s.removeItem(SAVE_KEY); return true; } catch { return false; }
+}
+
+/** The quarantined copy, for a rescue tool or a bug report. Never read on the load path. */
+export function quarantinedSave() {
+  const s = storage();
+  if (!s) return null;
+  try { return s.getItem(QUARANTINE_KEY); } catch { return null; }
+}
+
+/**
+ * The checks that need the SITE, run after `migrate` and before anything reads the profile.
+ *
+ * ⚠ A DANGLING `cellId` MAKES A CAPTURE DISAPPEAR FROM THE ONE SCREEN THAT EXISTS TO SHOW
+ * IT. `src/ui/base.js:_containment` builds its list by walking the site's CELLS and looking
+ * each one up in the profile, then appends the entries whose `cellId` is null as "unplaced".
+ * An entry naming a cell that no longer exists — an overflow position that came from a site
+ * upgrade the profile no longer has, a renamed cell, a hand-edited id — matches neither
+ * pass and is rendered nowhere at all. That is precisely the §18.1 defect commit 2054db5
+ * fixed for `cellId: null`, reappearing through a different door, and the fix is the same
+ * one: make it unplaced, which is what it actually is, so it stays visible and gets a real
+ * cell the next time the corridor has one.
+ *
+ * An anomaly the build no longer ships is treated the opposite way — KEPT and flagged
+ * rather than deleted. The site is holding something; deleting the row does not release it.
+ */
+export function reconcileProfile(profile, { site = null, report = null } = {}) {
+  if (!profile || !site) return profile;
+  const cellIds = new Set(((site.containmentWing && site.containmentWing.cells) || []).map((c) => c.id));
+  /* Overflow positions are granted by a site upgrade and are numbered, not declared, so
+   * they are matched by shape rather than by list. */
+  const isOverflow = (id) => /^overflow-\d+$/.test(id);
+  const known = new Set((site.dossiers || []).map((d) => d.anomalyId));
+  const siteUpgradeIds = new Set();
+  for (const room of site.rooms || []) for (const u of room.upgrades || []) siteUpgradeIds.add(u.id);
+
+  for (const entry of profile.containment) {
+    if (entry.cellId && !cellIds.has(entry.cellId) && !isOverflow(entry.cellId)) {
+      drop(report, `containment[${entry.anomalyId}].cellId`,
+        `names holding position "${entry.cellId}", which this site does not have; recorded as unplaced so it stays on the corridor list`, entry.cellId);
+      tell(report, 'A holding position named in your profile no longer exists at this site. What was in it is now listed as unplaced and will be given a real cell when one is free.');
+      entry.cellId = null;
+    }
+    if (!known.has(entry.anomalyId)) {
+      /* Kept. A build that stops shipping an anomaly does not empty its cells. */
+      entry.unknownAnomaly = true;
+      drop(report, `containment[${entry.anomalyId}]`, 'names an anomaly this build has no dossier for; kept, and marked', entry.anomalyId);
+      tell(report, 'Something in the containment corridor was filed under an anomaly this build no longer carries a dossier for. It is still listed, and still occupies its position.');
+    } else {
+      entry.unknownAnomaly = false;
+    }
+  }
+
+  const before = profile.siteUpgrades.length;
+  profile.siteUpgrades = profile.siteUpgrades.filter((id) => {
+    if (siteUpgradeIds.has(id)) return true;
+    drop(report, 'siteUpgrades[]', 'names a site upgrade this build does not declare; it granted nothing and has been removed', id);
+    return false;
+  });
+  if (profile.siteUpgrades.length !== before) {
+    tell(report, 'A facility upgrade recorded in your profile is not one this build has. It was doing nothing and has been removed.');
+  }
+  return profile;
 }
 
 /* ── content/site.json ────────────────────────────────────────────────────────
@@ -1014,8 +1564,22 @@ export class Progression {
    *   autosave  false in tests, so a headless run cannot write over a real campaign
    */
   constructor({ profile = null, site = null, autosave = true } = {}) {
-    this.profile = profile ? migrate(profile) : loadProfile();
+    const loaded = profile ? migrateWithReport(profile) : loadProfileWithReport();
+    this.profile = loaded.profile;
     this.site = site || null;
+    /**
+     * What had to be done to the save to make it usable — `{outcome, fromVersion, dropped,
+     * notices, preservedAs}`.
+     *
+     * ⚠ IT IS THE UI'S JOB TO SAY SO. §18.1 forbids the interface misrepresenting state,
+     * and a fresh profile shown to a player who had thirty operations is the largest
+     * misrepresentation this build can make. `migration.notices` is a list of whole
+     * sentences written for a player; the base screen must print them the first time it
+     * opens. Nothing here can print anything — `src/sim/` does not touch the DOM (section
+     * K4) — so this is where the information is put and the screen is where it is shown.
+     */
+    this.migration = loaded.report;
+    reconcileProfile(this.profile, { site: this.site, report: this.migration });
     this.autosave = autosave;
     /* ⚠ MISSION_ENDED CAN ARRIVE TWICE. endMission() guards itself, but the bus is public
      * and a reconnecting client applies a snapshot that already carries a result. Paying
@@ -1276,8 +1840,12 @@ export class Progression {
 
     const p = this.profile;
     const effects = this.effects();
+    /* ⚠ `=== 'Established'` COMPARED AGAINST A TRANSLATED STRING. Whether the site records
+     * a capture at all turned on the English rendering of one debrief word, so the first
+     * non-English locale would have stopped the containment corridor filling — quietly,
+     * and with every assertion still passing. `wordId` is never translated. */
     const custody = opts.custody
-      || (dimWord(result, 'Containment integrity') === 'Established' ? 'verified' : 'none');
+      || (dimWordId(result, 'containment') === 'established' ? 'verified' : 'none');
     const minutes = opts.minutes !== undefined ? opts.minutes : minutesFrom(result);
     const earnings = earningsFor(result, mission, {
       effects,
@@ -1419,11 +1987,13 @@ export class Progression {
       return applied;
     }
 
-    const word = dimWord(result, 'Personnel survival');
+    /* Word id, not word — see the note in applyDebrief. Whether the one operative on a
+     * solo roster comes home injured must not depend on which language they read. */
+    const word = dimWordId(result, 'personnel');
     const first = this.profile.roster[0];
     if (first) first.operations += 1;
-    if (word === 'Critical') assign(first, 'fatigue');
-    else if (word === 'Injured') assign(first, 'strain');
+    if (word === 'critical') assign(first, 'fatigue');
+    else if (word === 'injured') assign(first, 'strain');
     return applied;
   }
 
@@ -1525,18 +2095,50 @@ export class Progression {
 
 /* ── small readers over grade()'s output ──────────────────────────────────── */
 
-/** The word grade() gave a named dimension, or null. Normalised, so a spelling pass on
- *  the dimension names does not silently break every reader. */
-export function dimWord(result, name) {
-  const want = dimKey(name);
-  for (const d of (result && result.dims) || []) if (dimKey(d.name) === want) return d.word;
+/**
+ * One graded dimension, found by its stable id or by its display name.
+ *
+ * ⚠ THE NAME WAS THE ONLY WAY IN AND THE NAME IS NOW TRANSLATED. Every caller here asked
+ * for `'Containment integrity'` and compared the answer against `'Established'`, which is
+ * correct in en-GB and in no other locale — the site would stop recording captures, and
+ * every test would stay green because the suite runs in English. `id` is the contract.
+ */
+export function dimOf(result, idOrName) {
+  const want = dimKey(idOrName);
+  for (const d of (result && result.dims) || []) {
+    if (d && (d.id === idOrName || dimKey(d.id) === want || dimKey(d.name) === want)) return d;
+  }
   return null;
 }
 
-/** Minutes, read off the time dimension. It is authored as "12.4 min", so it is parsed
- *  as a measurement rather than looked up as a verdict. */
+/** The untranslated word id, or null. Compare against THIS, never against `word`. */
+export function dimWordId(result, idOrName) {
+  const d = dimOf(result, idOrName);
+  if (!d) return null;
+  /* A result graded before word ids existed only has the display word; normalising it is
+   * the closest thing to an id such a result has. */
+  return d.wordId || (d.word ? wordKey(d.word) : null);
+}
+
+/** The word grade() gave a named dimension, for DISPLAY. Normalised lookup, so a spelling
+ *  pass on the dimension names does not silently break every reader. */
+export function dimWord(result, idOrName) {
+  const d = dimOf(result, idOrName);
+  return d ? d.word : null;
+}
+
+/**
+ * Minutes, read off the time dimension.
+ *
+ * ⚠ IT USED TO STRIP NON-DIGITS OUT OF THE DISPLAY STRING. The word is `"12.4 min"` and
+ * this recovered 12.4 by deleting everything that was not a digit or a dot — which reads
+ * `"12,4 min"` as 124, so a nine-minute operation would be filed as having taken an hour
+ * and a half in any locale that uses a decimal comma. The number travels beside the word
+ * now; the regex survives only as a fallback for a result stored by an older build.
+ */
 export function minutesFrom(result) {
-  const w = dimWord(result, 'Time to stabilisation');
-  const n = Number(String(w || '').replace(/[^0-9.]/g, ''));
+  const d = dimOf(result, 'time') || dimOf(result, 'Time to stabilisation');
+  if (d && typeof d.value === 'number' && Number.isFinite(d.value) && d.value > 0) return d.value;
+  const n = Number(String((d && d.word) || '').replace(/[^0-9.]/g, ''));
   return Number.isFinite(n) && n > 0 ? n : null;
 }
