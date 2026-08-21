@@ -309,6 +309,7 @@
       {
         "id": "lure-and-still",
         "grade": "safe",
+        "concurrentRoles": 2,
         "displayName": "Lure to the case, then silence",
         "requiredEquipment": ["directional-microphone", "reinforced-transit-case", "portable-heater", "power-pack", "trauma-kit"],
         "verbs": ["listen", "lure", "withdraw", "silence", "approach", "seal"],
@@ -318,6 +319,7 @@
       {
         "id": "run-silent",
         "grade": "minimum",
+        "concurrentRoles": 1,
         "displayName": "Nothing on, crouch throughout",
         "requiredEquipment": ["reinforced-transit-case"],
         "verbs": ["silence", "approach", "seal"],
@@ -327,6 +329,7 @@
       {
         "id": "paired-lure",
         "grade": "research",
+        "concurrentRoles": 3,
         "displayName": "Paired lure with a timed silence",
         "requiredEquipment": ["directional-microphone", "reinforced-transit-case", "power-pack", "floodlight-tripod", "trauma-kit", "remote-camera"],
         "verbs": ["listen", "lure", "hand-off", "withdraw", "silence", "approach", "seal", "witness"],

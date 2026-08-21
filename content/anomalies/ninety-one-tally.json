@@ -278,6 +278,7 @@
       {
         "id": "full-account",
         "grade": "safe",
+        "concurrentRoles": 2,
         "displayName": "Complete account, single case",
         "requiredEquipment": ["thermal-imager", "reinforced-transit-case", "trauma-kit", "remote-camera"],
         "verbs": ["survey", "verify", "recover", "account", "seal"],
@@ -287,6 +288,7 @@
       {
         "id": "sweep-and-lift",
         "grade": "minimum",
+        "concurrentRoles": 1,
         "displayName": "Lift on sight, verify at the case",
         "requiredEquipment": ["reinforced-transit-case"],
         "verbs": ["survey", "recover", "account"],
@@ -296,6 +298,7 @@
       {
         "id": "paired-verification",
         "grade": "research",
+        "concurrentRoles": 3,
         "displayName": "Paired verification with a standing count",
         "requiredEquipment": ["thermal-imager", "reinforced-transit-case", "remote-camera", "motion-sensor", "trauma-kit"],
         "verbs": ["survey", "verify", "recover", "account", "witness", "seal"],

@@ -382,6 +382,7 @@
       {
         "id": "vessel-first",
         "grade": "safe",
+        "concurrentRoles": 2,
         "displayName": "Vessel first, then look",
         "requiredEquipment": ["reinforced-transit-case", "thermal-imager", "power-pack", "trauma-kit"],
         "verbs": ["assess", "place", "withdraw", "disturb", "avert", "seal", "verify"],
@@ -396,6 +397,7 @@
       {
         "id": "hands-and-a-box",
         "grade": "minimum",
+        "concurrentRoles": 1,
         "displayName": "A box, and your own eyes",
         "requiredEquipment": ["reinforced-transit-case"],
         "verbs": ["place", "disturb", "seal"],
@@ -408,6 +410,7 @@
       {
         "id": "two-pairs-of-hands",
         "grade": "research",
+        "concurrentRoles": 3,
         "displayName": "Placed by one, disturbed by the other",
         "requiredEquipment": ["reinforced-transit-case", "thermal-imager", "power-pack", "sample-kit", "trauma-kit"],
         "verbs": ["assess", "place", "withdraw", "disturb", "relieve", "avert", "seal", "verify"],
