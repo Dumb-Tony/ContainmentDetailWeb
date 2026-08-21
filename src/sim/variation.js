@@ -91,26 +91,38 @@ export function chooseVariation(pack, seed = 'default') {
   /* 1. Incident origin and anchor position. */
   if (Array.isArray(v.origins) && v.origins.length) out.origin = pick(rand, v.origins);
 
+  /**
+   * ⚠ A "MAX" THAT IS ALWAYS TAKEN IS A QUOTA, AND FIVE SHIPPED LISTS WERE CONSTANTS.
+   *
+   * `routesShutMax`, `faultsMax` and `dropMax` read as caps and behaved as quotas: the
+   * count was `min(max, list.length)` and every seed took exactly that many. So a list
+   * whose length equals its max varies NOTHING — neither which nor how many — and four
+   * incidents shipped one: `cold-storage-draught` on both routes and faults,
+   * `cold-storage-figure`, `ashlar-gallery-draught` and `blackthorn-caller` on faults. Each
+   * of them jams the same door and faults the same circuit on every seed the game can
+   * generate, while reading as an axis in the file and being counted as one.
+   *
+   * Drawing 0..n makes the word mean what it says, and it makes "nothing went wrong with
+   * the building tonight" a world the seed can produce — which §14.4 wants and which no
+   * shipped incident could reach.
+   */
+  const take = (list, max) => {
+    const n = Math.min(max === undefined ? 1 : max, list.length);
+    const want = Math.floor(rand() * (n + 1));
+    const pool = list.slice();
+    const out2 = [];
+    for (let i = 0; i < want && pool.length; i++) {
+      out2.push(pool.splice(Math.floor(rand() * pool.length), 1)[0]);
+    }
+    return out2;
+  };
+
   /* 2. Locked, flooded, burned, collapsed or quarantined routes. A route is a door id the
    *    seed may shut and hold shut; the count is bounded by the content, never by this. */
-  if (Array.isArray(v.routes) && v.routes.length) {
-    const n = Math.min(v.routesShutMax === undefined ? 1 : v.routesShutMax, v.routes.length);
-    const pool = v.routes.slice();
-    for (let i = 0; i < n; i++) {
-      if (!pool.length) break;
-      out.routesShut.push(pool.splice(Math.floor(rand() * pool.length), 1)[0]);
-    }
-  }
+  if (Array.isArray(v.routes) && v.routes.length) out.routesShut = take(v.routes, v.routesShutMax);
 
   /* 3. Power and communication faults: a circuit that will not come up when thrown. */
-  if (Array.isArray(v.faults) && v.faults.length) {
-    const n = Math.min(v.faultsMax === undefined ? 1 : v.faultsMax, v.faults.length);
-    const pool = v.faults.slice();
-    for (let i = 0; i < n; i++) {
-      if (!pool.length) break;
-      out.faults.push(pool.splice(Math.floor(rand() * pool.length), 1)[0]);
-    }
-  }
+  if (Array.isArray(v.faults) && v.faults.length) out.faults = take(v.faults, v.faultsMax);
 
   /* 4. Civilian locations and states — which witness is where, and whether they will talk. */
   if (Array.isArray(v.civilians) && v.civilians.length) {
@@ -121,15 +133,11 @@ export function chooseVariation(pack, seed = 'default') {
   }
 
   /* 5. Evidence subset and false lead. See the header: at most one path per rule. */
-  if (Array.isArray(v.droppable) && v.droppable.length) {
-    const n = Math.min(v.dropMax === undefined ? 1 : v.dropMax, v.droppable.length);
-    const pool = v.droppable.slice();
-    for (let i = 0; i < n; i++) {
-      if (!pool.length) break;
-      out.dropped.push(pool.splice(Math.floor(rand() * pool.length), 1)[0]);
-    }
-  }
-  if (Array.isArray(v.falseLeads) && v.falseLeads.length) out.falseLead = pick(rand, v.falseLeads);
+  if (Array.isArray(v.droppable) && v.droppable.length) out.dropped = take(v.droppable, v.dropMax);
+  /* A false lead is drawn the same way, and may be NONE: a single-entry list picked from
+   * unconditionally is a constant, and four incidents had one. A night with nothing
+   * misleading on the floor is a different night, and the seed should be able to make it. */
+  if (Array.isArray(v.falseLeads) && v.falseLeads.length) out.falseLead = take(v.falseLeads, 1)[0] || null;
 
   /* 6. Weather and time. */
   out.weather = Array.isArray(v.weather) && v.weather.length ? pick(rand, v.weather) : 'still';

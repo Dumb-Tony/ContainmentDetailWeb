@@ -4885,15 +4885,58 @@ async function sectionAI(content) {
 async function sectionAJ() {
   lines.push('--- AJ. controlled variation (GDD §14.4) ---');
 
-  /* An incident that declares no bounds varies in nothing, whatever seed it is given.
-   * That is what let this be added without touching the four incidents that predate it. */
-  const plain = await loadContent({ incident: 'cold-storage-tally', seed: 'anything' });
-  const plainB = await loadContent({ incident: 'cold-storage-tally', seed: 'different' });
+  /**
+   * An incident that declares no bounds varies in nothing, whatever seed it is given. That
+   * is what let variation be added without touching the four incidents that predate it.
+   *
+   * ⚠ THIS USED `cold-storage-tally` AS THE FIXTURE, and that incident has a variation
+   * block now — so the assertion was testing a varying pack and passing by accident,
+   * because the tally's block happens to move neither the spawn nor the COUNT of sources,
+   * which is all this compared. NO SHIPPED INCIDENT HAS THE PROPERTY ANY MORE, which is
+   * the right outcome for the content and the wrong basis for a test. Synthesised, so it
+   * keeps testing the engine's behaviour rather than one file's current shape.
+   */
+  const bare = await loadContent({ incident: 'cold-storage-tally', seed: 'anything' });
+  const stripped = JSON.parse(JSON.stringify(bare));
+  delete stripped.incident.variation;
+  const seedA = chooseVariation(stripped, 'anything');
+  const seedB = chooseVariation(stripped, 'different');
   eq('AJ1 an incident with no variation block is identical under any seed',
-    JSON.stringify(plain.map.anomalySpawn) + plain.map.evidenceSources.length,
-    JSON.stringify(plainB.map.anomalySpawn) + plainB.map.evidenceSources.length);
+    JSON.stringify(seedA), JSON.stringify({ ...seedB, seed: 'anything' }));
+  ok('AJ1a and a shipped incident is NOT identical under any seed, so AJ1 is not the only outcome the engine can produce',
+    JSON.stringify(chooseVariation(bare, 'anything')) !== JSON.stringify({ ...chooseVariation(bare, 'different'), seed: 'anything' }));
   ok('AJ2 and loading with no seed at all is the authored default',
     (await loadContent({ incident: 'cold-storage-draught' })).map.anomalySpawn.join() === '-10,10');
+
+  /**
+   * ⚠ AND NO AUTHORED AXIS MAY BE A CONSTANT. `routesShutMax`, `faultsMax` and `dropMax`
+   * read as caps and behaved as quotas — the count was `min(max, length)` and every seed
+   * took exactly that many — so a list whose length equalled its max varied neither which
+   * nor how many. FIVE SHIPPED LISTS were in that state: `cold-storage-draught` on both
+   * routes and faults, and the figure, the gallery draught and the caller on faults. Each
+   * jammed the same door and faulted the same circuit on every seed the game can generate,
+   * while reading as an axis in the file and being counted as one by the section above.
+   *
+   * Measured over enough seeds to be sure, and reported per axis so the next degenerate one
+   * names itself rather than hiding inside a total.
+   */
+  const SEEDS_WIDE = Array.from({ length: 60 }, (_, i) => `axis-${i}`);
+  const flat = [];
+  for (const id of INCIDENTS) {
+    const pack = await loadContent({ incident: id });
+    const v = (pack.incident.variation) || {};
+    const axes = [
+      ['routes', 'routesShut'], ['faults', 'faults'], ['droppable', 'dropped'],
+      ['origins', 'origin'], ['weather', 'weather'], ['times', 'time'], ['falseLeads', 'falseLead'],
+    ];
+    for (const [authored, produced] of axes) {
+      if (!Array.isArray(v[authored]) || v[authored].length < 1) continue;
+      const seen = new Set(SEEDS_WIDE.map((s) => JSON.stringify(chooseVariation(pack, s)[produced])));
+      if (seen.size < 2) flat.push(`${id}/${authored} (${v[authored].length} entries, ${seen.size} outcome)`);
+    }
+  }
+  eq(`AJ2a every axis a package authors actually varies over sixty seeds${flat.length ? ` — ${flat.join(' · ')}` : ''}`,
+    flat.length, 0);
 
   /* ── the same seed is the same operation ──────────────────────────────────── */
   const fingerprint = (p) => JSON.stringify({
