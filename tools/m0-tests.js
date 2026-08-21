@@ -995,6 +995,36 @@ async function sectionK() {
   ok(`K14 every THREE class the renderer names exists in the vendored r128${absent.length ? ` — ${absent.join(', ')}` : ''}`,
     absent.length === 0);
 
+  /**
+   * ⚠ NO ENGINE FILE MAY NAME A STATE THAT ONE ANOMALY INVENTED.
+   *
+   * `latent`, `aware`, `drawn`, `banked` and `contained` are `graybox-draught`'s state ids.
+   * Three separate places in the engine had switched on them and each failed silently for
+   * every OTHER anomaly, because a state id that does not match falls through a `default:`
+   * rather than throwing: `stepCustody` escaped into the draught's `banked`, `chooseTarget`
+   * gated on it, and `mixFor` gave five of six anomalies no voice at all in any state.
+   *
+   * The distinction the engine is allowed to make is the `kind` — `latent`, `active`,
+   * `hunting`, `vulnerable`, `contained` — which every state declares and `content.js`
+   * validates. `latent` and `contained` are on BOTH lists, so this greps for the three that
+   * are only ever ids: a match on those is an engine file knowing an anomaly by name.
+   *
+   * `anomaly.js` is exempt: it is where `ANOMALY_STATE` is defined, and the definition has
+   * to say the words. `content.js` is exempt for the same reason about kinds.
+   */
+  const ONLY_IDS = ['aware', 'drawn', 'banked'];
+  const byName = [];
+  for (const f of files) {
+    if (f === 'src/sim/anomaly.js' || f === 'src/sim/content.js') continue;
+    /* Strip comments first: the note explaining the bug is not the bug. */
+    const code = src.get(f).replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+    for (const w of ONLY_IDS) {
+      if (new RegExp(`['"\`]${w}['"\`]`).test(code)) byName.push(`${f}: '${w}'`);
+    }
+  }
+  eq(`K15 no engine file switches on a state id one anomaly invented${byName.length ? ` — ${byName.join(', ')}` : ''}`,
+    byName.length, 0);
+
   /* ⚠ EVERY CONFIG LEAF MUST BE READ BY SOMETHING.
    *
    * `contactRadiusM`, `contactCooldownMs` and `reacquireGraceMs` sat in config.js with
