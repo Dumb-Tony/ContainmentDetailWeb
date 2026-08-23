@@ -222,6 +222,7 @@ what makes them accounted for rather than merely assumed.
 | `docs/m1-squad.png` | screenshot: the squad panel | `tools/shot.ps1` | project-original | no |
 | `docs/m3-briefing.png` | screenshot: the briefing tab | `tools/shot.ps1 -Setup tools/_shot-brief.js` | project-original | no |
 | `docs/m3-settings.png` | screenshot: the settings screen | `tools/shot.ps1 -Setup tools/_shot-settings.js` | project-original | no |
+| `docs/m6-figure.png` | screenshot: the figure in aisle B | `tools/shot.ps1 -Setup tools/_shot-figure.js -Query "incident=cold-storage-figure"` | project-original | no |
 | `docs/m3-site.png` | screenshot: the base | `tools/shot.ps1 -Setup tools/_shot-base.js` | project-original | no |
 | `assets/icons/icon-512.png` | install icon, 512px | rendered by `tools/make-icons.ps1` | project-original | no |
 | `assets/icons/icon-maskable-512.png` | install icon, maskable variant | rendered by `tools/make-icons.ps1` | project-original | no |
