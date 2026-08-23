@@ -34,6 +34,38 @@ export const SENSES = Object.freeze({
     poll: (a, w, ctx) => ctx.sources.some((s) => dist(a.x, a.z, s.x, s.z) <= w.radiusMetres),
   },
 
+  /**
+   * Nothing warm within a radius, for a while.
+   *
+   * ⚠ THE HEAT QUANTITY HAD NO "NOTHING" OPERATOR AND EVERY OTHER QUANTITY DID.
+   *
+   * Observation has `unobserved-for`, sound has `masked-for`, the gradient has
+   * `gradient-below`, the distributed set has `set-clean`. Heat — the first quantity this
+   * game ever measured, and the one four anomalies are built on — had only the positive
+   * form. So a heat-based RESTRAINT had no way back: an author could say "it stops when
+   * something warm is near" and could not say "and it starts again when the warmth leaves".
+   * `netherfold-toll` hit this and built its exit out of the same positive sense with a
+   * three-second sustain instead, which is a better rule than a negation would have been in
+   * that one case and is not a general answer.
+   *
+   * The asymmetry was invisible because nothing had needed it for six anomalies, which is
+   * exactly how a closed vocabulary develops a hole: the missing word is the one nobody has
+   * tried to say yet.
+   *
+   * ⚠ IT IS NOT `!heat-within`. The sustain is the whole point — a restraint that released
+   * on a single cold frame would release every time somebody walked behind a rack — and
+   * §8.2's fair-under-latency argument is the same one `unobserved-for` makes: the
+   * transition that COSTS the squad carries the sustain, so a flicker never decides it.
+   * `sustainSeconds` is handled by the trigger machinery, as it is for every other sense
+   * here; this reports the instantaneous fact and lets the sustain do its job.
+   *
+   * The operative's OWN body counts, because it is a heat source on the same field as
+   * everything else and pretending otherwise would make "stand back" mean nothing.
+   */
+  'no-heat-within': {
+    poll: (a, w, ctx) => !ctx.sources.some((s) => dist(a.x, a.z, s.x, s.z) <= w.radiusMetres),
+  },
+
   /** The one it has actually chosen, close enough to commit to. Reads `targetId`, so it
    *  inherits reachability for free — a target behind a 40C wall was never chosen. */
   'strongest-heat-within': {

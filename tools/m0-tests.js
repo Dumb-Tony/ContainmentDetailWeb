@@ -5689,6 +5689,46 @@ async function sectionAO() {
   ok('AO2 every sense the engine implements carries a poll or is marked performed',
     Object.values(SENSES).every((s) => typeof s.poll === 'function' || s.performed === true));
 
+  /**
+   * ⚠ EVERY QUANTITY NEEDS A WORD FOR "NOTHING", AND HEAT DID NOT HAVE ONE.
+   *
+   * Observation has `unobserved-for`, sound has `masked-for`, the gradient has
+   * `gradient-below`, the distributed set has `set-clean`. Heat — the first quantity this
+   * game measured and the one four anomalies are built on — had only the positive form. So a
+   * heat-based RESTRAINT had no way back: an author could say "it stops when something warm
+   * is near" and could not say "and it starts again when the warmth leaves". The eighth
+   * anomaly hit it and built its exit out of the positive sense with a sustain instead.
+   *
+   * That is how a closed vocabulary develops a hole: the missing word is the one nobody has
+   * tried to say yet, and six anomalies went past without needing it.
+   *
+   * Driven against the real poll rather than asserted from the source, because "it exists"
+   * is not the claim — the claim is that it answers the opposite of its positive twin at
+   * every distance, which is the only thing that makes it usable as an exit.
+   */
+  const heatIn = SENSES['heat-within'].poll;
+  const heatOut = SENSES['no-heat-within'].poll;
+  const at = (x) => ({ sources: [{ id: 's', x, z: 0 }] });
+  const anom = { x: 0, z: 0 };
+  const w = { radiusMetres: 5 };
+  const disagreements = [];
+  for (let d = 0; d <= 10; d += 0.5) {
+    const inside = heatIn(anom, w, at(d));
+    const outside = heatOut(anom, w, at(d));
+    if (inside === outside) disagreements.push(`${d}m`);
+  }
+  eq(`AO2a \`no-heat-within\` is the exact inverse of \`heat-within\` at every distance${disagreements.length ? ` — disagreed at ${disagreements.join(', ')}` : ''}`,
+    disagreements.length, 0);
+  ok('AO2b and an empty field reads as nothing warm, rather than as an error',
+    heatOut(anom, w, { sources: [] }) === true);
+  /* ⚠ AND IT IS NOT `!heat-within` IN THE CONTENT. The sustain is what makes it a rule
+   * rather than a flicker — a restraint releasing on one cold frame would release every time
+   * somebody walked behind a rack — and the sustain lives in the trigger machinery, which is
+   * why this poll reports the instantaneous fact and nothing else. Same argument
+   * `unobserved-for` makes, and the same §8.2 fairness reason. */
+  ok('AO2c it reports an instant rather than carrying its own timer, so the sustain stays the trigger\'s job',
+    SENSES['no-heat-within'].poll.length <= 3 && !('sustain' in SENSES['no-heat-within']));
+
   /* And the other direction: no content file names a token outside the vocabularies. The
    * loader already refuses this, so the assertion is that the loader is still the thing
    * standing in the way rather than luck. */
