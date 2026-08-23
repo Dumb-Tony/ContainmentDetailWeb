@@ -6,6 +6,24 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Containment Detail — cold storage, level 2</title>
 <meta name="description" content="A cooperative-design containment operation: learn the anomaly's rules, build a field procedure, establish custody. Browser build.">
+
+<!-- Installability and offline play — GDD §23 Milestone 5. See sw.js for why the worker is
+     network-first and what it would cost this repo if it were not.
+
+     ⚠ cd-sw IS A KILL SWITCH, and it is here rather than in sw.js on purpose. If the worker
+     ever misbehaves, setting content="off" makes it drop every cache and unregister itself on
+     the next load. index.html is the one file every deploy touches and the one file the
+     worker always fetches from the network, so disarming a bad worker is a one-line commit
+     instead of a support problem. Do not remove it because it "does nothing" — doing nothing
+     is what "on" means. -->
+<meta name="cd-sw" content="on">
+<link rel="manifest" href="manifest.webmanifest">
+<!-- --panel, matching the colour of every panel the game draws, so the browser's chrome
+     matches the game's chrome. The manifest carries the same value; platform-tests.js checks
+     the two against this stylesheet rather than against each other. -->
+<meta name="theme-color" content="#0e1218">
+<link rel="icon" type="image/png" sizes="48x48" href="assets/icons/icon-48.png">
+<link rel="apple-touch-icon" href="assets/icons/icon-192.png">
 <style>
   :root{
     --bg:#05070a; --panel:#0e1218; --panel2:#141a22; --line:#26303b;
