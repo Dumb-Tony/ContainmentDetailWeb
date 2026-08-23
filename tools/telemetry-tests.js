@@ -18,7 +18,7 @@ import { lines, counts, ok, eq, note, emit, run, heading } from './harness.js';
 import { loadContent, INCIDENTS } from '../src/sim/content.js';
 import { Game, RECOMMENDED_MANIFEST, EVENTS } from '../src/game.js';
 import { PHASE } from '../src/sim/mission.js';
-import { sessionRecord, sessionRecordText, RECORDED } from '../src/sim/telemetry.js';
+import { sessionRecord, sessionRecordText, RECORDED, balanceReport, MIN_SAMPLE } from '../src/sim/telemetry.js';
 import { SLOTS } from '../src/config.js';
 
 const CALLSIGN = 'Zzz Personal Data Vasquez';
@@ -156,6 +156,74 @@ async function sectionB(content) {
   emit();
 }
 
+/* ── BB. §21.3, which is a question about a population ────────────────────── */
+function sectionBB() {
+  heading('BB. a balance target computed from one session is not a balance target');
+
+  /**
+   * ⚠ THE TEMPTING SHAPE IS A PER-SESSION VERDICT, and it would produce a green tick on the
+   * first successful playtest and a red one on the first failure, from a sample of one, on a
+   * screen that looks like a report. "Mission success: 55-70%" is a RATE. A single run gives
+   * 0% or 100% and neither is evidence of anything.
+   */
+  const one = [{ outcome: { overall: 'Controlled' }, evidence: { claimsCorrect: 5, claimsWrong: 0 }, procedure: { hypothesisChanges: 3 }, containmentShare: 0.2, squadSize: 4, perSeatContributions: { p1: 3, p2: 2, p3: 1, p4: 1 } }];
+  const r1 = balanceReport(one);
+  const success = r1.targets.find((t) => t.id === 'mission-success');
+  eq('BB1 a perfect single run does not report a met target', success.verdict, 'insufficient');
+  eq('BB2 it reports the sample it had', success.sample, 1);
+  ok('BB3 and says it is not confident', success.confident === false);
+  note(`minimum sample is ${r1.minimumSample}`);
+
+  /* Enough runs, and it answers. */
+  const many = [];
+  for (let i = 0; i < MIN_SAMPLE; i++) {
+    many.push({
+      outcome: { overall: i < 13 ? 'Controlled' : 'Compromised' },   // 65% success
+      evidence: { claimsCorrect: i < 13 ? 5 : 1, claimsWrong: i < 13 ? 1 : 4 },
+      procedure: { hypothesisChanges: i % 2 ? 3 : 1 },
+      containmentShare: 0.2,
+      squadSize: 4,
+      perSeatContributions: { p1: 2, p2: 2, p3: 1, p4: i < 18 ? 1 : 0 },
+    });
+  }
+  const r2 = balanceReport(many);
+  const s2 = r2.targets.find((t) => t.id === 'mission-success');
+  eq('BB4 twenty runs at 65% reports the target as met', s2.verdict, 'met');
+  ok('BB5 with the rate it measured', Math.abs(s2.value - 0.65) < 0.001, String(s2.value));
+  ok('BB6 and confidence, because the sample cleared the minimum', s2.confident === true);
+
+  /* A target whose denominator is smaller than the run count says so. */
+  const cls = r2.targets.find((t) => t.id === 'correct-classification');
+  ok('BB7 "among successful teams" counts successes and not runs, and reports that sample',
+    cls.sample === 13, `${cls.sample} of ${r2.sample}`);
+  note(`classification sample ${cls.sample} of ${r2.sample} runs — below the minimum, so ${cls.verdict}`);
+
+  /* Full-squad-only targets stay insufficient on a solo-tested build, correctly. */
+  const solo = many.map((r) => ({ ...r, squadSize: 1, perSeatContributions: { p1: 3 } }));
+  const r3 = balanceReport(solo);
+  const seats = r3.targets.find((t) => t.id === 'every-seat-contributes');
+  eq('BB8 a build tested only solo reports the full-squad target as insufficient, for ever',
+    seats.verdict, 'insufficient');
+  eq('BB9 because the sample for it is zero, not twenty', seats.sample, 0);
+
+  /**
+   * ⚠ AND THE SIXTH TARGET IS ABSENT ON PURPOSE. "A majority of failed teams can accurately
+   * name the decisive mistake in post-test interviews" is a claim about an interview. There
+   * is no number in a log that stands in for it, and producing one would be the exact
+   * failure this file is arranged against — so it is named in `notMeasurable` instead.
+   */
+  eq('BB10 five of §21.3\'s six targets are computed', r2.targets.length, 5);
+  eq('BB11 and the sixth is named as needing an interview rather than quietly dropped',
+    r2.notMeasurable.length, 1);
+  note(r2.notMeasurable[0].slice(0, 96));
+
+  /* Two targets carry a judgement rather than a figure from the document, and say so. */
+  const judged = r2.targets.filter((t) => t.why);
+  eq('BB12 every target whose band this file INVENTED carries the reason in the report', judged.length, 2);
+  for (const t of judged) note(`  ${t.id}: ${t.why.slice(0, 88)}…`);
+  emit();
+}
+
 /* ── C. it works on every shipped package ─────────────────────────────────── */
 async function sectionC() {
   heading('C. a record can be taken from every incident in the build');
@@ -192,6 +260,7 @@ async function sectionC() {
     const content = await loadContent();
     await run('A', () => sectionA(content));
     await run('B', () => sectionB(content));
+    await run('BB', () => sectionBB());
     await run('C', () => sectionC());
     emit();
   } catch (e) {

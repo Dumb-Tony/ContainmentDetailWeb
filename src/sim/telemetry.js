@@ -192,3 +192,102 @@ export function sessionRecord(game, opts = {}) {
 export function sessionRecordText(game, opts = {}) {
   return JSON.stringify(sessionRecord(game, opts), null, 2);
 }
+
+/* ── §21.3, which is a question about a population ───────────────────────────── */
+
+/**
+ * GDD §21.3's six balance targets, evaluated over MANY records.
+ *
+ * ⚠ ONE SESSION CANNOT ANSWER ANY OF THEM, and that is the point of this function existing
+ * separately from `sessionRecord`. "Mission success: 55-70%" is a rate; a single run gives
+ * 0% or 100% and neither is evidence. The tempting shape is a per-session verdict, and it
+ * would produce a green tick on the first successful playtest and a red one on the first
+ * failure, from a sample of one, on a screen that looks like a report.
+ *
+ * So every target carries the SAMPLE it was computed from and a `confident` flag, and a
+ * target below the minimum sample reports `insufficient` rather than a number. §26.4 asks
+ * for external tests; the thing that makes those worth running is a report that refuses to
+ * pretend before the data exists.
+ *
+ * MINIMUM SAMPLE IS TWENTY, and that is a judgement rather than a measurement. It is the
+ * smallest n at which a 55-70% band is distinguishable from 50% at a glance, and it is
+ * written here rather than buried so it can be argued with.
+ */
+export const MIN_SAMPLE = 20;
+
+const SUCCESS = new Set(['Exemplary', 'Controlled', 'Costly']);
+
+/**
+ * @param {object[]} records  many `sessionRecord()` results
+ * @returns {{targets: object[], sample: number}}
+ */
+export function balanceReport(records) {
+  const rs = Array.isArray(records) ? records.filter(Boolean) : [];
+  const n = rs.length;
+  const out = [];
+
+  const target = (id, statement, value, lo, hi, sample, why = null) => {
+    const enough = sample >= MIN_SAMPLE;
+    out.push({
+      id,
+      statement,
+      sample,
+      value: sample > 0 ? value : null,
+      target: [lo, hi],
+      verdict: !enough ? 'insufficient' : (value >= lo && value <= hi ? 'met' : 'outside'),
+      confident: enough,
+      ...(why ? { why } : {}),
+    });
+  };
+
+  const succeeded = rs.filter((r) => SUCCESS.has(r.outcome && r.outcome.overall));
+  target('mission-success', 'Mission success: 55-70% on standard Field difficulty.',
+    n ? succeeded.length / n : 0, 0.55, 0.70, n);
+
+  /* "Correct classification AMONG SUCCESSFUL TEAMS" — the denominator is the successes, so
+   * the sample for this target is smaller than the run count and must say so. */
+  const classified = succeeded.filter((r) => {
+    const e = r.evidence || {};
+    return (e.claimsCorrect + e.claimsWrong) > 0 && e.claimsCorrect / (e.claimsCorrect + e.claimsWrong) >= 0.7;
+  });
+  target('correct-classification', 'Correct classification among successful teams: 70-90%.',
+    succeeded.length ? classified.length / succeeded.length : 0, 0.70, 0.90, succeeded.length);
+
+  const revised = rs.filter((r) => (r.procedure && r.procedure.hypothesisChanges) > 1);
+  target('hypothesis-revision', 'At least one meaningful hypothesis revision: common but not mandatory.',
+    n ? revised.length / n : 0, 0.30, 1.0, n,
+    'The GDD says "common but not mandatory", which is not a band. 30% is this file\'s '
+    + 'reading of "common" and is a judgement, not a figure from the document.');
+
+  const shares = rs.map((r) => r.containmentShare).filter((v) => typeof v === 'number');
+  const meanShare = shares.length ? shares.reduce((a, b) => a + b, 0) / shares.length : 0;
+  target('containment-share', 'Containment phase duration: 15-25% of mission time.',
+    meanShare, 0.15, 0.25, shares.length);
+
+  /* "Every player has at least one pivotal logged contribution in MOST FULL-SQUAD missions."
+   * Only full squads count, so a build tested solo reports `insufficient` here for ever —
+   * which is the correct answer and not a gap in the metric. */
+  const full = rs.filter((r) => r.squadSize >= 3);
+  const everyone = full.filter((r) => Object.values(r.perSeatContributions || {}).every((c) => c > 0));
+  target('every-seat-contributes',
+    'Every player has at least one pivotal logged contribution in most full-squad missions.',
+    full.length ? everyone.length / full.length : 0, 0.60, 1.0, full.length,
+    '"Pivotal" is not something a log can judge. This counts seats with ANY recorded '
+    + 'contribution, which is a floor on the real answer and not the real answer.');
+
+  /**
+   * ⚠ THE SIXTH TARGET IS NOT ON THIS LIST AND MUST NOT BE. "A majority of failed teams can
+   * accurately name the decisive mistake in post-test interviews" is a claim about an
+   * interview. There is no number in a log that stands in for it, and producing one would be
+   * the exact failure this whole file is arranged against.
+   */
+  return {
+    sample: n,
+    minimumSample: MIN_SAMPLE,
+    targets: out,
+    notMeasurable: [
+      'A majority of failed teams can accurately name the decisive mistake in post-test '
+      + 'interviews. — no log can answer this; it needs the interview.',
+    ],
+  };
+}
