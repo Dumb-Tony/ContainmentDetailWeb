@@ -983,6 +983,114 @@ async function sectionF() {
     toll >= passenger * 8);
 }
 
+/* ------------------------------------------------------------------------------------- */
+async function sectionD3() {
+  heading('D3. the way back down, which the ballast had no word for');
+  const content = await loadContent({ incident: 'harrowbank-ballast' });
+
+  /* ── on foot, from the middle of the yard ─────────────────────────────────────────── */
+  const g = new Game(content, { seed: 'ballast-withdraw' });
+  const { walkTo, route, wait, hold, deployAt } = driver(g);
+  const A = g.anomaly;
+  g.commitLoadout([{ itemId: 'trauma-kit', qty: 1 }]);
+  eq('D33 it is bedded when the squad lands', A.state, 'bedded');
+
+  route([[13.6, -12.6], [14.0, -10.2], [8.0, -10.0], [0.0, -6.0], [-6.0, -2.0], [0.0, 1.0]], 1.0, 150000);
+  walkTo(2.4, 4.2, 0.9, 60000);
+  const dIn = dist(g.player.x, g.player.z, A.x, A.z);
+  wait(5000);
+  note(`  approached to ${dIn.toFixed(1)}m of the bed; it is ${A.state}`);
+  ok(`D34 inside eleven metres for four seconds and it is up (${dIn.toFixed(1)}m)`, A.state !== 'bedded');
+  const woke = g.clock.simTimeMs;
+
+  /* Straight back out, as far as this compound goes, and then stand still and watch. */
+  route([[0.0, 1.0], [-6.0, -2.0], [0.0, -6.0], [8.0, -10.0], [14.0, -10.2], [13.6, -12.6],
+    [0.0, -13.0], [-6.0, -13.6], [-13.5, -14.2]], 1.2, 200000);
+  const leftAt = g.clock.simTimeMs;
+  const dOut = dist(g.player.x, g.player.z, A.x, A.z);
+  let closest = dOut;
+  for (let ms = 0; ms < 40000 && A.state !== 'bedded'; ms += 100) {
+    g.setCommand('p1', { axis: { x: 0, y: 0 }, sprint: false, crouch: false });
+    g.skipMs(100);
+    closest = Math.min(closest, dist(g.player.x, g.player.z, A.x, A.z));
+  }
+  note(`  walked out for ${((leftAt - woke) / 1000).toFixed(0)}s to a gap of ${dOut.toFixed(1)}m; standing still it closed to ${closest.toFixed(1)}m`);
+
+  /* ⚠ THE WITHDRAWAL FAILS, AND THAT IS THE RULE WORKING RATHER THAN THE RULE MISSING.
+   * `no-heat-within` measures from the ANOMALY, and the anomaly is walking. Twenty seconds
+   * of clearance therefore costs eleven metres plus twenty seconds of its own travel, and
+   * the yard is not big enough to buy that from the middle of it. */
+  const lift = A.def.states.find((s) => s.id === 'lifting').speedMps;
+  const standoff = 11 + lift * 20;
+  note(`  it follows at ${lift} m/s, so twenty seconds beyond eleven metres wants ${standoff.toFixed(0)}m of standing clearance`);
+  ok(`D35 backing off on foot from the middle of the yard does NOT settle it — the gap bought was ${dOut.toFixed(1)}m against the ${standoff.toFixed(0)}m the arithmetic wants`,
+    dOut < standoff);
+  ok(`D36 and it closed rather than waited: ${dOut.toFixed(1)}m to ${closest.toFixed(1)}m with nobody moving, ending ${A.state}`,
+    closest < dOut && A.state !== 'bedded');
+
+  /* ── the decoy, which is the route that works ─────────────────────────────────────── */
+  const h = new Game(content, { seed: 'ballast-settle' });
+  const d2 = driver(h);
+  const B = h.anomaly;
+  h.commitLoadout([{ itemId: 'floodlight-tripod', qty: 1 }, { itemId: 'trauma-kit', qty: 1 }]);
+  d2.walkTo(h.site.cache.x, h.site.cache.z, 1.2);
+  h.takeFromCache('floodlight-tripod');
+  d2.route([[13.6, -12.6], [14.0, -10.2], [8.0, -10.0], [0.0, -6.0], [-6.0, -2.0], [0.0, 1.0]], 1.0, 150000);
+  d2.walkTo(2.4, 4.2, 0.9, 60000);
+  d2.hold('floodlight-tripod');
+  eq('D37 the decoy goes down between the squad and the bed', d2.deployAt(2.4, 6.0, 2.4, 4.2), null);
+  const lamp = h.deployables.byItem('floodlight-tripod')[0];
+  const litAt = h.clock.simTimeMs;
+
+  /* Out, and this time it is not being followed — 60C outranks 37C from anywhere. */
+  d2.route([[0.0, 1.0], [-6.0, -2.0], [0.0, -6.0], [8.0, -10.0], [14.0, -10.2], [13.6, -12.6],
+    [0.0, -13.0], [-6.0, -13.6]], 1.2, 200000);
+  const away = dist(h.player.x, h.player.z, lamp.x, lamp.z);
+  note(`  the squad is ${away.toFixed(1)}m from the lamp; the mass is ${dist(B.x, B.z, lamp.x, lamp.z).toFixed(1)}m from it and ${B.state}`);
+  ok(`D38 the mass took the decoy and left the squad alone (${away.toFixed(1)}m off)`, away > 11);
+
+  /* Now wait it out. The lamp has five and a half minutes of cell and nothing renews it. */
+  let deadAt = null, settledAt = null, nearest = away;
+  for (let ms = 0; ms < 420000 && settledAt === null; ms += 200) {
+    h.setCommand('p1', { axis: { x: 0, y: 0 }, sprint: false, crouch: false });
+    h.skipMs(200);
+    nearest = Math.min(nearest, dist(h.player.x, h.player.z, B.x, B.z));
+    if (deadAt === null && lamp.batteryMs <= 0) deadAt = h.clock.simTimeMs;
+    if (B.state === 'bedded') settledAt = h.clock.simTimeMs;
+  }
+  const settled = B.transitions[B.transitions.length - 1];
+  const held = deadAt === null || settledAt === null ? null : (settledAt - deadAt) / 1000;
+  note(`  the cell ran out at ${deadAt === null ? '(never)' : (deadAt / 1000).toFixed(0)}s and it went down at ${settledAt === null ? '(never)' : (settledAt / 1000).toFixed(0)}s`);
+
+  ok('D39 it beds down again — the state the operation starts in is reachable for the rest of it', B.state === 'bedded');
+  ok(`D40 by \`${settled.triggerId}\`, out of \`${settled.from}\``, /^beds-down-/.test(settled.triggerId));
+  ok(`D41 ${held === null ? '(never)' : held.toFixed(1)}s after the decoy died, which is the authored twenty and not a frame less`,
+    held !== null && held >= 20 && held < 23);
+  ok(`D42 and nobody was ever inside the eleven metres, so what was measured is one unbroken sustain (closest ${nearest.toFixed(1)}m)`,
+    nearest > 11);
+
+  /* ⚠ THE DECOY DIED IN A THIRD OF ITS CELL, AND THAT IS TWO RULES MEETING. `bleeds-cells`
+   * is `drain-power` at 4.5m in exactly the three states this thing hunts in, so the mass
+   * you lured onto the lamp is standing on the lamp eating it. The tactic is therefore
+   * self-limiting by the anomaly's own rule rather than by a number in the item file, and
+   * nobody authored that — it falls out of two independent entries agreeing. */
+  const nominal = 5.5 * 60;
+  const burn = deadAt === null ? null : (deadAt - litAt) / 1000;
+  note(`  the lamp burned ${burn === null ? '(never died)' : burn.toFixed(0)}s of a ${nominal}s cell`);
+  ok(`D42a and it died in ${burn === null ? '(never)' : burn.toFixed(0)}s of a ${nominal}s cell, because the thing sitting on it bleeds cells at 4.5m`,
+    burn !== null && burn < nominal * 0.6);
+
+  /* The two states it must never leave, and it is structure that says so rather than luck. */
+  const backs = B.def.triggers.filter((t) => t.to === 'bedded');
+  eq('D43 three ways down, one for each state that can be walked away from', backs.length, 3);
+  eq('D44 and none of them from `light` or `cased` — bedding down out of either would undo the stone work or the seal',
+    backs.filter((t) => t.from === 'light' || t.from === 'cased' || t.from === '*').length, 0);
+  const same = new Set(backs.map((t) => `${t.when.radiusMetres}/${t.when.sustainSeconds}`));
+  eq('D45 all three read the same radius and the same sustain, so the squad learns one distance and not three', same.size, 1);
+  const tells = new Set(backs.map((t) => t.telegraph));
+  eq('D46 and all three tell it differently, because settling out of a run is not settling out of a sit', tells.size, 3);
+}
+
 suite('content', async () => {
   let ctx = null;
   await run('A', async () => { ctx = await sectionA(); });
@@ -990,6 +1098,7 @@ suite('content', async () => {
   await run('C', () => sectionC());
   await run('D', () => sectionD());
   await run('D2', () => sectionD2());
+  await run('D3', () => sectionD3());
   await run('E', () => sectionE());
   await run('E2', () => sectionE2());
   await run('F', () => sectionF());

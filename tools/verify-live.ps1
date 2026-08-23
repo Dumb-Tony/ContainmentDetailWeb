@@ -40,6 +40,66 @@ function Get-BlobHash([byte[]] $bytes) {
   ($sha1.ComputeHash($buf) | ForEach-Object { $_.ToString('x2') }) -join ''
 }
 
+# ⚠ A BLOB MATCH IS NOT A DEPLOY VERIFICATION ON ITS OWN, and believing it was is how the
+# live site ran for eight commits telling every crash report it was `0e4a0aa`. This script
+# compared the served bytes of the files HEAD touched, found them identical, printed MATCH
+# in green, and never once asked the page what build it thought it was. index.html had not
+# been restamped, so it was not in the changed-file set, so it was not checked — the one
+# file whose staleness is invisible is the one that carries the build id.
+#
+# So the served page's own `cd-build` is read back and held to the only claim it makes:
+# the code it names must be the code being served. Not "the stamp is recent" and not "the
+# stamp is HEAD" — the stamp legitimately names the commit BEFORE the stamping commit
+# (see stamp-build.ps1), and a fixup commit that touches nothing servable moves HEAD past
+# it again. Both are fine and both would fail a hash-equality check on the sha.
+#
+# What cannot be fine is a stamped commit whose SOURCE differs from what is on the wire.
+# index.html is excluded from that comparison and only from it: the stamp line is the one
+# byte-difference the stamping commit is allowed to introduce.
+function Test-ServedStamp([string] $baseUrl, [string[]] $paths) {
+  $wc = New-Object System.Net.WebClient
+  $wc.Headers.Add('Cache-Control', 'no-cache')
+  try {
+    $url = "$baseUrl/index.html" + '?v=' + [Guid]::NewGuid().ToString('N')
+    $html = [System.Text.Encoding]::UTF8.GetString($wc.DownloadData($url))
+  } finally { $wc.Dispose() }
+
+  $m = [regex]::Match($html, '<meta name="cd-build" content="([0-9a-f]+)[^"]*">')
+  if (-not $m.Success) {
+    Write-Host 'STAMP: the served index.html carries no cd-build meta.' -ForegroundColor Red
+    Write-Host '       Every crash report from this build will name the deploy time, which identifies nothing.'
+    return $false
+  }
+  $stamped = $m.Groups[1].Value
+
+  # `2>$null` and not `2>&1`: redirecting a native command's stderr in PS 5.1 wraps each
+  # line in an ErrorRecord and sets $? false on exit 0, which would report every healthy
+  # deploy as an unknown commit.
+  git rev-parse --verify --quiet "$stamped^{commit}" 2>$null | Out-Null
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host "STAMP: the served page names commit $stamped, which is not in this clone." -ForegroundColor Red
+    Write-Host '       Either it was never pushed, or the live site is not this repository.'
+    return $false
+  }
+
+  # ⚠ EVERY SERVED FILE, not just the ones HEAD happened to touch. "Does the stamp name the
+  # code on the wire" is a question about the whole build. Scoped to the changed set it
+  # would have answered "yes" for the entire eight-commit drift, because the commit that
+  # exposed the problem touched content and the stamp had gone stale over src.
+  $drift = @(git diff --name-only "$stamped" HEAD) |
+           Where-Object { $_ -and $_ -notmatch '^(docs/|tools/|GAME_BIBLE/)' -and $_ -notmatch '/LICENSE$' -and
+                          $_ -notin @('README.md', 'index.html', 'assets/lib/NOTICE.md', 'content/provenance.json') }
+  if ($drift.Count -gt 0) {
+    Write-Host "STAMP IS STALE: the served page says $stamped, but $($drift.Count) served file(s) have changed since:" -ForegroundColor Red
+    $drift | Select-Object -First 8 | ForEach-Object { Write-Host "  $_" }
+    if ($drift.Count -gt 8) { Write-Host "  ... and $($drift.Count - 8) more" }
+    Write-Host '       Run tools/stamp-build.ps1, commit, and push before posting this link.'
+    return $false
+  }
+  Write-Host "STAMP: served page names $stamped and every served file matches it." -ForegroundColor Green
+  return $true
+}
+
 $want = @{}
 foreach ($p in $Paths) { $want[$p] = (git rev-parse "HEAD:$p").Trim() }
 $commit = (git rev-parse --short HEAD).Trim()
@@ -71,8 +131,12 @@ while ($true) {
     }
   }
   if ($stale.Count -eq 0) {
-    Write-Host "MATCH on try $try - $BaseUrl is serving commit $commit" -ForegroundColor Green
-    exit 0
+    Write-Host "Bytes match on try $try - $BaseUrl is serving commit $commit"
+    if (Test-ServedStamp $BaseUrl $Paths) {
+      Write-Host "MATCH - $BaseUrl is serving commit $commit and says so" -ForegroundColor Green
+      exit 0
+    }
+    exit 1
   }
   if ((Get-Date) -ge $deadline) {
     Write-Host "TIMEOUT after $try tries. Still stale:" -ForegroundColor Red

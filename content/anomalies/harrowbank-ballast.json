@@ -176,6 +176,39 @@
       "_note": "THE WAY BACK, and the reason it exists is the reason senses.js gives for `set-clean`: a state machine authored with only the entering transition is a trap. `instances-loose` counts stones that are anomalous and not deposited, so it can only rise again through `InstanceSet.purge` — turning the case out — and turning the case out is the only cure for a contaminated one. So the punishment for logging the wrong stone is not a walk back, it is the thing standing up in the middle of the yard with everything you had collected lying round its feet.\n\nA count of ONE rather than a fraction of the set, because the rule is about ownership rather than arithmetic: it does not need most of its ballast, it needs some."
     },
     {
+      "id": "beds-down-lifting",
+      "from": "lifting",
+      "to": "bedded",
+      "when": { "sense": "no-heat-within", "radiusMetres": 11, "sustainSeconds": 20 },
+      "condition": "nothing warm anywhere inside 11m for twenty seconds",
+      "telegraph": "The runs of shifting chippings get shorter, and then there is a longer gap than there has been.",
+      "pressureDelta": -1,
+      "latencyToleranceMs": 1200,
+      "_note": "⚠ IT HAD NO WAY BACK DOWN, AND `re-earthed`'s OWN NOTE IS THE ARGUMENT AGAINST THAT: a state machine authored with only the entering transition is a trap. `bedded` was entered once, at the start of the operation, and was unreachable for the rest of it. So one operative straying inside eleven metres in the first minute escalated the whole compound permanently, and the file's own account of why the radius is eleven — 'a squad can take three statements and walk the fence line before it knows they are on site' — described a state of affairs that could never be returned to.\n\nIt is also the rule the ballast's whole fiction asserts and the machine did not implement. It sat in the north half for NINE DAYS. Nine days is not a thing that happens to an anomaly that cannot stop hunting.\n\nTHE SAME ELEVEN METRES as `disturbed` and `stirs-again`, deliberately, so the squad learns one distance and not three. Four seconds to wake and twenty to settle: backing off is a decision that costs most of half a minute, not a step. And this rule cannot race `stirs-again` however the sustains are set, because one of them requires warmth inside the radius and the other requires its absence — the cleanest pair of transitions in the build, and the reason `no-heat-within` exists rather than a second reading of `heat-within`.\n\nWhat it costs: a squad can now reset an approach by withdrawing, repeatedly, and that is a real reduction in difficulty. It is the right trade. The alternative was an operation whose first mistake could not be walked back, which is the failure §8.2 and §12.1 both name."
+    },
+    {
+      "id": "beds-down-drawing",
+      "from": "drawing",
+      "to": "bedded",
+      "when": { "sense": "no-heat-within", "radiusMetres": 11, "sustainSeconds": 20 },
+      "condition": "the thing it was going for has gone cold and nothing else warm is inside 11m, for twenty seconds",
+      "telegraph": "It is still grinding, but not toward anything. The line it is cutting stops being straight.",
+      "pressureDelta": -2,
+      "latencyToleranceMs": 1200,
+      "_note": "A SEPARATE TELEGRAPH AND THAT IS WHY IT IS A SEPARATE TRIGGER. Settling out of a run is not the same event as settling out of a sit, and a squad watching from the fence should be able to tell which one it just watched. Bedding down from here is how a decoy that BURNS OUT resolves instead of handing the thing straight back to the nearest operative: it went for a heater, the heater died, nobody is within eleven metres, and it puts itself down where it stands rather than turning round."
+    },
+    {
+      "id": "beds-down-holding",
+      "from": "holding",
+      "to": "bedded",
+      "when": { "sense": "no-heat-within", "radiusMetres": 11, "sustainSeconds": 20 },
+      "condition": "whatever it settled on has gone cold and nothing else warm is inside 11m, for twenty seconds",
+      "telegraph": "The creaking stops without the grinding starting.",
+      "pressureDelta": -1,
+      "latencyToleranceMs": 1200,
+      "_note": "THE DECOY'S HONEST ENDING. `stirs-again` is what happens when the decoy dies and somebody is still on the yard: twenty-five seconds and it gets up looking. This is what happens when it dies and nobody is — and without it the pair was half-written, because the squad could buy a cycle and never buy an end to one. Letting a decoy burn out while you work the far side of the compound is now a tactic with a result."
+    },
+    {
       "id": "sealed",
       "from": "light",
       "to": "cased",
@@ -264,6 +297,28 @@
       "revealsRule": "ballast-holds-it",
       "requiredEquipment": [],
       "channel": "document",
+      "isFalseLead": false
+    },
+    {
+      "id": "patrol-log",
+      "type": "documentary",
+      "dimension": "behaviour",
+      "rawObservation": "The security firm's beam log for the north half, nine nights of it. Every night the beam trips in a run while the gang are working and then stops, and the last trip of each run is between eighteen and twenty-two seconds after the gate barrier logs the last man out. Between 02:10 and 05:40, when nobody is on site, there is not one trip in nine nights.",
+      "reliability": "confirmed",
+      "revealsRule": "settles-when-left",
+      "requiredEquipment": [],
+      "channel": "document",
+      "isFalseLead": false
+    },
+    {
+      "id": "old-beds",
+      "type": "environmental",
+      "dimension": "behaviour",
+      "rawObservation": "Two more rings of stood-up chippings besides the one it is sitting in, twelve and nineteen metres off. Both are beds it has left. The nearer one is dry an inch down; the far one has rain through it and grass starting in the middle, so it was made and left some time ago and nothing has disturbed it since.",
+      "reliability": "confirmed",
+      "revealsRule": "settles-when-left",
+      "requiredEquipment": [],
+      "channel": "visual",
       "isFalseLead": false
     },
     {
@@ -425,7 +480,7 @@
     }
   ],
 
-  "_claimsNote": "Six required rules, six true claims, each carrying every one of its own entries, and two false ones that are the two stories the yard tells about itself.\n\n`re-earthed` is the pair with no confirmed source in it at all — a skip driver and a day sheet, both probable, which cannot carry a claim past 'probable' however carefully a squad works — so its claim also names the weighbridge tickets. That is not a patch: the two tickets ARE the rule, stated in tonnes. Stone left the site on the first ticket and was back in the yard by the second, and the only event between them is a skip being emptied. The driver says what happened after and the tickets say that it did.\n\n`warmest-thing-wins` is the pair with no second confirmed source in it — a confirmed heater and a disputed linesman — so its claim also names the boot: the man who was hurt was found a metre and a half off the band the thing had ground on its way to something else, which is what says it was going somewhere and he was in the way rather than that it was going for him.\n\nThe false pair is deliberately the two most reasonable readings on the compound. Anybody who has read the decommissioning record will reach for the earth mat, because a mat being lifted is the one thing that has changed here in sixty years. And the quarry docket is real: the stone IS from a closed pit forty miles away, every last tonne of it, which is exactly why it explains nothing.",
+  "_claimsNote": "Seven required rules, seven true claims, each carrying every one of its own entries, and two false ones that are the two stories the yard tells about itself.\n\n`settles-when-left` is the newest and the only one whose two entries agree exactly. The beam log gives the wait in seconds, from nine nights of a machine writing down when a man left; the abandoned beds give the fact without any number at all, and one of them has grass in it. A squad that finds either can act on it; a squad that finds both knows how long it has to wait before it can cross the yard.\n\n`re-earthed` is the pair with no confirmed source in it at all — a skip driver and a day sheet, both probable, which cannot carry a claim past 'probable' however carefully a squad works — so its claim also names the weighbridge tickets. That is not a patch: the two tickets ARE the rule, stated in tonnes. Stone left the site on the first ticket and was back in the yard by the second, and the only event between them is a skip being emptied. The driver says what happened after and the tickets say that it did.\n\n`warmest-thing-wins` is the pair with no second confirmed source in it — a confirmed heater and a disputed linesman — so its claim also names the boot: the man who was hurt was found a metre and a half off the band the thing had ground on its way to something else, which is what says it was going somewhere and he was in the way rather than that it was going for him.\n\nThe false pair is deliberately the two most reasonable readings on the compound. Anybody who has read the decommissioning record will reach for the earth mat, because a mat being lifted is the one thing that has changed here in sixty years. And the quarry docket is real: the stone IS from a closed pit forty miles away, every last tonne of it, which is exactly why it explains nothing.",
 
   "claims": [
     {
@@ -434,6 +489,13 @@
       "text": "It cannot be lifted while it owns any stone. Every one of them has to be in the case and nothing else may be.",
       "truth": true,
       "supportedBy": ["weighbridge-ticket", "lifted-chippings", "ganger-statement"]
+    },
+    {
+      "id": "claim-it-settles-when-left",
+      "dimension": "behaviour",
+      "text": "Leave it nothing warm to reach and it puts itself back down. Eleven metres is the distance and about twenty seconds is the wait.",
+      "truth": true,
+      "supportedBy": ["patrol-log", "old-beds"]
     },
     {
       "id": "claim-opening-the-case-frees-it",

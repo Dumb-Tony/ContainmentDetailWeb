@@ -13,7 +13,11 @@ $root = Split-Path $PSScriptRoot -Parent
 $mime = @{ ".html"="text/html"; ".js"="text/javascript"; ".mjs"="text/javascript";
            ".css"="text/css"; ".json"="application/json"; ".png"="image/png";
            ".jpg"="image/jpeg"; ".svg"="image/svg+xml"; ".ico"="image/x-icon";
-           ".woff2"="font/woff2"; ".map"="application/json" }
+           ".woff2"="font/woff2"; ".map"="application/json";
+           # Pages sends this; the dev server was sending application/octet-stream, which
+           # Chrome happens to parse anyway. A manifest that only works because the browser
+           # is forgiving is a difference between dev and production waiting to matter.
+           ".webmanifest"="application/manifest+json" }
 
 $listener = $null
 $ports = if ($Port -gt 0) { @($Port) } else { 8401..8410 }

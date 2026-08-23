@@ -462,14 +462,40 @@ async function boot() {
      * returns it as something a facilitator can copy out of the console at the end of a run.
      *
      * ⚠ IT IS PULLED AND NEVER PUSHED. Nothing in `sim/telemetry.js` can reach the network —
-     * the suite greps it for `fetch`, a beacon, a socket and a hostname — because this build
-     * contacts exactly one host, the signalling broker, and `assets/lib/NOTICE.md` says so.
-     * Handing the record to somebody is a decision a person makes, once, out loud.
+     * the suite greps it for `fetch`, a beacon, a socket and a hostname. Handing the record
+     * to somebody is a decision a person makes, once, out loud.
+     *
+     * This comment used to end "because this build contacts exactly one host, the signalling
+     * broker". That was measured and it is false: `PEER_OPTS` sets no `config`, so PeerJS
+     * uses its defaults and a hosted session can reach FOUR — the broker, `stun.l.google.com`
+     * for the reflexive address, and TURN at `eu-0.turn.peerjs.com` / `us-0.turn.peerjs.com`
+     * when a direct path cannot be found. `assets/lib/NOTICE.md` and the privacy notice name
+     * all four; the audit asserts the library really carries them and that we do not override
+     * them. The telemetry claim above never depended on the count — it is a property of that
+     * file, checked in that file — and stating it in terms of a number that was wrong is how
+     * a true sentence gets retired along with a false one.
      */
     sessionRecord: () => sessionRecord(game, { build: buildId(), locale: locale() }),
     sessionRecordText: () => sessionRecordText(game, { build: buildId(), locale: locale() }),
     get paused() { return game.clock.paused; } };
   window.dispatchEvent(new CustomEvent('cd-ready', { detail: window.__CD }));
+
+  /* The offline copy. `sw.js` is network-first in every case — it reads its cache only when
+   * `fetch` rejects or the origin returns 5xx — so it cannot hand an online player a staler
+   * build than they would get with no worker at all. That property is what makes registering
+   * it safe under push-is-the-deploy, and `tools/platform-tests.js` section E asserts it
+   * from both directions rather than trusting the sentence.
+   *
+   * ⚠ AT THE END OF A BOOT THAT SUCCEEDED. A build that throws on the way up never reaches
+   * this line, so it never becomes anybody's offline copy — the one failure a service worker
+   * can make permanent. `new URL(..., import.meta.url)` because this page is served from a
+   * repository subpath on Pages and from the root locally, the same discipline `content.js`
+   * and `i18n.js` keep. `updateViaCache: 'none'` so a fix to the worker is not ten minutes
+   * behind Pages' `max-age=600`. Never awaited, and the failure is swallowed: the game is
+   * identical without it. */
+  if ('serviceWorker' in navigator) navigator.serviceWorker
+    .register(new URL('../sw.js', import.meta.url).href, { updateViaCache: 'none' })
+    .catch(() => {});
 }
 
 boot();
