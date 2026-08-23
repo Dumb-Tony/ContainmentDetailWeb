@@ -139,16 +139,36 @@ function instrumentCheck() {
    * measure the same span with `performance.now()`. The optimiser cannot elide a loop whose
    * condition reads the wall clock, and the thing being compared is the thing in question.
    */
+  /**
+   * ⚠ AND THEN THE CLOCK-SPIN HUNG THE WHOLE HARNESS FOR FIFTY-TWO MINUTES.
+   *
+   * `while (Date.now() - d0 < TARGET_MS)` has no bound but the clock, and under
+   * `--virtual-time-budget` the clock is not a thing that advances on its own: virtual time
+   * moves when the task queue drains, and a synchronous busy-wait is precisely a task that
+   * never drains. Three consecutive runs produced NO OUTPUT AT ALL — not a failure line, not
+   * a partial `emit()`, nothing — because the page never reached the first `say()`. One of
+   * them was killed after 3,134 seconds and reported "the page crashed, or the dump raced
+   * it", which is the harness's guess and was wrong in both halves.
+   *
+   * So the loop is bounded by BOTH: the clock target, and an iteration cap far above what
+   * 40 ms costs on any machine that could run this game. Whichever ends it is reported, and
+   * `endedOn === 'cap'` with a zero `dateMs` is not a hang and not a mystery — it is the
+   * clock saying it is frozen, which the guard below already knows how to refuse.
+   *
+   * A measurement instrument that can hang is worse than one that can lie, because a lie
+   * shows up in the output and a hang looks like a slow machine.
+   */
   const TARGET_MS = 40;
+  const SPIN_CAP = 2e8;
   const d0 = Date.now();
   const p0 = performance.now();
   let spins = 0;
   let acc = 0;
-  while (Date.now() - d0 < TARGET_MS) { spins++; acc += Math.sqrt(spins); }
+  while (Date.now() - d0 < TARGET_MS && spins < SPIN_CAP) { spins++; acc += Math.sqrt(spins); }
   const dateMs = Date.now() - d0;
   const perfMs = performance.now() - p0;
   SINK += acc;
-  return { perfMs, dateMs, first: perfMs, best: perfMs, spins };
+  return { perfMs, dateMs, first: perfMs, best: perfMs, spins, endedOn: spins >= SPIN_CAP ? 'cap' : 'clock' };
 }
 
 /* ── B. the measurement primitive ────────────────────────────────────────────── */
@@ -559,6 +579,29 @@ function emit(tail = '') {
     + '\n==CDBENCH-END==\n==CDBENCH-DATA==\n' + data.join('\n') + '\n==CDBENCH-DATA-END==\n';
 }
 
+/**
+ * ⚠ AND POST IT, because the DOM is not a channel a benchmark can use.
+ *
+ * `--dump-dom` fires when the page settles and takes whatever is in the DOM at that moment,
+ * so a run that is still going loses everything — measured, three times, as "No benchmark
+ * output found", once after fifty-two minutes. `--virtual-time-budget` fixed that by making
+ * the dump wait, and cost the clocks: under it neither `Date.now()` nor `performance.now()`
+ * advances during a synchronous task, so every span this file times reads zero. A benchmark
+ * cannot use the mechanism that makes the dump wait, and cannot survive the dump without it.
+ *
+ * So the page tells the server when it is finished. `tools/serve.ps1` writes the body to
+ * `_result-<port>.txt` and `tools/bench.ps1` waits for the file. Failures are posted too —
+ * an aborted run that says why is worth more than a browser that exits quietly.
+ */
+function post(final) {
+  if (!final) return;
+  try {
+    navigator.sendBeacon(`/__result?slot=${location.port || 0}`, new Blob([out.textContent], { type: 'text/plain' }));
+  } catch {
+    fetch(`/__result?slot=${location.port || 0}`, { method: 'POST', body: out.textContent }).catch(() => {});
+  }
+}
+
 /* ── the run ─────────────────────────────────────────────────────────────────── */
 
 async function run() {
@@ -568,7 +611,8 @@ async function run() {
   say('--- A. the instrument ---');
   say(`  performance.now() quantum      ${fmt(q * 1000, 9)} us   (${q >= 0.05 ? 'CLAMPED — batching is mandatory' : 'fine grained'})`);
   say(`  clock cross-check: ${chk.spins.toLocaleString()} spins over ${chk.dateMs} ms of wall clock, `
-    + `${chk.perfMs.toFixed(1)} ms of performance.now() — ${(100 * Math.abs(chk.perfMs - chk.dateMs) / chk.dateMs).toFixed(1)}% apart`);
+    + `${chk.perfMs.toFixed(1)} ms of performance.now() — ${(100 * Math.abs(chk.perfMs - chk.dateMs) / (chk.dateMs || 1)).toFixed(1)}% apart`
+    + `  (ended on the ${chk.endedOn})`);
   data.push(`machine|reference-loop|${chk.best.toFixed(3)}|${chk.best.toFixed(3)}`);
   say(`  hardwareConcurrency ${navigator.hardwareConcurrency}   devicePixelRatio ${window.devicePixelRatio}   viewport ${window.innerWidth}x${window.innerHeight}`);
   const frozen = chk.perfMs <= 0 || chk.dateMs <= 0 || Math.abs(chk.perfMs - chk.dateMs) > 0.25 * chk.dateMs + 5;
@@ -577,6 +621,7 @@ async function run() {
     say('  INSTRUMENT FAILED — performance.now() disagrees with the wall clock. Refusing to');
     say('  report timings. Run without --virtual-time-budget and check the Chrome version.');
     emit('INSTRUMENT FAILED');
+    post(true);
     return;
   }
   say('  clocks agree — timings below are wall clock.');
@@ -826,6 +871,7 @@ async function run() {
   say('  not zero, and expect it to stop being zero on a machine much faster than this one.');
   say(`  sink ${SINK.toFixed(3)}   (printed so the optimiser cannot delete the work above)`);
   emit(`BENCH-COMPLETE  ${data.length} measurements`);
+  post(true);
 }
 
 try {
@@ -834,4 +880,5 @@ try {
   say('');
   say(`BENCH ABORTED: ${e && e.stack ? e.stack : e}`);
   emit('BENCH ABORTED');
+  post(true);
 }

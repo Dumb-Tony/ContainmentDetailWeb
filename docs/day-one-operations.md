@@ -99,6 +99,15 @@ and it currently is not. Until that is fixed, a crash report from production nam
 commit, and an operator who believes it will bisect against a tree that has nothing to do
 with the fault.
 
+**Closed the same day, and not by remembering to run the script.** `verify-live.ps1` now
+reads the served `cd-build` back and refuses to report a match if any served file has
+changed since the commit it names. That is the gate the link is posted through, so a stale
+stamp can no longer reach production quietly: it fails the check that was already being run,
+rather than needing a new step somebody has to remember. Note the scope — EVERY served file,
+not the ones the commit touched, because scoped to the changed set it would have said yes to
+the whole eight-commit drift, `index.html` being absent from that set for exactly the reason
+it was stale.
+
 The two measurements are the point rather than the numbers: **whatever the stamp says today,
 check it against `verify-live.ps1` before you act on it.**
 
@@ -303,10 +312,10 @@ Ordered by how much they will cost on day one.
 1. **A rolled-back player is told nothing.** `Progression.migration` carries the
    explanation and no UI module reads it. One paragraph on the base screen closes it. Owner:
    UI. Measured by `audit-tests.js` section G.
-2. **The build stamp is stale in production.** Live bytes are `81cb4f9`; the stamp says
-   `0e4a0aa`. Every crash report from the live site currently names the wrong commit. Fix
-   is to run `stamp-build.ps1` before each shipping commit — or better, to make the pre-push
-   step fail if the stamp does not name the commit being pushed. Owner: tooling.
+2. ~~**The build stamp is stale in production.**~~ **CLOSED.** It was: live bytes `81cb4f9`,
+   stamp `0e4a0aa`, every crash report naming the wrong commit. Fixed the way this entry
+   asked for — the check that gates the link now fails on it, rather than a step somebody
+   has to remember. `verify-live.ps1` `Test-ServedStamp`.
 3. **The quarantine slot is not durable.** One slot, newest wins, and nothing exports it.
    A player who hits a second bad load loses the rescue. Owner: progression.
 4. **`stamp-build.ps1 -Check` is expected to fail in the steady state.** Not a defect, but

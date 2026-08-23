@@ -48,6 +48,36 @@ while ($listener.IsListening) {
     $ctx  = $listener.GetContext()
     $path = [System.Uri]::UnescapeDataString($ctx.Request.Url.AbsolutePath.TrimStart('/'))
     if ($path -eq '') { $path = 'index.html' }
+
+    # ⚠ ONE WRITE ENDPOINT, FOR INSTRUMENTS THAT OUTLIVE THE LOAD EVENT.
+    #
+    # `--dump-dom` fires when the page settles, so anything still running loses its output —
+    # which is what `--virtual-time-budget` was papering over, by making the dump wait. That
+    # trade is unavailable to a BENCHMARK: under virtual time neither `Date.now()` nor
+    # `performance.now()` advances during a synchronous task, measured here at 200,000,000
+    # spins across 0 ms on both clocks, so every span a benchmark could time reads zero.
+    #
+    # So a long instrument runs in real time with no dump at all and POSTs its text here;
+    # the runner polls for the file and then stops the browser. The name is fixed and the
+    # body is written verbatim: no path comes from the request, so this cannot be made to
+    # write anywhere else. It is a localhost dev server for a single-player browser game and
+    # this is the only route by which a page may write to disk.
+    if ($ctx.Request.HttpMethod -eq 'POST' -and $path -eq '__result') {
+      # ⚠ UTF-8, STATED, NOT `$ctx.Request.ContentEncoding`. `sendBeacon` sends
+      # `text/plain;charset=UTF-8` and HttpListener still handed back a codepage that turned
+      # every em-dash in the report into `?"`. Both ends here are ours and both are UTF-8;
+      # getting one of them right is how you produce mojibake rather than avoid it.
+      $reader = New-Object System.IO.StreamReader($ctx.Request.InputStream, [System.Text.Encoding]::UTF8)
+      $body = $reader.ReadToEnd()
+      $reader.Close()
+      $slot = $ctx.Request.QueryString['slot']
+      if ($slot -notmatch '^[0-9]{1,6}$') { $slot = '0' }
+      [System.IO.File]::WriteAllText((Join-Path $root "_result-$slot.txt"), $body,
+        (New-Object System.Text.UTF8Encoding $false))
+      $ctx.Response.StatusCode = 204
+      $ctx.Response.Close()
+      continue
+    }
     $file = Join-Path $root $path
     if ((Test-Path $file -PathType Leaf) -and ((Resolve-Path $file).Path.StartsWith($root))) {
       $bytes = [System.IO.File]::ReadAllBytes($file)

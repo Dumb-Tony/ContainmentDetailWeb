@@ -44,7 +44,13 @@ param(
   [int]$Port     = 8451,
   [int]$Runs     = 2,
   [switch]$RealTime,
-  [switch]$Keep
+  [switch]$Keep,
+  # Go back to --dump-dom + virtual time. Kept so the failure is reproducible rather than
+  # only described: with it, the instrument check reports 200,000,000 spins across 0 ms.
+  [switch]$UseDump,
+  # How long to wait for the page to POST its result. Nine incidents at two squad sizes,
+  # twice over for the fence comparison, plus the render passes.
+  [int]$WaitSeconds = 420
 )
 $ErrorActionPreference = "Stop"
 $root = Split-Path $PSScriptRoot -Parent
@@ -104,19 +110,45 @@ for ($run = 1; $run -le $Runs; $run++) {
   $chromeArgs = @(
     "--headless=new","--no-first-run","--no-default-browser-check",
     "--user-data-dir=$profileDir","--window-size=1280,720",
-    "--autoplay-policy=no-user-gesture-required","--dump-dom"
+    "--autoplay-policy=no-user-gesture-required"
   )
-  if (-not $RealTime) { $chromeArgs += "--virtual-time-budget=900000" }
+  if ($UseDump) {
+    $chromeArgs += "--dump-dom"
+    if (-not $RealTime) { $chromeArgs += "--virtual-time-budget=900000" }
+  }
   $chromeArgs += $url
 
-  $sw = [System.Diagnostics.Stopwatch]::StartNew()
-  Start-Process $chrome -ArgumentList $chromeArgs -RedirectStandardOutput $domFile -NoNewWindow -Wait | Out-Null
-  $sw.Stop()
-  try { Remove-Item -Recurse -Force $profileDir -ErrorAction Stop } catch {}
+  $slotFile = Join-Path $root "_result-$($srv.Port).txt"
+  if (Test-Path $slotFile) { Remove-Item $slotFile -Force }
 
+  $sw = [System.Diagnostics.Stopwatch]::StartNew()
   $text = ""
-  if (Test-Path $domFile) { $text = Get-Content $domFile -Raw -Encoding UTF8 }
-  try { Remove-Item $domFile -Force -ErrorAction Stop } catch {}
+  if ($UseDump) {
+    Start-Process $chrome -ArgumentList $chromeArgs -RedirectStandardOutput $domFile -NoNewWindow -Wait | Out-Null
+    $sw.Stop()
+    if (Test-Path $domFile) { $text = Get-Content $domFile -Raw -Encoding UTF8 }
+    try { Remove-Item $domFile -Force -ErrorAction Stop } catch {}
+  } else {
+    # ⚠ NO --dump-dom AND NO VIRTUAL TIME. See the header: the dump fires when the page
+    # settles and takes the output of anything still running, and virtual time -- which was
+    # what made the dump wait -- freezes BOTH clocks during a synchronous task, so a
+    # benchmark under it measures nothing but zeroes. The page POSTs its own result to the
+    # dev server instead and this waits for the file, which is the only arrangement in which
+    # the browser is neither racing the measurement nor being asked to stop for it.
+    $proc = Start-Process $chrome -ArgumentList $chromeArgs -NoNewWindow -PassThru
+    $deadline = (Get-Date).AddSeconds($WaitSeconds)
+    while (-not (Test-Path $slotFile) -and (Get-Date) -lt $deadline -and -not $proc.HasExited) {
+      Start-Sleep -Milliseconds 400
+    }
+    $sw.Stop()
+    if (Test-Path $slotFile) {
+      Start-Sleep -Milliseconds 200          # the write is not atomic; let it land
+      $text = Get-Content $slotFile -Raw -Encoding UTF8
+      try { Remove-Item $slotFile -Force -ErrorAction Stop } catch {}
+    }
+    if (-not $proc.HasExited) { try { Stop-Process -Id $proc.Id -Force } catch {} }
+  }
+  try { Remove-Item -Recurse -Force $profileDir -ErrorAction Stop } catch {}
   if (-not $text) { $text = "" }
 
   Write-Host ""

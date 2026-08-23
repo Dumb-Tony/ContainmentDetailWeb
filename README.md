@@ -553,10 +553,36 @@ microphone with no screen, and every anomaly's body on the thermal layer alone, 
 `tools/bench.ps1` is the other half, because the suite asserts *work* — how many occluder
 sweeps, how many samples — and says nothing about milliseconds. It replaces `main.js` so
 nothing competes for the CPU being measured, keeps the real GPU adapter, and runs the whole
-thing twice to print the spread. Measured on all seven incidents with five operatives, the
-most expensive frame is Flat 5 at **4.596 ms of a 16.67 ms frame** — 27.6%, p95 5.883,
-worst 6.531, 3.6× headroom at the median. Every sampled frame fits. That is §23's Milestone
-3 performance gate, as a number rather than a claim.
+thing twice to print the spread. Measured on all **nine** incidents with five operatives, the
+most expensive frame is Flat 5 at **3.472 ms of a 16.67 ms frame** — 20.8%, p95 4.694,
+worst 6.149, **4.8× headroom** at the median. Every sampled frame fits, on every incident.
+That is §23's Milestone 3 performance gate, as a number rather than a claim.
+
+Twice over, because a benchmark that is not reproducible is not evidence: the two runs put
+Flat 5 at 3.270 and 3.472 ms and agree to **5.9% mean spread** across 307 measurements. The
+worst spread is 50%, on `blocksPath` at one operative — 1.3 µs against 2.0 — which is a
+figure a 0.1 µs clock cannot hold to better than that, and the harness prints how many
+samples were thin rather than quietly rounding them.
+
+Getting that number back took fixing the harness, and the failure is worth recording because
+it looked like nothing. The instrument check busy-waited until `Date.now()` had advanced 40
+ms — a loop the optimiser cannot elide, which was the point — with no bound but the clock.
+Under `--virtual-time-budget` the clock is not a thing that advances on its own: virtual time
+moves when the task queue drains, and a synchronous busy-wait is exactly a task that never
+drains. Three runs produced no output at all, one of them after **fifty-two minutes**, and
+the harness's own guess was "the page crashed, or the dump raced it" — wrong in both halves.
+
+Bounded, it terminates in nine seconds and prints the real problem: **200,000,000 spins
+across 0 ms of `Date.now()` and 0.0 ms of `performance.now()`.** Virtual time freezes both
+clocks through a synchronous task in this Chrome, so every span a benchmark can time reads
+zero. But virtual time was the thing making `--dump-dom` wait — without it the dump fires
+while the run is still going and takes an empty page.
+
+So the benchmark no longer uses the DOM as a channel. It runs in real time and **POSTs its
+own result** to a single write endpoint in `serve.ps1`, which writes it to `_result-<port>.txt`;
+`bench.ps1` waits for the file and then stops the browser. Neither racing the measurement nor
+freezing it. A measurement instrument that can hang is worse than one that can lie — a lie
+shows up in the output, and a hang looks like a slow machine.
 
 `tools/shot.ps1 -Setup tools/_shot-fence.js -Out docs/m0-fence.png` poses a scene and
 photographs it. `tools/verify-live.ps1` asks whether GitHub Pages is actually serving the

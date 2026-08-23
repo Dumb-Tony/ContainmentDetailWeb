@@ -117,7 +117,13 @@ paraphrased one would be making a different claim.
 `audit-tests.js` F22–F25 assert the five documents exist, that each has a title, a summary
 and sections, that every section is a heading over plain-text paragraphs or bullets, and
 that none of them contains markup — a stray tag in a privacy statement is either broken text
-or a hole, depending on where the text came from. What remains is a screen that renders them.
+or a hole, depending on where the text came from.
+
+✅ **Closed.** The Archive room renders them: an index of five documents with summaries, and
+a page per document. The screen contains no prose of its own — five furniture keys, asserted
+exactly — and `i18n-tests.js` J4 asserts all 61 paragraphs and bullets across all five
+documents reach it. The room comes from `notices.room`, so moving the documents is a content
+edit rather than a code change.
 
 ### 8. ⚠ PeerJS carries no copyright notice, and none has been invented
 
@@ -172,8 +178,12 @@ the player-facing privacy page names all four, and `audit-tests.js` F27–F29 as
 three ICE hosts are in the library, that `PEER_OPTS` does not override them, and that the
 privacy page names them — so the claim cannot quietly revert to the tidier version.
 
-⚠ **`README.md` still carries the old sentence.** It is outside this pass's ownership and is
-recorded here rather than fixed.
+✅ **Closed.** `README.md` and `src/main.js` both carried it and both are corrected. The
+README keeps the wrong sentence visible next to the right one, because the reason it was
+wrong is the finding: the one host is the only one *this repository's own code* names, and
+every check was pointed at this repository's own code. `src/main.js` had stated a true claim
+about `telemetry.js` — that nothing in it can reach the network — *because* of the false
+count, which is how a true sentence gets retired along with a false one.
 
 ### 10. ⚠ Other players' typed callsigns are written to the host's disk
 
