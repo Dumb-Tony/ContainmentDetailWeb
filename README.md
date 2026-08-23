@@ -479,6 +479,39 @@ powershell -ExecutionPolicy Bypass -File tools/serve.ps1
 It scans ports 8401–8410 and prints the one it got. Read that line — several projects on
 this machine run the same server.
 
+## Offline, without ever serving a stale build
+
+The deployed page installs and plays with no network. That is normally in tension with
+push-is-the-deploy, and the tension is the whole design: the usual recipe,
+`caches.match(request).then(hit => hit || fetch(request))`, would end this repo's deploy
+model with no red light anywhere. `tools/verify-live.ps1` would keep passing, because the URL
+genuinely *is* serving the new commit — and a returning player would keep yesterday's build
+for ever, because their browser never asks. The only person who could see it is the one who
+cannot report it.
+
+So the worker is **network-first in every case**. Every GET goes to the network, and if the
+origin answers at all — 200, 304, even 404 — those bytes go to the page and the cache is not
+consulted. The cache is read in exactly two situations: `fetch` rejected, or the origin
+returned 5xx. Neither is a case where a fresher build exists and the player is being denied
+it. The property worth stating plainly is that **this worker cannot make a page staler than
+no worker at all.**
+
+One cache per build, named for the `cd-build` stamp, with a completion sentinel written
+*last* — so two builds never mix, and a half-written cache is never read from. `sw.js` is
+byte-identical across deploys and the build id is data, so a new build raises no waiting
+worker and no "new version available" prompt. The update is invisible.
+
+Measured on the live site, 2026-08-23, by opening the deployed URL and reading
+`caches.keys()`: `cd-build-f235436-2026-08-23T15-13-53-04-00`, holding **74 files and the
+`__cd-complete` sentinel** — 40 under `src/`, 26 under `content/`, 6 assets, `index.html`,
+`manifest.webmanifest`, three.js and PeerJS both in, and `sw.js` itself correctly absent.
+Exactly the 74 the platform suite derives from the module graph rather than from a list.
+
+Worth knowing if you go looking: the worker does **not** register over `http://localhost` in
+every browser context, and `main.js` swallows the failure by design, so a page that never
+goes offline looks exactly like one that does. The deployed URL is the only place the answer
+is real.
+
 ## Tests
 
 The harness is a browser, because the thing under test needs one: WebGL, `AudioContext`,

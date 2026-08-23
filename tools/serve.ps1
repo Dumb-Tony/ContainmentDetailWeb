@@ -101,12 +101,19 @@ while ($listener.IsListening) {
       # comment claiming a cause it does not have is the thing this file keeps finding
       # elsewhere.
       #
-      # What that leaves open is recorded rather than papered over: NOTHING IN THIS BUILD
-      # VERIFIES THAT A REAL SERVICE WORKER REGISTERS. `tools/platform-tests.js` drives
-      # `sw.js`'s logic against an in-memory CacheStorage, deliberately and for reasons its
-      # own header measures; the browser pane cannot register one at all; and `main.js`
-      # swallows the failure by design, so a page that never goes offline looks exactly like
-      # one that does.
+      # ⚠ AND THE PANE BLOCKS IT ON `http://localhost` ONLY. Measured on the LIVE HTTPS
+      # origin immediately after: the worker registers, activates, claims the page, and on
+      # the next navigation writes `cd-build-f235436-2026-08-23T15-13-53-04-00` holding 74
+      # files and the `__cd-complete` sentinel — 40 under `src/`, 26 under `content/`, 6
+      # assets, `index.html`, `manifest.webmanifest`, three.js and peerjs both in, `sw.js`
+      # itself correctly absent. Exactly the 74 `tools/platform-tests.js` derives.
+      #
+      # So the offline layer IS verified end to end, on the deployed site, and the sentence
+      # that stood here saying otherwise was written from a localhost failure that turns out
+      # to be about the pane and not about the build. What remains true is narrower and worth
+      # keeping: the failure is swallowed by design in `main.js`, so a page that never goes
+      # offline still looks exactly like one that does — the only way to know is to open the
+      # deployed URL and look at `caches.keys()`.
       $noStore = $ext -notin @(".html", ".htm") -and $path -ne "sw.js"
       $ctx.Response.Headers.Add("Cache-Control", $(if ($noStore) { "no-store" } else { "no-cache, must-revalidate" }))
       $ctx.Response.ContentLength64 = $bytes.Length
