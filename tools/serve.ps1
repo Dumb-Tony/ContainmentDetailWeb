@@ -83,8 +83,32 @@ while ($listener.IsListening) {
       $bytes = [System.IO.File]::ReadAllBytes($file)
       $ext = [System.IO.Path]::GetExtension($file).ToLower()
       $ctx.Response.ContentType = if ($mime[$ext]) { $mime[$ext] } else { "application/octet-stream" }
-      # no-store: a cached module during a test run is a false green
-      $ctx.Response.Headers.Add("Cache-Control", "no-store")
+      # ⚠ THE DOCUMENT AND `sw.js` ARE `no-cache`; EVERYTHING ELSE IS STILL `no-store`.
+      #
+      # `no-store` on a DOCUMENT is a documented obstacle to registering a service worker for
+      # it, and `no-cache` keeps the property the original comment wanted: the browser must
+      # revalidate before use, and this server answers every conditional with a fresh 200, so
+      # a test run cannot be handed a stale document. Modules and content keep `no-store`,
+      # where a cached copy during a run is a false green.
+      #
+      # ⚠ AND IT IS NOT WHY REGISTRATION FAILS IN THE BROWSER PANE, which is what this was
+      # changed for. Measured after the change: a TWO-LINE worker
+      # (`self.addEventListener("install", () => {})`), served 200 as text/javascript from
+      # this server, fails with the identical "An unknown error occurred when fetching the
+      # script". The pane blocks registration; the headers were not the cause and the fix
+      # above fixed nothing. It is kept because the obstacle is real for anyone running this
+      # server in an ordinary Chrome — but the diagnosis that produced it was wrong, and a
+      # comment claiming a cause it does not have is the thing this file keeps finding
+      # elsewhere.
+      #
+      # What that leaves open is recorded rather than papered over: NOTHING IN THIS BUILD
+      # VERIFIES THAT A REAL SERVICE WORKER REGISTERS. `tools/platform-tests.js` drives
+      # `sw.js`'s logic against an in-memory CacheStorage, deliberately and for reasons its
+      # own header measures; the browser pane cannot register one at all; and `main.js`
+      # swallows the failure by design, so a page that never goes offline looks exactly like
+      # one that does.
+      $noStore = $ext -notin @(".html", ".htm") -and $path -ne "sw.js"
+      $ctx.Response.Headers.Add("Cache-Control", $(if ($noStore) { "no-store" } else { "no-cache, must-revalidate" }))
       $ctx.Response.ContentLength64 = $bytes.Length
       $ctx.Response.OutputStream.Write($bytes, 0, $bytes.Length)
     } else {
