@@ -26,7 +26,9 @@ import { Progression, loadSite } from './sim/progression.js';
 import { escapeHtml } from './ui/hud.js';
 import { dist } from './sim/geometry.js';
 import { CONFIG } from './config.js';
-import { installCrashBoundary } from './core/crash.js';
+import { installCrashBoundary, buildId } from './core/crash.js';
+import { sessionRecord, sessionRecordText } from './sim/telemetry.js';
+import { locale } from './core/i18n.js';
 
 const CONFIG_NET_HZ = CONFIG.net.snapshotHz;
 
@@ -454,6 +456,18 @@ async function boot() {
   window.__CD = { game, renderer, hud, panels, audio, input, content, mixFor, net, ROLE, ACT,
     commsWheel, lobby,
     settings, settingsPanel, base, progression, site,
+    /**
+     * §21's session record, for the external balance and onboarding tests §23 Milestone 5
+     * asks for. `__CD.sessionRecord()` returns the object; `__CD.sessionRecordText()`
+     * returns it as something a facilitator can copy out of the console at the end of a run.
+     *
+     * ⚠ IT IS PULLED AND NEVER PUSHED. Nothing in `sim/telemetry.js` can reach the network —
+     * the suite greps it for `fetch`, a beacon, a socket and a hostname — because this build
+     * contacts exactly one host, the signalling broker, and `assets/lib/NOTICE.md` says so.
+     * Handing the record to somebody is a decision a person makes, once, out loud.
+     */
+    sessionRecord: () => sessionRecord(game, { build: buildId(), locale: locale() }),
+    sessionRecordText: () => sessionRecordText(game, { build: buildId(), locale: locale() }),
     get paused() { return game.clock.paused; } };
   window.dispatchEvent(new CustomEvent('cd-ready', { detail: window.__CD }));
 }
