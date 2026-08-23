@@ -388,6 +388,15 @@ compatible if the *primary* channel is the one that needs neither, so what exist
 ping-and-phrase wheel on `Z`: ten phrases the loop actually requires — *it is here*, *hold,
 ## The lobby, and what it is honest about
 
+Verified on the deployed build, 2026-08-23, in two browsers against the real broker: the
+host opens room **A88QJ** and reports *"room A88QJ — waiting"*; a second machine joins by
+code, is issued seat **p2**, and its typed callsign appears on the host's roster as
+*"Vasquez joined"*; the client then holds the host's authoritative positions for both
+operatives, which is a full snapshot having crossed the wire. On leave, the host's roster
+drops back to one seat and the room closes. That is the whole join path — broker, WebRTC,
+seat allocation, callsign, snapshot, teardown — on the URL at the top of this file rather
+than on a loopback.
+
 Host a room and share a five-character code, a **room name** your squad already agreed on, or
 put it on a **shared list** so a stranger can find you. There is no game server — the
 transport is the public PeerJS broker — so each of the three ships with its own limits
