@@ -164,12 +164,13 @@
   },
 
   "grade": {
-    "_note": "§6.4's five overall words. AN ID AND A LABEL, exactly like `phase`: `grade()` returns one of these strings, ui/base.js maps it onto a CSS pill class, and a saved profile has an operation history written in them. Localising the value would break the pill and rewrite the archive; this is the label beside it.",
+    "_note": "§6.4's five overall words. AN ID AND A LABEL, exactly like `phase`: `grade()` returns one of these strings, ui/base.js maps it onto a CSS pill class, and a saved profile has an operation history written in them. Localising the value would break the pill and rewrite the archive; this is the label beside it.\n\n⚠ `Unassessed` IS THE SIXTH WORD AND IT WAS NOT HERE. It is not on §6.4's ladder — `grade()` never returns it — but `applyDebrief`, `earningsFor` and `sanitiseHistory` all write it as the fallback when a result carries no overall word, so a history row from a hand-edited save, or from an operation closed without a grade, reached `gradeLabel('Unassessed')` and printed the string `grade.Unassessed` into the archive. A ladder word and a no-word-recorded marker are different things; both have to be sayable.",
     "Exemplary": "Exemplary",
     "Controlled": "Controlled",
     "Costly": "Costly",
     "Compromised": "Compromised",
-    "Failed": "Failed"
+    "Failed": "Failed",
+    "Unassessed": "Unassessed"
   },
 
   "tablet": {
@@ -418,6 +419,8 @@
       "requisitionHead": "Requisition",
       "priceNote": "Price is the department's rate at your current standing. Research-data costs do not move with standing — analysis is analysis.",
       "rate": "{tier} rate",
+      "gain": "+{axis}",
+      "loss": "−{axis}",
       "researchCost": "{count}R",
       "held": "held",
       "order": "Order",
@@ -469,9 +472,31 @@
         "one": "{count} operation",
         "other": "{count} operations"
       },
-      "caseNotes": "{filed} of {total} case notes filed.",
-      "attributionHead": "Attribution",
-      "attribution": "Designations are provisional until a licensing record exists — GDD §25.3. Nothing in this build prints a number it has not earned the right to print."
+      "caseNotes": "{filed} of {total} case notes filed."
+    },
+
+    "notices": {
+      "_note": "GDD §25.4's in-game notices — credits, attribution and licensing, privacy, terms of use and support — as a reader over content/site.json's `notices` block.\n\n§25.4 asks that attribution be REACHABLE rather than buried in end credits. The archive room has listed \"Read the attribution and licensing record\" among its affordances since the site file was written, and nothing rendered it: docs/licensing-audit.md finding 7. A menu item naming a document the game does not contain is a §18.1 problem as much as a §25 one.\n\n⚠ THERE IS NO PROSE HERE AND THERE MUST NOT BE. Every word of every document is content — an ordered `notices.documents` array of `{ id, title, summary, sections[] }`, each section `{ heading, body[], bullets[] }` — and the site file says why: these are legal and privacy statements whose exact wording is the point, and a locale that paraphrased one would be making a different claim. What is keyed below is five pieces of furniture: the heading, the control that opens a document, the control that comes back, the empty state, and the revision line. If a sixth sentence ever wants to live here, it belongs in the site file instead.\n\nTHE ROOM IS CONTENT TOO. `notices.room` names which room the documents hang off, so moving them is a content edit and not a code edit.",
+      "head": "Notices",
+      "open": "Read",
+      "back": "Back",
+      "empty": "The site file carries no notices.",
+      "revision": "Revision {revision} · {updated}"
+    },
+
+    "migration": {
+      "_note": "What happened to the saved profile, said to the person it happened to. `Progression.migration` is `{outcome, fromVersion, dropped[], notices[], preservedAs}` and the NOTICES are already whole sentences written for a player (see the `save` block); this is the frame around them.\n\n⚠ IT IS THE ONE THING A PLAYER CAN LOSE AND LOSING IT WAS SILENT. A profile could be upgraded, quarantined or repaired and nothing said so — a fresh profile shown to somebody who had thirty operations is the largest misrepresentation §18.1 forbids.\n\n⚠ `dropped[]` IS NOT PRINTED AND MUST NOT BE. Its `why` strings are developer diagnostics — \"is not a finite number\", \"is a duplicate id\" — written for whoever reads the report object, not for a player, and putting them on a translated screen would be untranslated engine prose inside it. The player gets the outcome, the sentences, and where an unreadable save was put.",
+      "head": "Your saved profile",
+      "outcome": {
+        "fresh": "There was no profile to load, so this session started a new one.",
+        "loaded": "This profile loaded from this browser.",
+        "upgraded": "This profile was written by an older build and was brought forward as it loaded.",
+        "repaired": "Part of this profile could not be read and was repaired as it loaded.",
+        "refused": "This profile was not loaded, and it was not changed."
+      },
+      "fromVersion": "Save format {from}; this build reads {to}.",
+      "preserved": "The original is still in this browser, under {key}.",
+      "dismiss": "Understood"
     },
     "research": {
       "dataHead": "Research data",
@@ -551,6 +576,301 @@
       "short": "Requisition short",
       "built": "built",
       "build": "Build"
+    }
+  },
+
+  "campaign": {
+    "_note": "GDD §12 — the campaign model's own vocabulary, and every sentence src/sim/progression.js says out loud.\n\n⚠ THESE ARE NOT CONTENT, AND THAT IS THE DISTINCTION THE PSEUDOLOCALE MAKES VISIBLE. content/site.json's rooms, facility upgrades, cell labels and dossier designations are authored data and are interpolated — a site that shipped with different rooms needs no line of this file. But the six departments, the eleven equipment sidegrades, the four clearance tiers, the five standing tiers, the three injuries and the two treatments are TABLES IN THE JAVASCRIPT, spelled into src/sim/progression.js and shipped with the engine. Left alone they are English inside every accented line on the armory, the standing block and the isolation bench, which is exactly what `Latent` and `Arrival` were on the HUD.\n\n⚠ THE IDS STAY THE IDS. `research`, `imager-mast`, `strain`, `range`, `observation-rest` are compared against, saved into a profile, and validated by `validateSidegrades()`; localising the value would break every one of those. Each is an id with a label beside it — the same split `phase`, `pressure` and `grade` make, and the reason the keys below are the ids verbatim, spaces and hyphens and all.\n\n⚠ `department.*.values` AND `.watches` ARE AUTHORED IN LOWER CASE ON PURPOSE. They are read mid-sentence by `base.standing.watches`, and the panel used to call `.toLowerCase()` on them — which is a LOCALE operation performed by the engine, and wrong in German the moment a noun is involved. The locale authors the case the sentence needs.",
+
+    "resource": {
+      "_note": "§12.2's four, and no more. `what` is the tooltip on the ledger bar; `name` is the resource's own word.",
+      "requisition": {
+        "name": "Requisition",
+        "what": "Routine equipment, consumables, repairs and facility improvements."
+      },
+      "research": {
+        "name": "Research data",
+        "what": "Verified evidence and samples, spent on analytical unlocks and prototypes."
+      },
+      "standing": {
+        "name": "Department standing",
+        "what": "Earned by behaviour a department values. Changes what things cost you, never whether you may have them."
+      },
+      "clearance": {
+        "name": "Clearance",
+        "what": "Milestone access to rooms, operations and institutional authority. It cannot be bought."
+      }
+    },
+
+    "department": {
+      "_note": "§12.3's six. `values` and `watches` are what the standing block prints so a player can read WHY Logistics is unhappy instead of guessing at a hidden meter; `rewards` is the GDD table's third column.",
+      "research": {
+        "name": "Research",
+        "rewards": "Better analysis, experimental sensors",
+        "values": "high-integrity evidence and samples",
+        "watches": "evidence quality, research completion, rules read correctly"
+      },
+      "engineering": {
+        "name": "Engineering",
+        "rewards": "Modular tools, lighter equipment",
+        "values": "device recovery and field telemetry",
+        "watches": "infrastructure damage, equipment stewardship, circuits restored"
+      },
+      "medical": {
+        "name": "Medical",
+        "rewards": "Treatment and exposure countermeasures",
+        "values": "personnel and civilian survival",
+        "watches": "personnel survival, casualties recovered, field treatment"
+      },
+      "security": {
+        "name": "Security",
+        "rewards": "Defensive equipment and transport armour",
+        "values": "controlled threat response",
+        "watches": "containment integrity, contacts taken, squad conduct"
+      },
+      "ethics": {
+        "name": "Ethics Committee",
+        "rewards": "Intelligence, waivers, public-risk tools",
+        "values": "proportional force and civilian care",
+        "watches": "civilian outcome, secrecy, aborting rather than pressing on"
+      },
+      "logistics": {
+        "name": "Logistics",
+        "rewards": "Cargo, maintenance, deployment options",
+        "values": "equipment stewardship and efficient operations",
+        "watches": "equipment stewardship, time to stabilisation"
+      }
+    },
+
+    "standingTier": {
+      "_note": "§12.3's five price bands. A band is a PRICE and never a door — at -20 every counter still sells — so nothing here is phrased as a refusal.",
+      "Obstructive": { "name": "Obstructive", "note": "Every request goes through review." },
+      "Cool": { "name": "Cool", "note": "Requests are honoured, slowly." },
+      "Working": { "name": "Working", "note": "Standard institutional rate." },
+      "Trusted": { "name": "Trusted", "note": "Your requests skip the queue." },
+      "Sponsor": { "name": "Sponsor", "note": "They are funding you on purpose." }
+    },
+
+    "clearance": {
+      "_note": "§12.1's four milestone tiers, keyed on the LEVEL, which is the id: `clearanceTier(2)` is what the code asks for and the number is what a profile derives. `grants` is the tier's own sentence about what it opens.",
+      "0": {
+        "name": "Provisional",
+        "grants": "Operations room and the logistics counter. Nothing else is signed off yet."
+      },
+      "1": {
+        "name": "Level 1 — Site",
+        "grants": "Archive terminal, research station, and the containment observation corridor."
+      },
+      "2": {
+        "name": "Level 2 — Regional",
+        "grants": "Specialised storage and perimeter monitoring may be requisitioned."
+      },
+      "3": {
+        "name": "Level 3 — Sector",
+        "grants": "Prototype requests, and contracts the region does not advertise."
+      }
+    },
+
+    "axis": {
+      "_note": "§12.4's eight sidegrade axes. ⚠ THE KEY IS THE AXIS STRING VERBATIM, spaces included, because that string is the id: `validateSidegrades()` fails the build on an upgrade naming an axis that is not one of these eight, and the armory prints the label beside the gain or the loss.",
+      "range": "range",
+      "precision": "precision",
+      "portability": "portability",
+      "battery endurance": "battery endurance",
+      "durability": "durability",
+      "remote operation": "remote operation",
+      "environmental resistance": "environmental resistance",
+      "data logging": "data logging"
+    },
+
+    "upgrade": {
+      "_note": "§12.4's eleven equipment sidegrades. Every one names at least one gain and at least one loss, which `validateSidegrades()` enforces — so a blurb that only praised the variant would be describing a different table. Keyed on the upgrade id, which is what a profile stores.",
+      "imager-headmount": {
+        "name": "Head-mounted imager",
+        "blurb": "Both hands back. You see less of the room and you see it worse, and you can carry the case while you do it."
+      },
+      "imager-mast": {
+        "name": "Long-range thermal scanner",
+        "blurb": "Reads an aisle end to end from the stair head. It is a long item and it eats its cells."
+      },
+      "imager-relay": {
+        "name": "Remote thermal relay",
+        "blurb": "Watches a lane nobody is standing in and files every frame. Heavier, and it dies sooner."
+      },
+      "tripod-lowdraw": {
+        "name": "Low-draw floodlight",
+        "blurb": "Runs most of an operation on one charge. Its 40C contour is visibly smaller, and the aisles did not get narrower."
+      },
+      "tripod-widefield": {
+        "name": "Wide-field floodlight",
+        "blurb": "One unit can span a 4.2m aisle. You will carry fewer of them and change cells sooner."
+      },
+      "case-logger": {
+        "name": "Instrumented transit case",
+        "blurb": "Logs interior conditions through the hold, which is most of what Research wanted from the operation. The sensor bus is drawn off the same cells as the heater."
+      },
+      "barrier-composite": {
+        "name": "Composite barrier panel",
+        "blurb": "Wider panel, survives being dragged. It takes the volume of something else you wanted."
+      },
+      "pack-fastfeed": {
+        "name": "Distribution power pack",
+        "blurb": "Feeds a wider ring of emitters for a shorter time. A fence that holds while you seal, and not much longer."
+      },
+      "sensor-net": {
+        "name": "Networked lane sensor",
+        "blurb": "Covers a whole aisle and reports to the command point. Still reports motion, not identity."
+      },
+      "sample-kit-assay": {
+        "name": "Field assay kit",
+        "blurb": "Grades the sample on the floor instead of at the bench, so a bad sample is known while there is still time to take another."
+      },
+      "trauma-kit-sealed": {
+        "name": "Sealed trauma pouch",
+        "blurb": "Survives a contaminated floor and rides on a belt loop. It records nothing, so Medical learns nothing from the exposure it treats."
+      }
+    },
+
+    "injury": {
+      "_note": "§12.5's three temporary effects, measured in OPERATIONS and never in seconds. ⚠ None of them makes an operative easier to hurt — reduced carrying tolerance and slower stabilisation are capability, not fragility (§12.1) — and no wording here may suggest otherwise.",
+      "strain": {
+        "name": "Reduced carrying tolerance",
+        "note": "Cracked ribs from a fall on the stair. They can deploy; they cannot take the long items."
+      },
+      "exposure": {
+        "name": "Slower stabilisation",
+        "note": "Cold injury. Treating them in the field takes half again as long as it should."
+      },
+      "fatigue": {
+        "name": "Post-critical fatigue",
+        "note": "Came out on a stretcher. Cleared to deploy, and everyone can see they should not be carrying the case."
+      }
+    },
+
+    "treatment": {
+      "_note": "§12.5's two. Treatment is never required and never waits on a real clock.",
+      "observation-rest": {
+        "name": "Rest and observation",
+        "note": "Costs a slot in the rotation rather than money. One operation of the effect, gone."
+      },
+      "infirmary-course": {
+        "name": "Infirmary course",
+        "note": "Occupies a bed and a budget line. Clears the condition outright."
+      }
+    },
+
+    "earnings": {
+      "_note": "The debrief ledger §12.6 asks for: every line of what an operation paid and what it cost, with the reason beside it. `earningsFor()` is pure and returns these as data, so the same lines answer the suite and the screen.\n\n⚠ TWO ENGLISH PLURALS WERE WRITTEN OUT HERE — `procedure${n === 1 ? '' : 's'}` and `item${n === 1 ? '' : 's'}` — and both are now groups selected by Intl.PluralRules.\n\n⚠ `assessment.label` TAKES THE GRADE'S LABEL AND NOT ITS ID. It read `Assessment: ${result.overall}`, which put the untranslated ladder word inside the line — the same defect the pseudolocale found on the HUD.",
+      "grant": {
+        "label": "Operating grant",
+        "detail": "Paid on every operation the site closes, whatever it cost."
+      },
+      "deployment": {
+        "label": "Deployment cost",
+        "detail": "Consumables, transport and the van, spent whether or not it worked."
+      },
+      "timeUnder": "{minutes} min against a {target} min window.",
+      "timeOver": "{minutes} min against a {target} min window. Overrun.",
+      "rulesRead": {
+        "label": "Rules read correctly",
+        "detail": "{correct} of {total} claims marked as the site behaved. {wrong} misread, at no cost."
+      },
+      "behaviour": {
+        "_note": "§12.3 pays for BEHAVIOUR and not only for the final grade, so an economy that read the overall word alone could not tell a squad that dragged a casualty out from one that got lucky. Keyed on the tally name, which is the id `BEHAVIOUR_YIELD` indexes on.",
+        "rescues": "Casualties recovered under pressure",
+        "treatments": "Stabilised in the field",
+        "circuitsRestored": "Site systems restored",
+        "deployablesPlaced": "Field telemetry returned",
+        "contacts": "Contacts taken",
+        "custodyLosses": "Custody lost and re-established"
+      },
+      "tally": "{count}",
+      "tallyCapped": "{count} (capped)",
+      "aborts": {
+        "label": "Aborted and re-planned",
+        "detail": {
+          "one": "{count} procedure withdrawn rather than pressed.",
+          "other": "{count} procedures withdrawn rather than pressed."
+        }
+      },
+      "assessment": {
+        "label": "Assessment: {word}",
+        "detail": "Institutional bonus on the overall word."
+      },
+      "replacement": {
+        "label": "Equipment replacement",
+        "detail": {
+          "one": "{count} issued item written off and reordered.",
+          "other": "{count} issued items written off and reordered."
+        }
+      },
+      "analysis": {
+        "label": "Analysis capacity",
+        "detail": "Site and fitted logging equipment add {percent}% to the analytical yield."
+      }
+    },
+
+    "refuse": {
+      "_note": "Everything the model says back when it will not do the thing. §8.2 asks a refusal to be actionable, and every one of these names the reason rather than the rule. The base screen prints the string it was handed and never re-derives a nicer sentence — that is how a panel and a model start disagreeing about what is affordable.",
+      "noSuchUpgrade": "No such upgrade.",
+      "alreadyRequisitioned": "Already requisitioned.",
+      "requisitionShort": "Requisition short by {amount}.",
+      "researchShort": "Research data short by {amount}.",
+      "doesNotFit": "{upgrade} does not fit a {item}.",
+      "notRequisitioned": "Not requisitioned yet.",
+      "noSuchSiteUpgrade": "No such site upgrade.",
+      "alreadyBuilt": "Already built.",
+      "blocked": "Depends on work that has not been done.",
+      "requiresTier": "Requires {tier}.",
+      "noSuchOperative": "No such operative.",
+      "nothingToTreat": "Nothing to treat.",
+      "noSuchTreatment": "No such treatment.",
+      "bedsInUse": {
+        "one": "The site has {count} isolation bed and {inUse} in use.",
+        "other": "The site has {count} isolation beds and {inUse} in use."
+      }
+    },
+
+    "cell": {
+      "_note": "⚠ THE CORRIDOR'S OWN CELLS ARE CONTENT AND THESE TWO ARE NOT. Every declared holding position is authored in content/site.json and interpolated; an overflow position is INVENTED by the engine when the specialised-storage upgrade is built, numbered rather than declared, and there is nowhere in the site file for its words to live. So the engine has to be able to say them.",
+      "overflowLabel": "Specialised storage {index}",
+      "overflowHolding": "Built out of the requisition budget. Climate and sensor ports on the same bus as the main run."
+    },
+
+    "corridor": {
+      "_note": "§13.2's operational history: where a capture came from, what holding it costs, what it has done since. Never a rank, never a rarity, never a count of how many you own.\n\n⚠ THESE LINES ARE WRITTEN INTO THE PROFILE AND SAVED. A line is composed in the locale that was running when the capture happened and is stored as text, so a corridor whose entries were filed in three languages will show three — the same way a chat log does. Composing at read time instead would mean storing the parameters, which is a save-format change and a migration step; recorded here rather than pretended about.\n\nFour custody lines rather than one with two optional pieces: `minutes` may be absent, `holding` comes from the dossier and may be absent, and a sentence assembled from those two conditions is a sentence no translator can move.",
+      "maintenanceNote": "Operation {operation}: {note}",
+      "maintenanceDefault": "Scheduled check due. Sensor log reviewed, no change recorded.",
+      "custody": "Operation {operation}: custody verified. Transferred under {holding}.",
+      "custodyTimed": "Operation {operation}: custody verified at {minutes} min. Transferred under {holding}.",
+      "custodyStandard": "Operation {operation}: custody verified. Transferred under standard escort.",
+      "custodyStandardTimed": "Operation {operation}: custody verified at {minutes} min. Transferred under standard escort.",
+      "improvised": "Placed in {cell}, which is not rated {rating}. Logged as an improvised position pending a rated one.",
+      "unplaced": "No holding position was free. Held on the vehicle bay bus and recorded as unplaced."
+    },
+
+    "roster": {
+      "_note": "The one operative a fresh profile starts with, and the name a roster entry falls back to when a save carries none. ⚠ Both are written INTO the profile and saved, so they are fixed in the locale that created the character — which is the right answer for a name.",
+      "starting": "Operative 1",
+      "unnamed": "Operative"
+    }
+  },
+
+  "save": {
+    "_note": "What happened to the stored profile, in sentences addressed to the person whose profile it is. `src/sim/progression.js` puts these on `Progression.migration.notices` and `src/ui/base.js` prints them the first time the base screen opens — see `base.migration` for the frame.\n\n⚠ A PROFILE IS THE ONLY THING IN THIS BUILD A PLAYER CAN LOSE, AND LOSING IT USED TO BE SILENT. Every path that could not use a save returned a fresh profile and said nothing, so somebody with thirty operations behind them saw Provisional clearance and 340 requisition with no way to tell whether they had been robbed or opened the wrong browser profile.\n\n⚠ WHAT IS NOT HERE: `report.dropped[]`. Those are developer diagnostics — a field path and why it was rejected — and they are deliberately not printed at a player and deliberately not translated.",
+    "notice": {
+      "unreadable": "The stored profile was not readable, so this session starts fresh. The original has not been deleted.",
+      "damaged": "The stored profile was damaged and could not be read, so this session starts fresh. The damaged copy has been kept rather than deleted.",
+      "newerBuild": "This profile was written by a newer build (save format {version}; this one reads {reads}). It has been left exactly as it was and this session starts fresh — open the newer build to pick it up where you left off.",
+      "olderBuild": "Your profile was saved by an older build and has been brought forward. Nothing was lost.",
+      "repaired": {
+        "one": "Part of your saved profile could not be read and was repaired: {count} field was reset. Everything else was kept.",
+        "other": "Part of your saved profile could not be read and was repaired: {count} fields were reset. Everything else was kept."
+      },
+      "noStorage": "This browser is not allowing local storage, so nothing from this session will be kept. Private-browsing windows do this.",
+      "cellGone": "A holding position named in your profile no longer exists at this site. What was in it is now listed as unplaced and will be given a real cell when one is free.",
+      "unknownAnomaly": "Something in the containment corridor was filed under an anomaly this build no longer carries a dossier for. It is still listed, and still occupies its position.",
+      "upgradeGone": "A facility upgrade recorded in your profile is not one this build has. It was doing nothing and has been removed."
     }
   },
 

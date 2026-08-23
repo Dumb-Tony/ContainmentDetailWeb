@@ -1,6 +1,6 @@
 {
   "_locale": "en-US",
-  "_note": "A PARTIAL LOCALE, and it is partial on purpose.\n\nThis file contains only the messages where American English actually differs from the British English in en-GB. Everything else falls through to en-GB and is not repeated here — which is the point of shipping it: the fallback path is the one piece of localization machinery that cannot be tested with a complete file, because a complete file never exercises it.\n\nThere are two kinds of entry here.\n\nSPELLING. 'stabilised' is 'stabilized'. That is the whole change, and it appears in four messages because the word appears in four messages.\n\nUNITS. This is the interesting one and it is why en-US is not a trivial locale. The game measures in metres and states temperatures in Celsius, and BOTH are load-bearing rules rather than flavour: the anomaly's threshold is 40C, the aisles are 4.2m, the seal radius is 1.5m, and a squad reasons in those numbers. So the units are NOT converted. A player reading 'within 1.5m' in an American locale is reading the number the rule uses, and a converted '4.9ft' would be a different number from the one every other surface prints — the imager bezel, the design document, the evidence board and the after-action report all say 1.5m.\n\nThat is a decision rather than an omission, and it is written down here rather than in a commit message because the next person to open this file will wonder. If a future locale DOES want imperial units, the conversion belongs in the formatter beside Intl.NumberFormat, not in a translated string, so that the rule and its rendering cannot drift apart.",
+  "_note": "A PARTIAL LOCALE, and it is partial on purpose.\n\nThis file contains only the messages where American English actually differs from the British English in en-GB. Everything else falls through to en-GB and is not repeated here — which is the point of shipping it: the fallback path is the one piece of localization machinery that cannot be tested with a complete file, because a complete file never exercises it.\n\nThere are two kinds of entry here.\n\nSPELLING. ⚠ THIS NOTE USED TO SAY 'stabilised is stabilized, and that is the whole change'. It was not the whole change even when it was written: `settings.blurb.vision` said Colour, `base.ops.locked` said authorised, and neither was overridden — so an American player got the accessibility screen in British spelling while the debrief was in American, which is the half-and-half outcome an honest fallback is supposed to prevent. The set is now derived rather than remembered: -isation/-ised, -our, and Colour. Six words across ten messages, and the list is what a sweep over en-GB finds rather than what somebody recalled.\n\nUNITS. This is the interesting one and it is why en-US is not a trivial locale. The game measures in metres and states temperatures in Celsius, and BOTH are load-bearing rules rather than flavour: the anomaly's threshold is 40C, the aisles are 4.2m, the seal radius is 1.5m, and a squad reasons in those numbers. So the units are NOT converted. A player reading 'within 1.5m' in an American locale is reading the number the rule uses, and a converted '4.9ft' would be a different number from the one every other surface prints — the imager bezel, the design document, the evidence board and the after-action report all say 1.5m.\n\nThat is a decision rather than an omission, and it is written down here rather than in a commit message because the next person to open this file will wonder. If a future locale DOES want imperial units, the conversion belongs in the formatter beside Intl.NumberFormat, not in a translated string, so that the rule and its rendering cannot drift apart.\n\n⚠ TWO BRITISH SPELLINGS ARE DELIBERATELY LEFT ALONE. `campaign.cell.overflowLabel` and `campaign.clearance.2.grants` both say 'Specialised storage', and that is the NAME content/site.json gives the facility upgrade that builds those positions. A locale may translate what the engine says; it may not rename a thing the content package named, because then the corridor and the armory would be calling one upgrade two things. The same rule that keeps department names out of content keeps this one out of here.",
 
   "hud": {
     "cond": {
@@ -28,6 +28,55 @@
     },
     "why": {
       "careStabilised": "stabilized"
+    }
+  },
+
+  "base": {
+    "ops": {
+      "locked": "Not authorized. Requires {tier} clearance.",
+      "warnStabilise": "Field stabilization will take {percent}% longer with the current roster."
+    }
+  },
+
+  "campaign": {
+    "resource": {
+      "standing": {
+        "what": "Earned by behavior a department values. Changes what things cost you, never whether you may have them."
+      }
+    },
+    "department": {
+      "security": {
+        "rewards": "Defensive equipment and transport armor"
+      },
+      "logistics": {
+        "watches": "equipment stewardship, time to stabilization"
+      }
+    },
+    "standingTier": {
+      "Cool": {
+        "note": "Requests are honored, slowly."
+      }
+    },
+    "injury": {
+      "exposure": {
+        "name": "Slower stabilization"
+      }
+    },
+    "earnings": {
+      "behaviour": {
+        "treatments": "Stabilized in the field"
+      }
+    }
+  },
+
+  "settings": {
+    "blurb": {
+      "vision": "Color presets change the five signal colors only. Shape redundancy is on by default and should stay on — §18.5 requires every treatment to work without color."
+    },
+    "field": {
+      "vision": {
+        "palette": "Color vision"
+      }
     }
   }
 }

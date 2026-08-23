@@ -34,6 +34,28 @@
  * ⚠ AND `operation${n === 1 ? '' : 's'}` APPEARED EIGHT TIMES IN THIS FILE. That is English's
  * plural rule written out; Polish has three forms and Arabic six. Every one is now a plural
  * GROUP selected by Intl.PluralRules.
+ *
+ * ⚠ THIS FILE NO LONGER CALLS `.toLowerCase()` ON ANYTHING THAT CAME OUT OF THE MESSAGE TABLE.
+ * Three lines did — a standing tier's name and a department's `values` and `watches`, all
+ * lower-cased on the way into a sentence that reads them mid-clause. That is a LOCALE
+ * operation performed by an engine with no locale in hand: it is wrong in German the first
+ * time the word is a noun and wrong in Turkish for any word with an `I` in it. The locale
+ * authors the case its own sentence needs. One `.toLowerCase()` survives, on
+ * `items.displayName` in the armory's standard-variant option — that is CONTENT rather than a
+ * message, so the fix belongs in the equipment manifest, and it is recorded here rather than
+ * silently left.
+ *
+ * ── TWO SCREENS THIS FILE NOW RENDERS THAT NOTHING RENDERED BEFORE ────────────
+ *
+ * `_migration()` — the save report. `sim/progression.js` has produced `{outcome, fromVersion,
+ * dropped, notices, preservedAs}` on every load since it was written and nothing printed it,
+ * so a profile could be brought forward, quarantined or repaired and the player was never
+ * told. §18.1, and the one thing in this build a player can lose.
+ *
+ * `_noticesIndex()` / `_document()` — §25.4's in-game notices. `content/site.json` has listed
+ * "Read the attribution and licensing record" among the archive's affordances since the file
+ * was written and nothing rendered it; `docs/licensing-audit.md` carries it as finding 7.
+ * Every word of every document is content and this file contributes none of it.
  */
 
 import { escapeHtml } from './hud.js';
@@ -72,6 +94,17 @@ const issuedValue = (field, value) => (value === undefined
   ? msg('base.issued.missing')
   : msg(`base.issued.unit.${field}`, { value }));
 
+/**
+ * A §12.4 sidegrade axis, as a word. ⚠ THE VALUE IS AN ID: `validateSidegrades()` fails the
+ * build on an upgrade naming an axis that is not one of the eight, and the eight are compared
+ * character-for-character. So the armory prints the label and the table keeps the id — the
+ * same split `phase`, `pressure` and `grade` make. The key IS the axis string, spaces and all.
+ */
+const axisLabel = (axis) => msg(`campaign.axis.${axis}`);
+
+/** The five outcomes `migrateWithReport` can report. Anything else is not a sentence we have. */
+const MIGRATION_OUTCOMES = ['fresh', 'loaded', 'upgraded', 'repaired', 'refused'];
+
 export class BaseScreen {
   /**
    * @param {HTMLElement} root  where the panel div is appended, exactly as Panels does
@@ -97,6 +130,34 @@ export class BaseScreen {
     /* One line, from the model, shown until the next thing the player does. Refusals are
      * addressed to the person who just clicked and nothing else needs to hear them. */
     this.notice = null;
+    /**
+     * Which §25.4 notice document is open, by id, or null for the room's own page. A SUB-VIEW
+     * inside a room rather than a sixth tab: `content/site.json` names the room the documents
+     * hang off (`notices.room`), and a tab would put a legal page beside five operational ones
+     * in the same rank, which is not what it is.
+     */
+    this.page = null;
+    /**
+     * ⚠ THE MIGRATION NOTICE IS DISMISSED, NOT TIMED OUT. It says the one thing in this build
+     * a player can lose actually happened to them, so it stays on the screen across every tab
+     * until they acknowledge it — a banner that vanished on the first click is a banner nobody
+     * read.
+     *
+     * THE DISMISSAL IS NOT REMEMBERED ACROSS A RELOAD, AND IT MUST NOT BE. The report is
+     * re-derived from the save on every load, so the banner comes back if and only if the
+     * condition is still true — which is the honest rule and splits the notices in two.
+     * Measured, in a browser, on the real load path:
+     *
+     *   TRANSIENT — the older-build upgrade, the repaired fields, the dangling holding
+     *   position, the facility upgrade this build does not declare. All four are fixed in the
+     *   profile the moment it is written back, and the next load says nothing at all.
+     *
+     *   STANDING — a save from a newer build (refused every time, and quarantined every time),
+     *   and a capture filed under an anomaly with no dossier, which is KEPT on purpose because
+     *   deleting the row would not release what the site is holding. Both recur, and should:
+     *   the thing they describe has not stopped being true.
+     */
+    this.migrationDismissed = false;
   }
 
   get isOpen() { return this.open !== null; }
@@ -108,6 +169,16 @@ export class BaseScreen {
      * after a save that was made at a higher clearance and then reset. */
     this.tab = room && this.progression.roomOpen(room) ? tab : 'operations';
     this._render();
+  }
+
+  /* ── §25.4's notices, which are content and live in the room the site file names ─── */
+
+  /** Which room the notices hang off. Content decides; `archive` is the shape it ships in. */
+  get _noticesRoom() { return (this.site.notices && this.site.notices.room) || 'archive'; }
+
+  get _noticeDocuments() {
+    const n = this.site.notices;
+    return (n && Array.isArray(n.documents)) ? n.documents : [];
   }
 
   hide() {
@@ -149,7 +220,13 @@ export class BaseScreen {
     const room = rooms.find((r) => r.id === this.tab) || rooms[0] || null;
     let body = `<div class="pad"><p class="empty">${msg('base.shell.noRooms')}</p></div>`;
     if (room) {
-      if (this.tab === 'operations') body = this._operations(room);
+      /* A notice document REPLACES the room's page rather than sitting under it. It is a
+       * whole document and the room's own page is a whole page; stacking them would make
+       * the licensing statement something you scroll past the case files to reach, which
+       * is the "buried in end credits" §25.4 exists to forbid. */
+      const doc = this._openDocument(room);
+      if (doc) body = this._document(doc);
+      else if (this.tab === 'operations') body = this._operations(room);
       else if (this.tab === 'logistics') body = this._logistics(room);
       else if (this.tab === 'archive') body = this._archive(room);
       else if (this.tab === 'research') body = this._research(room);
@@ -170,7 +247,7 @@ export class BaseScreen {
         operations: plural('base.shell.operationsClosed', p.operationsCompleted),
         standing: escapeHtml(this.site.standing || ''),
       }),
-      `${this._ledger()}<nav class="tabs">${nav}</nav>${this._notice()}
+      `${this._ledger()}<nav class="tabs">${nav}</nav>${this._migration()}${this._notice()}
        <div class="pad"><h2>${escapeHtml(room ? room.name : this.site.displayName || '')}</h2>
          <p class="small">${escapeHtml(room ? room.purpose : '')}</p></div>${body}`,
       footer);
@@ -181,6 +258,50 @@ export class BaseScreen {
   _notice() {
     if (!this.notice) return '';
     return `<div class="pad"><div class="warn"><b>${msg('base.shell.counter')}</b><ul><li>${escapeHtml(this.notice)}</li></ul></div></div>`;
+  }
+
+  /**
+   * ⚠ WHAT HAPPENED TO THE SAVE, SAID TO THE PERSON IT HAPPENED TO.
+   *
+   * `sim/progression.js` has produced `{outcome, fromVersion, dropped[], notices[], preservedAs}`
+   * on every load since the migration report was written, and NOTHING PRINTED IT. A profile
+   * could be upgraded from an older build, quarantined because it came from a newer one, or
+   * repaired field by field, and the player was shown Provisional clearance and a starting
+   * balance with no way to tell whether they had been robbed or had opened the wrong browser
+   * profile. §18.1 does not allow the UI to misrepresent state, and a fresh profile presented
+   * as if it were yours is the largest misrepresentation this build can make — the more so
+   * because the first autosave then writes over the evidence.
+   *
+   * ⚠ `notices` IS PRINTED AND `dropped` IS NOT. The notices are whole sentences written for a
+   * player. The dropped list is `{field, why}` pairs written for a developer — "is not a finite
+   * number", "is a duplicate id" — and putting them on this screen would be untranslated engine
+   * prose inside a translated panel, which is exactly the class of defect the pseudolocale pass
+   * exists to find. The report object still carries them for whoever is debugging.
+   *
+   * When there is nothing to say it renders NOTHING AT ALL — no empty box, no reassurance that
+   * the save is fine. A silent load is the normal case and it should look like one.
+   */
+  _migration() {
+    const m = this.progression && this.progression.migration;
+    if (!m || this.migrationDismissed) return '';
+    const notices = Array.isArray(m.notices) ? m.notices : [];
+    if (!notices.length) return '';
+    const outcome = MIGRATION_OUTCOMES.includes(m.outcome)
+      ? `<p>${msg(`base.migration.outcome.${m.outcome}`)}</p>` : '';
+    /* Only when the shape actually moved. "Save format 2, this build reads 2" is noise. */
+    const version = typeof m.fromVersion === 'number' && m.fromVersion !== m.toVersion
+      ? `<p class="small">${msg('base.migration.fromVersion', { from: m.fromVersion, to: m.toVersion })}</p>` : '';
+    /* The key an unreadable save was copied to. It is the whole point of the quarantine that
+     * a player can be told where their campaign went, so it is named rather than alluded to. */
+    const kept = m.preservedAs
+      ? `<p class="small">${msg('base.migration.preserved', { key: escapeHtml(m.preservedAs) })}</p>` : '';
+    return `<div class="pad"><div class="warn">
+      <b>${msg('base.migration.head')}</b>
+      ${outcome}
+      <ul>${notices.map((n) => `<li>${escapeHtml(n)}</li>`).join('')}</ul>
+      ${version}${kept}
+      <p><button class="ghost" data-migration-ok>${msg('base.migration.dismiss')}</button></p>
+    </div></div>`;
   }
 
   /** The four §12.2 resources, across the top, on every tab. */
@@ -314,7 +435,16 @@ export class BaseScreen {
     </div>${this._siteUpgrades(room)}`;
   }
 
-  /** §12.3 as a readable picture: what each department wants, and what it charges you. */
+  /**
+   * §12.3 as a readable picture: what each department wants, and what it charges you.
+   *
+   * ⚠ THE TWO PHRASES ARE NO LONGER LOWER-CASED HERE. `d.values` and `d.watches` come out of
+   * the message table now, and `.toLowerCase()` on a translated string is a LOCALE operation
+   * performed by an engine that does not know the locale — wrong in German the first time one
+   * of them is a noun, and wrong in Turkish for any word with an `I` in it. `campaign.department`
+   * authors them in the case this sentence needs, so the English rendering is unchanged and the
+   * next language gets to decide for itself.
+   */
   _standing() {
     const pr = this.progression;
     return `<ul class="dims">${DEPARTMENTS.map((d) => {
@@ -327,7 +457,7 @@ export class BaseScreen {
         <div class="budget"><div class="bar"><i style="width:${Math.max(2, Math.min(100, pct))}%"></i></div>
           <span>${msg('base.standing.multiplier', { multiplier: tier.priceMultiplier.toFixed(2) })}</span></div>
         <p>${msg('base.standing.watches', {
-        values: escapeHtml(d.values.toLowerCase()), watches: escapeHtml(d.watches.toLowerCase()),
+        values: escapeHtml(d.values), watches: escapeHtml(d.watches),
       })}</p></li>`;
     }).join('')}</ul>
     <p class="small">${msg('base.standing.note')}</p>`;
@@ -360,13 +490,21 @@ export class BaseScreen {
       const price = pr.priceOf(u);
       const afford = pr.profile.requisition >= price && pr.profile.research >= (u.costResearch || 0);
       const dept = DEPARTMENTS.find((d) => d.id === u.department);
+      /* ⚠ THE AXIS WAS PRINTED RAW AND IT IS AN ID. `+portability` came straight out of the
+       * §12.4 table `validateSidegrades()` compares against, so under the pseudolocale every
+       * sidegrade row carried eight English words through an otherwise accented panel. The
+       * `+` and `−` are part of the message rather than glued on: a script that marks
+       * increase and decrease differently moves them itself. */
       return `<tr class="${owned ? 'taken' : afford ? '' : 'gone'}">
         <td class="name"><b>${escapeHtml(u.name)}</b>
           <span>${escapeHtml(u.blurb)}</span>
-          <span>${u.gains.map((g) => `<em class="gain">+${escapeHtml(g)}</em>`).join(' ')}
-                ${u.losses.map((l) => `<em class="loss">−${escapeHtml(l)}</em>`).join(' ')}</span>
+          <span>${u.gains.map((g) => `<em class="gain">${msg('base.armory.gain', { axis: axisLabel(g) })}</em>`).join(' ')}
+                ${u.losses.map((l) => `<em class="loss">${msg('base.armory.loss', { axis: axisLabel(l) })}</em>`).join(' ')}</span>
           <span>${escapeHtml(dept ? dept.name : '')} · ${msg('base.armory.rate', {
-    tier: escapeHtml(standingTier(pr.standing(u.department)).name.toLowerCase()),
+    /* ⚠ NO `.toLowerCase()`. The tier name is a translated string now, and lower-casing one
+     * is a LOCALE operation the engine has no business performing — it is wrong in German the
+     * first time the word is a noun. The locale authors the case its own sentence needs. */
+    tier: escapeHtml(standingTier(pr.standing(u.department)).name),
   })}</span></td>
         <td class="vol">${price}${u.costResearch ? `<br>${msg('base.armory.researchCost', { count: u.costResearch })}` : ''}</td>
         <td class="qty">${owned
@@ -499,10 +637,68 @@ export class BaseScreen {
       <section>
         <h2>${msg('base.archive.filesHead')}</h2>
         <ul class="dims">${files || `<li class="empty">${msg('base.archive.filesEmpty')}</li>`}</ul>
-        <h2>${msg('base.archive.attributionHead')}</h2>
-        <p class="small">${msg('base.archive.attribution')}</p>
+        ${this._noticesIndex(room)}
       </section>
     </div>${this._siteUpgrades(room)}`;
+  }
+
+  /* ── §25.4 notices: credits, attribution, privacy, terms, support ─────────── */
+
+  /**
+   * ⚠ THE ROOM'S AFFORDANCE WAS A PROMISE THE BUILD DID NOT KEEP.
+   *
+   * `content/site.json` has listed "Read the attribution and licensing record" among the
+   * archive terminal's affordances since the file was written, and the room's purpose line
+   * names an attribution record — and nothing rendered either. `docs/licensing-audit.md`
+   * carries it as finding 7, open, owned by the UI. §25.4 requires attribution to be reachable
+   * rather than buried in end credits, and a menu item naming a document the game does not
+   * contain is a §18.1 problem as much as a §25 one.
+   *
+   * ⚠ IT RENDERS WHATEVER THE SITE FILE HAS AND CONTAINS NO PROSE OF ITS OWN. The documents
+   * are legal and privacy statements whose exact wording is the point; this is an index and a
+   * reader over them. A new document appears here by being added to `notices.documents`.
+   */
+  _noticesIndex(room) {
+    if (!room || room.id !== this._noticesRoom) return '';
+    const docs = this._noticeDocuments;
+    const n = this.site.notices || {};
+    if (!docs.length) {
+      return `<h2>${msg('base.notices.head')}</h2><p class="small empty">${msg('base.notices.empty')}</p>`;
+    }
+    const rev = n.revision || n.updated
+      ? `<p class="small">${msg('base.notices.revision', {
+        revision: escapeHtml(String(n.revision || '')), updated: escapeHtml(String(n.updated || '')),
+      })}</p>` : '';
+    return `<h2>${msg('base.notices.head')}</h2>
+      <ul class="dims">${docs.map((d) => `<li>
+        <b>${escapeHtml(d.title || d.id || '')}</b>
+        <span class="w"><button class="ghost" data-doc="${escapeHtml(String(d.id || ''))}">${msg('base.notices.open')}</button></span>
+        <p>${escapeHtml(d.summary || '')}</p></li>`).join('')}</ul>${rev}`;
+  }
+
+  /** The document the player has open, if the room they are in is the one that carries them. */
+  _openDocument(room) {
+    if (!this.page || !room || room.id !== this._noticesRoom) return null;
+    return this._noticeDocuments.find((d) => d.id === this.page) || null;
+  }
+
+  /**
+   * One notice document. Every string is the site file's, escaped on the way out, exactly as
+   * the `_noticesNote` in that file asks — `body` is an array of paragraphs and `bullets` is
+   * an optional list, and neither is markup.
+   */
+  _document(doc) {
+    const sections = (doc.sections || []).map((s) => `
+      <h2>${escapeHtml(s.heading || '')}</h2>
+      ${(s.body || []).map((p) => `<p>${escapeHtml(p)}</p>`).join('')}
+      ${(s.bullets || []).length ? `<ul>${(s.bullets || []).map((b) => `<li>${escapeHtml(b)}</li>`).join('')}</ul>` : ''}`).join('');
+    return `<div class="pad">
+      <p><button class="ghost" data-doc-back>${msg('base.notices.back')}</button></p>
+      <h2>${escapeHtml(doc.title || doc.id || '')}</h2>
+      <p class="small">${escapeHtml(doc.summary || '')}</p>
+      ${sections}
+      <p><button class="ghost" data-doc-back>${msg('base.notices.back')}</button></p>
+    </div>`;
   }
 
   /* ── research station and the isolation bench (§13.2, §12.5) ─────────────── */
@@ -705,10 +901,19 @@ export class BaseScreen {
     const q = (s) => this.node.querySelector(s);
     const all = (s) => this.node.querySelectorAll(s);
 
-    all('[data-room]').forEach((b) => b.onclick = () => { this.notice = null; this.show(b.dataset.room); });
+    /* Leaving the room closes whatever document was open in it: a notice is a page of that
+     * room, so coming back to the room should show the room. */
+    all('[data-room]').forEach((b) => b.onclick = () => {
+      this.notice = null; this.page = null; this.show(b.dataset.room);
+    });
 
     const close = q('[data-close]');
     if (close) close.onclick = () => this.hide();
+
+    all('[data-doc]').forEach((b) => b.onclick = () => { this.page = b.dataset.doc; this._render(); });
+    all('[data-doc-back]').forEach((b) => b.onclick = () => { this.page = null; this._render(); });
+    const ack = q('[data-migration-ok]');
+    if (ack) ack.onclick = () => { this.migrationDismissed = true; this._render(); };
 
     all('[data-op]').forEach((n) => {
       n.onclick = () => { this.selectedOp = n.dataset.op; this.refresh(); };

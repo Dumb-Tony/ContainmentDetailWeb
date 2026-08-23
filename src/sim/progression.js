@@ -29,9 +29,65 @@
  *
  * The economy constants are exported rather than buried so a balance pass can find them
  * (§21.3 wants balance changes to be evidence-led, which needs the numbers to be findable).
+ *
+ * ── WHAT IS KEYED AND WHAT IS CONTENT (GDD §23 Milestone 5) ───────────────────
+ *
+ * This was the largest concentration of English left in the build, and the line runs where
+ * the DOCUMENT boundary is rather than where the screen boundary is.
+ *
+ * CONTENT, interpolated and never keyed: everything in `content/site.json` — room names and
+ * purposes, facility upgrade names and blurbs, cell labels and holding descriptions, dossier
+ * designations and prose, maintenance notes — plus the equipment manifest's display names.
+ * A site that shipped with different rooms needs no line of `content/locales`.
+ *
+ * ENGINE, keyed: the six departments, the four clearance tiers, the five standing bands, the
+ * eight sidegrade axes, the eleven equipment sidegrades, the three injuries, the two
+ * treatments, the four §12.2 resources, every debrief ledger line, every counter refusal,
+ * every corridor history line, and the migration report's notices. All of them are TABLES IN
+ * THIS FILE. They ship with the engine, they are identical on every site, and left alone they
+ * are English inside every accented line on the armory and the isolation bench.
+ *
+ * The ids are never translated. `research`, `imager-mast`, `strain`, `range` and
+ * `observation-rest` are compared against, saved into a profile and validated by
+ * `validateSidegrades()`; each is an id with a label beside it, which is the same split
+ * `phase`, `pressure` and `grade` make.
+ *
+ * ⚠ WHAT IS DELIBERATELY NOT KEYED: `validateSite()`, `validateSidegrades()` and every `why`
+ * string in `drop()`. Those are DEVELOPER diagnostics — a field path and why it was rejected,
+ * or a content file refusing to load — read by whoever is fixing the build and never printed
+ * at a player. `src/sim/content.js` draws the same line for the same reason, and its refusals
+ * reach the same crash screen; converting one half of that screen and not the other would be
+ * worse than converting neither. The player-facing half of the report is `notices`, and every
+ * one of those is a message.
  */
 
 import { ContentError } from './content.js';
+/* ⚠ IMPORTED AS `msg`, NOT AS `t`. Three functions in this file bind a local `t` — the
+ * standing tier in `standingTier`, the clearance tier in `clearanceFor`, the treatment in
+ * `treat` — and a shadowed translator fails as "t is not a function" at the moment a player
+ * clicks Order. `src/game.js` and `src/ui/base.js` renamed it for the same reason. */
+import { t as msg, plural } from '../core/i18n.js';
+
+/**
+ * A table row whose WORDS come out of the message table and whose ID does not.
+ *
+ * ⚠ THE FIELDS ARE ACCESSORS AND NOT COPIES, AND THAT IS THE WHOLE POINT. `{ ...row }` over
+ * a table of translated values copies each one AT MODULE LOAD, which freezes English at boot
+ * and passes every assertion that runs in en-GB — the defect `src/audio/audio.js` records and
+ * the reason the caption tables are built this way too. A getter is the only shape that can
+ * answer differently after `loadLocale()`, which is what `tools/i18n-tests.js` H2 checks.
+ *
+ * ⚠ AND THE ID STAYS IN THE ROW. `research`, `imager-mast`, `strain` and `observation-rest`
+ * are compared against, saved into a profile and validated by `validateSidegrades()`;
+ * translating them would break every one of those. The row keeps the id, the message table
+ * carries the label, and the key IS the id — the same split `phase`, `pressure` and `grade`
+ * make, and the same one GDD §23 Milestone 5's pseudolocale pass exists to find.
+ */
+const worded = (path, row, ...fields) => {
+  const props = {};
+  for (const f of fields) props[f] = { get: () => msg(`${path}.${f}`), enumerable: true };
+  return Object.freeze(Object.defineProperties({ ...row }, props));
+};
 
 /**
  * ⚠ THE VERSION NUMBER MEANT NOTHING FOR THE FIRST THREE SHAPES OF THIS FILE, and that is
@@ -100,45 +156,35 @@ export const CEILINGS = Object.freeze({
  * Two are spendable, one is a relationship, one is a milestone. Nothing in this file
  * awards a random item, and nothing rolls for a drop. */
 export const RESOURCES = Object.freeze([
-  { id: 'requisition', name: 'Requisition', spendable: true,
-    what: 'Routine equipment, consumables, repairs and facility improvements.' },
-  { id: 'research', name: 'Research data', spendable: true,
-    what: 'Verified evidence and samples, spent on analytical unlocks and prototypes.' },
-  { id: 'standing', name: 'Department standing', spendable: false,
-    what: 'Earned by behaviour a department values. Changes what things cost you, never whether you may have them.' },
-  { id: 'clearance', name: 'Clearance', spendable: false,
-    what: 'Milestone access to rooms, operations and institutional authority. It cannot be bought.' },
+  worded('campaign.resource.requisition', { id: 'requisition', spendable: true }, 'name', 'what'),
+  worded('campaign.resource.research', { id: 'research', spendable: true }, 'name', 'what'),
+  worded('campaign.resource.standing', { id: 'standing', spendable: false }, 'name', 'what'),
+  worded('campaign.resource.clearance', { id: 'clearance', spendable: false }, 'name', 'what'),
 ]);
 
 /* ── §12.3 the departments ────────────────────────────────────────────────────
  * `rewards` and `values` are the GDD table. `dimensions` and `behaviours` are how this
  * file turns a debrief into standing, and the base screen prints them so a player can
- * read WHY Logistics is unhappy instead of guessing at a hidden meter. */
+ * read WHY Logistics is unhappy instead of guessing at a hidden meter.
+ *
+ * ⚠ A DEPARTMENT IS AN ENGINE TABLE AND NOT A CONTENT DOCUMENT, which is the distinction
+ * that decides where its words live. content/site.json's rooms, facility upgrades and
+ * dossiers are authored data and the base screen interpolates every one of them; the six
+ * departments ship with the engine, in this file, and a site that shipped with different
+ * rooms would still have exactly these six. So they are keyed.
+ *
+ * ⚠ `values` AND `watches` ARE AUTHORED IN LOWER CASE. They are read mid-sentence by
+ * `base.standing.watches`, and the panel used to call `.toLowerCase()` on them on the way
+ * in — an engine performing a LOCALE operation on a translated string, which is wrong in
+ * German the first time one of them is a noun. The locale authors the case its own sentence
+ * needs and the panel no longer touches it. */
 export const DEPARTMENTS = Object.freeze([
-  { id: 'research', name: 'Research',
-    rewards: 'Better analysis, experimental sensors',
-    values: 'High-integrity evidence and samples',
-    watches: 'Evidence quality, research completion, rules read correctly' },
-  { id: 'engineering', name: 'Engineering',
-    rewards: 'Modular tools, lighter equipment',
-    values: 'Device recovery and field telemetry',
-    watches: 'Infrastructure damage, equipment stewardship, circuits restored' },
-  { id: 'medical', name: 'Medical',
-    rewards: 'Treatment and exposure countermeasures',
-    values: 'Personnel and civilian survival',
-    watches: 'Personnel survival, casualties recovered, field treatment' },
-  { id: 'security', name: 'Security',
-    rewards: 'Defensive equipment and transport armour',
-    values: 'Controlled threat response',
-    watches: 'Containment integrity, contacts taken, squad conduct' },
-  { id: 'ethics', name: 'Ethics Committee',
-    rewards: 'Intelligence, waivers, public-risk tools',
-    values: 'Proportional force and civilian care',
-    watches: 'Civilian outcome, secrecy, aborting rather than pressing on' },
-  { id: 'logistics', name: 'Logistics',
-    rewards: 'Cargo, maintenance, deployment options',
-    values: 'Equipment stewardship and efficient operations',
-    watches: 'Equipment stewardship, time to stabilisation' },
+  worded('campaign.department.research', { id: 'research' }, 'name', 'rewards', 'values', 'watches'),
+  worded('campaign.department.engineering', { id: 'engineering' }, 'name', 'rewards', 'values', 'watches'),
+  worded('campaign.department.medical', { id: 'medical' }, 'name', 'rewards', 'values', 'watches'),
+  worded('campaign.department.security', { id: 'security' }, 'name', 'rewards', 'values', 'watches'),
+  worded('campaign.department.ethics', { id: 'ethics' }, 'name', 'rewards', 'values', 'watches'),
+  worded('campaign.department.logistics', { id: 'logistics' }, 'name', 'rewards', 'values', 'watches'),
 ]);
 
 export const DEPARTMENT_IDS = Object.freeze(DEPARTMENTS.map((d) => d.id));
@@ -151,11 +197,11 @@ export const STANDING_CEILING = 100;
 /* Cost multipliers, not access gates. A department that likes you does you favours; one
  * that does not charges the full institutional rate and takes its time. */
 export const STANDING_TIERS = Object.freeze([
-  { min: -20, name: 'Obstructive', priceMultiplier: 1.40, note: 'Every request goes through review.' },
-  { min: -4, name: 'Cool', priceMultiplier: 1.15, note: 'Requests are honoured, slowly.' },
-  { min: 10, name: 'Working', priceMultiplier: 1.00, note: 'Standard institutional rate.' },
-  { min: 30, name: 'Trusted', priceMultiplier: 0.85, note: 'Your requests skip the queue.' },
-  { min: 60, name: 'Sponsor', priceMultiplier: 0.70, note: 'They are funding you on purpose.' },
+  worded('campaign.standingTier.Obstructive', { min: -20, priceMultiplier: 1.40 }, 'name', 'note'),
+  worded('campaign.standingTier.Cool', { min: -4, priceMultiplier: 1.15 }, 'name', 'note'),
+  worded('campaign.standingTier.Working', { min: 10, priceMultiplier: 1.00 }, 'name', 'note'),
+  worded('campaign.standingTier.Trusted', { min: 30, priceMultiplier: 0.85 }, 'name', 'note'),
+  worded('campaign.standingTier.Sponsor', { min: 60, priceMultiplier: 0.70 }, 'name', 'note'),
 ]);
 
 export function standingTier(value) {
@@ -168,19 +214,15 @@ export function standingTier(value) {
  * Milestone-based. Derived from facts the campaign already records, so it cannot drift
  * away from what the player has actually done and cannot be bought by accident. */
 export const CLEARANCE_TIERS = Object.freeze([
-  { level: 0, name: 'Provisional', requires: {},
-    grants: 'Operations room and the logistics counter. Nothing else is signed off yet.' },
+  worded('campaign.clearance.0', { level: 0, requires: {} }, 'name', 'grants'),
   /* ⚠ The containment corridor opens at Level 1, on the FIRST closed operation, and not at
    * Level 2 where the institutional fiction would prefer it. A tester who establishes
    * custody has to be able to go and look at what they caught in the same session — GDD
    * §26.2 lists the containment wing result display as a slice system, and a display
    * nobody reaches is not one. Level 2 gates the corridor's UPGRADES instead. */
-  { level: 1, name: 'Level 1 — Site', requires: { operations: 1 },
-    grants: 'Archive terminal, research station, and the containment observation corridor.' },
-  { level: 2, name: 'Level 2 — Regional', requires: { operations: 3, custodies: 1 },
-    grants: 'Specialised storage and perimeter monitoring may be requisitioned.' },
-  { level: 3, name: 'Level 3 — Sector', requires: { operations: 6, custodies: 3, research: 400 },
-    grants: 'Prototype requests, and contracts the region does not advertise.' },
+  worded('campaign.clearance.1', { level: 1, requires: { operations: 1 } }, 'name', 'grants'),
+  worded('campaign.clearance.2', { level: 2, requires: { operations: 3, custodies: 1 } }, 'name', 'grants'),
+  worded('campaign.clearance.3', { level: 3, requires: { operations: 6, custodies: 3, research: 400 } }, 'name', 'grants'),
 ]);
 
 export function clearanceFor(profile) {
@@ -241,87 +283,76 @@ export const MODIFIABLE_FIELDS = Object.freeze({
  * carry them, so an `add` would start from zero and produce a variant with an imager
  * range of minus eight metres. Absolute values for fields that do not exist yet. */
 export const UPGRADES = Object.freeze([
-  {
-    id: 'imager-headmount', family: 'thermal-imager', name: 'Head-mounted imager',
+  worded('campaign.upgrade.imager-headmount', {
+    id: 'imager-headmount', family: 'thermal-imager',
     department: 'engineering', costRequisition: 220, costResearch: 0,
     gains: ['portability', 'battery endurance'], losses: ['range', 'precision'],
-    blurb: 'Both hands back. You see less of the room and you see it worse, and you can carry the case while you do it.',
     modifiers: { set: { bulk: 'compact', imagerFovDeg: 38, imagerRangeM: 12 }, add: { batteryMinutes: 5 } },
-  },
-  {
-    id: 'imager-mast', family: 'thermal-imager', name: 'Long-range thermal scanner',
+  }, 'name', 'blurb'),
+  worded('campaign.upgrade.imager-mast', {
+    id: 'imager-mast', family: 'thermal-imager',
     department: 'research', costRequisition: 260, costResearch: 60,
     gains: ['range', 'precision'], losses: ['portability', 'battery endurance'],
-    blurb: 'Reads an aisle end to end from the stair head. It is a long item and it eats its cells.',
     modifiers: { set: { bulk: 'long', imagerFovDeg: 30, imagerRangeM: 34 }, add: { cargoVolume: 1, batteryMinutes: -4 } },
-  },
-  {
-    id: 'imager-relay', family: 'thermal-imager', name: 'Remote thermal relay',
+  }, 'name', 'blurb'),
+  worded('campaign.upgrade.imager-relay', {
+    id: 'imager-relay', family: 'thermal-imager',
     department: 'engineering', costRequisition: 300, costResearch: 90,
     gains: ['remote operation', 'data logging'], losses: ['portability', 'battery endurance'],
-    blurb: 'Watches a lane nobody is standing in and files every frame. Heavier, and it dies sooner.',
     modifiers: { set: { remoteOperable: true, logsToArchive: true, imagerRangeM: 18 }, add: { cargoVolume: 1, batteryMinutes: -3 } },
     economy: { researchBonusPct: 6 },
-  },
-  {
-    id: 'tripod-lowdraw', family: 'floodlight-tripod', name: 'Low-draw floodlight',
+  }, 'name', 'blurb'),
+  worded('campaign.upgrade.tripod-lowdraw', {
+    id: 'tripod-lowdraw', family: 'floodlight-tripod',
     department: 'logistics', costRequisition: 180, costResearch: 0,
     gains: ['battery endurance', 'durability'], losses: ['range'],
-    blurb: 'Runs most of an operation on one charge. Its 40C contour is visibly smaller, and the aisles did not get narrower.',
     modifiers: { set: { ruggedised: true }, add: { batteryMinutes: 4.5, heatOutputCelsius: -9, heatFalloffMetres: -0.35 } },
-  },
-  {
-    id: 'tripod-widefield', family: 'floodlight-tripod', name: 'Wide-field floodlight',
+  }, 'name', 'blurb'),
+  worded('campaign.upgrade.tripod-widefield', {
+    id: 'tripod-widefield', family: 'floodlight-tripod',
     department: 'engineering', costRequisition: 240, costResearch: 0,
     gains: ['range', 'environmental resistance'], losses: ['portability', 'battery endurance'],
-    blurb: 'One unit can span a 4.2m aisle. You will carry fewer of them and change cells sooner.',
     modifiers: { set: { environmentalSealC: -20 }, add: { heatFalloffMetres: 0.6, heatOutputCelsius: 6, cargoVolume: 1, batteryMinutes: -1.8 } },
-  },
-  {
-    id: 'case-logger', family: 'reinforced-transit-case', name: 'Instrumented transit case',
+  }, 'name', 'blurb'),
+  worded('campaign.upgrade.case-logger', {
+    id: 'case-logger', family: 'reinforced-transit-case',
     department: 'research', costRequisition: 210, costResearch: 80,
     gains: ['data logging', 'precision'], losses: ['battery endurance'],
-    blurb: 'Logs interior conditions through the hold, which is most of what Research wanted from the operation. The sensor bus is drawn off the same cells as the heater.',
     modifiers: { set: { logsToArchive: true }, add: { batteryMinutes: -2.5 } },
     economy: { researchBonusPct: 10 },
-  },
-  {
-    id: 'barrier-composite', family: 'portable-barrier', name: 'Composite barrier panel',
+  }, 'name', 'blurb'),
+  worded('campaign.upgrade.barrier-composite', {
+    id: 'barrier-composite', family: 'portable-barrier',
     department: 'engineering', costRequisition: 200, costResearch: 0,
     gains: ['durability', 'environmental resistance'], losses: ['portability'],
-    blurb: 'Wider panel, survives being dragged. It takes the volume of something else you wanted.',
     modifiers: { set: { ruggedised: true }, add: { barrierWidthMetres: 0.5, cargoVolume: 1 } },
-  },
-  {
-    id: 'pack-fastfeed', family: 'power-pack', name: 'Distribution power pack',
+  }, 'name', 'blurb'),
+  worded('campaign.upgrade.pack-fastfeed', {
+    id: 'pack-fastfeed', family: 'power-pack',
     department: 'engineering', costRequisition: 190, costResearch: 0,
     gains: ['range'], losses: ['battery endurance'],
-    blurb: 'Feeds a wider ring of emitters for a shorter time. A fence that holds while you seal, and not much longer.',
     modifiers: { add: { feedRadiusMetres: 1.6, batteryMinutes: -2.5 } },
-  },
-  {
-    id: 'sensor-net', family: 'motion-sensor', name: 'Networked lane sensor',
+  }, 'name', 'blurb'),
+  worded('campaign.upgrade.sensor-net', {
+    id: 'sensor-net', family: 'motion-sensor',
     department: 'security', costRequisition: 170, costResearch: 0,
     gains: ['remote operation', 'range'], losses: ['battery endurance', 'portability'],
-    blurb: 'Covers a whole aisle and reports to the command point. Still reports motion, not identity.',
     modifiers: { set: { remoteOperable: true, sensorLaneM: 14 }, add: { batteryMinutes: -5, cargoVolume: 1 } },
-  },
-  {
-    id: 'sample-kit-assay', family: 'sample-kit', name: 'Field assay kit',
+  }, 'name', 'blurb'),
+  worded('campaign.upgrade.sample-kit-assay', {
+    id: 'sample-kit-assay', family: 'sample-kit',
     department: 'research', costRequisition: 150, costResearch: 40,
     gains: ['data logging', 'precision'], losses: ['portability'],
-    blurb: 'Grades the sample on the floor instead of at the bench, so a bad sample is known while there is still time to take another.',
     modifiers: { set: { logsToArchive: true }, add: { cargoVolume: 1 } },
     economy: { researchBonusPct: 8 },
-  },
-  {
-    id: 'trauma-kit-sealed', family: 'trauma-kit', name: 'Sealed trauma pouch',
+  }, 'name', 'blurb'),
+  worded('campaign.upgrade.trauma-kit-sealed', {
+    id: 'trauma-kit-sealed', family: 'trauma-kit',
     department: 'medical', costRequisition: 140, costResearch: 0,
     gains: ['portability', 'durability'], losses: ['data logging'],
-    blurb: 'Survives a contaminated floor and rides on a belt loop. It records nothing, so Medical learns nothing from the exposure it treats.',
     modifiers: { set: { ruggedised: true, logsToArchive: false } },
     economy: { researchBonusPct: -5 },
-  },
+  }, 'name', 'blurb'),
 ]);
 
 export const UPGRADES_BY_ID = new Map(UPGRADES.map((u) => [u.id, u]));
@@ -410,15 +441,9 @@ export function applyModifiers(item, mods) {
  * ⚠ None of these effects makes an operative easier to hurt. Reduced carrying tolerance
  * and slower stabilisation are CAPABILITY, not fragility (§12.1). */
 export const INJURY_EFFECTS = Object.freeze([
-  { id: 'strain', name: 'Reduced carrying tolerance', operations: 2,
-    effect: { cargoVolume: -1 },
-    note: 'Cracked ribs from a fall on the stair. They can deploy; they cannot take the long items.' },
-  { id: 'exposure', name: 'Slower stabilisation', operations: 2,
-    effect: { stabiliseFactor: 1.35 },
-    note: 'Cold injury. Treating them in the field takes half again as long as it should.' },
-  { id: 'fatigue', name: 'Post-critical fatigue', operations: 3,
-    effect: { cargoVolume: -1, stabiliseFactor: 1.2 },
-    note: 'Came out on a stretcher. Cleared to deploy, and everyone can see they should not be carrying the case.' },
+  worded('campaign.injury.strain', { id: 'strain', operations: 2, effect: { cargoVolume: -1 } }, 'name', 'note'),
+  worded('campaign.injury.exposure', { id: 'exposure', operations: 2, effect: { stabiliseFactor: 1.35 } }, 'name', 'note'),
+  worded('campaign.injury.fatigue', { id: 'fatigue', operations: 3, effect: { cargoVolume: -1, stabiliseFactor: 1.2 } }, 'name', 'note'),
 ]);
 
 export const INJURY_BY_ID = new Map(INJURY_EFFECTS.map((i) => [i.id, i]));
@@ -426,10 +451,10 @@ export const INJURY_BY_ID = new Map(INJURY_EFFECTS.map((i) => [i.id, i]));
 /* §12.5: "Treatment uses time, site capacity, or medical resources." All three are here.
  * Capacity is beds — one, until the isolation bay is built (content/site.json). */
 export const TREATMENTS = Object.freeze([
-  { id: 'observation-rest', name: 'Rest and observation', costRequisition: 0, clears: 1, capacity: 0,
-    note: 'Costs a slot in the rotation rather than money. One operation of the effect, gone.' },
-  { id: 'infirmary-course', name: 'Infirmary course', costRequisition: 70, clears: 3, capacity: 1,
-    note: 'Occupies a bed and a budget line. Clears the condition outright.' },
+  worded('campaign.treatment.observation-rest',
+    { id: 'observation-rest', costRequisition: 0, clears: 1, capacity: 0 }, 'name', 'note'),
+  worded('campaign.treatment.infirmary-course',
+    { id: 'infirmary-course', costRequisition: 70, clears: 3, capacity: 1 }, 'name', 'note'),
 ]);
 
 export const TREATMENTS_BY_ID = new Map(TREATMENTS.map((t) => [t.id, t]));
@@ -585,19 +610,18 @@ export const DIMENSION_KEY_BY_ID = Object.freeze({
  * departmental priorities", and an economy that only reads the final grade cannot see the
  * difference between a squad that dragged a casualty out and one that got lucky. Every row
  * is capped so no single behaviour can be farmed. */
+/* ⚠ THE ROW CARRIES THE TALLY NAME AND NOT THE LABEL. It used to carry both, and the label
+ * was the English sentence — so the line a player reads about why Medical is pleased was
+ * spelled into the yield table. The tally IS the id (`mission.tally.rescues`), the label is
+ * `campaign.earnings.behaviour.<tally>`, and the loop below asks for it at credit time
+ * rather than at module load, which is the same live-lookup discipline `worded` keeps. */
 const BEHAVIOUR_YIELD = Object.freeze([
-  { tally: 'rescues', per: { medical: 2, security: 1 }, cap: 6,
-    label: 'Casualties recovered under pressure' },
-  { tally: 'treatments', per: { medical: 1 }, cap: 3,
-    label: 'Stabilised in the field' },
-  { tally: 'circuitsRestored', per: { engineering: 2 }, cap: 4,
-    label: 'Site systems restored' },
-  { tally: 'deployablesPlaced', per: { engineering: 1 }, cap: 3,
-    label: 'Field telemetry returned' },
-  { tally: 'contacts', per: { security: -1 }, cap: 4,
-    label: 'Contacts taken' },
-  { tally: 'custodyLosses', per: { security: -2, research: -1 }, cap: 4,
-    label: 'Custody lost and re-established' },
+  { tally: 'rescues', per: { medical: 2, security: 1 }, cap: 6 },
+  { tally: 'treatments', per: { medical: 1 }, cap: 3 },
+  { tally: 'circuitsRestored', per: { engineering: 2 }, cap: 4 },
+  { tally: 'deployablesPlaced', per: { engineering: 1 }, cap: 3 },
+  { tally: 'contacts', per: { security: -1 }, cap: 4 },
+  { tally: 'custodyLosses', per: { security: -2, research: -1 }, cap: 4 },
 ]);
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
@@ -671,13 +695,13 @@ export function earningsFor(result, mission = null, opts = {}) {
   /* The grant covers a deployment's routine cost. It is deliberately smaller than what a
    * closed operation earns and smaller than what a lost one costs, so it softens a bad
    * run without ever making one worth having. */
-  credit('Operating grant', 'Paid on every operation the site closes, whatever it cost.',
+  credit(msg('campaign.earnings.grant.label'), msg('campaign.earnings.grant.detail'),
     { req: OPERATING_STIPEND + effects.requisitionPerOperation });
 
   /* Deploying is not free. §12.6 lists lost consumables as one of the things that keeps
    * stakes real when an operation fails, and a squad that walks back in with everything
    * still in the van has spent nothing at all. */
-  credit('Deployment cost', 'Consumables, transport and the van, spent whether or not it worked.',
+  credit(msg('campaign.earnings.deployment.label'), msg('campaign.earnings.deployment.detail'),
     { req: -DEPLOYMENT_COST });
 
   for (const d of dims) {
@@ -696,10 +720,10 @@ export function earningsFor(result, mission = null, opts = {}) {
       if (!Number.isFinite(mins) || mins <= 0) continue;
       if (mins <= TIME_TARGET_MINUTES) {
         const under = Math.min(TIME_TARGET_MINUTES, TIME_TARGET_MINUTES - mins);
-        credit(d.name, `${mins.toFixed(1)} min against a ${TIME_TARGET_MINUTES} min window.`,
+        credit(d.name, msg('campaign.earnings.timeUnder', { minutes: mins.toFixed(1), target: TIME_TARGET_MINUTES }),
           { req: Math.round(under * 3), st: { logistics: 2 } });
       } else {
-        credit(d.name, `${mins.toFixed(1)} min against a ${TIME_TARGET_MINUTES} min window. Overrun.`,
+        credit(d.name, msg('campaign.earnings.timeOver', { minutes: mins.toFixed(1), target: TIME_TARGET_MINUTES }),
           { st: { logistics: -1 } });
       }
       continue;
@@ -719,8 +743,8 @@ export function earningsFor(result, mission = null, opts = {}) {
    * than checklist completion, and an economy that fined a wrong mark would teach players
    * to leave the board blank — which is the one behaviour the board exists to prevent. */
   if (claims.correct > 0) {
-    credit('Rules read correctly',
-      `${claims.correct} of ${claims.total} claims marked as the site behaved. ${claims.wrong} misread, at no cost.`,
+    credit(msg('campaign.earnings.rulesRead.label'),
+      msg('campaign.earnings.rulesRead.detail', { correct: claims.correct, total: claims.total, wrong: claims.wrong }),
       { res: RESEARCH_PER_RULE_READ * claims.correct, st: { research: Math.min(4, claims.correct) } });
   }
 
@@ -729,7 +753,10 @@ export function earningsFor(result, mission = null, opts = {}) {
     if (!n) continue;
     const st = {};
     for (const [dept, v] of Object.entries(b.per)) st[dept] = v * n;
-    credit(b.label, `${n}${n === b.cap ? ' (capped)' : ''}`, { st });
+    /* Two whole messages rather than a number with a suffix stuck on the end of it: the
+     * capped line is a different thing said, not the same line plus a word. */
+    credit(msg(`campaign.earnings.behaviour.${b.tally}`),
+      msg(n === b.cap ? 'campaign.earnings.tallyCapped' : 'campaign.earnings.tally', { count: n }), { st });
   }
 
   /* Backing off and re-planning is the §5.4 relief move, and §12.3 has Ethics valuing
@@ -737,13 +764,17 @@ export function earningsFor(result, mission = null, opts = {}) {
    * enough to make it a real option, not enough to make it a loop. */
   const aborts = Math.min(2, Math.max(0, Number(mission && mission.abortCount) || 0));
   if (aborts) {
-    credit('Aborted and re-planned', `${aborts} procedure${aborts === 1 ? '' : 's'} withdrawn rather than pressed.`,
+    credit(msg('campaign.earnings.aborts.label'), plural('campaign.earnings.aborts.detail', aborts),
       { st: { ethics: aborts } });
   }
 
   const bonus = OVERALL_BONUS[wordKey(result && result.overall)] || { requisition: 0, research: 0 };
   if (bonus.requisition || bonus.research) {
-    credit(`Assessment: ${result.overall}`, 'Institutional bonus on the overall word.',
+    /* ⚠ THE LABEL TAKES THE GRADE'S LABEL AND NOT ITS ID. It read `Assessment: ${overall}`,
+     * which put the untranslated §6.4 ladder word inside an otherwise translated line —
+     * the same defect the pseudolocale found on the HUD as "Încîdént préssûré: Latent". */
+    credit(msg('campaign.earnings.assessment.label', { word: msg(`grade.${result.overall}`) }),
+      msg('campaign.earnings.assessment.detail'),
       { req: bonus.requisition, res: bonus.research });
   }
 
@@ -755,8 +786,8 @@ export function earningsFor(result, mission = null, opts = {}) {
   if (itemsLost > 0) {
     replacement = Math.round(REPLACEMENT_PER_ITEM * itemsLost * (1 + effects.replacementCostPct / 100));
     lines.push({
-      label: 'Equipment replacement',
-      detail: `${itemsLost} issued item${itemsLost === 1 ? '' : 's'} written off and reordered.`,
+      label: msg('campaign.earnings.replacement.label'),
+      detail: plural('campaign.earnings.replacement.detail', itemsLost),
       requisition: -replacement, research: 0, standing: {},
     });
     requisition -= replacement;
@@ -766,8 +797,8 @@ export function earningsFor(result, mission = null, opts = {}) {
     const uplift = Math.round(research * (effects.researchBonusPct / 100));
     if (uplift) {
       lines.push({
-        label: 'Analysis capacity',
-        detail: `Site and fitted logging equipment add ${effects.researchBonusPct}% to the analytical yield.`,
+        label: msg('campaign.earnings.analysis.label'),
+        detail: msg('campaign.earnings.analysis.detail', { percent: effects.researchBonusPct }),
         requisition: 0, research: uplift, standing: {},
       });
       research += uplift;
@@ -853,7 +884,11 @@ export function defaultProfile() {
     upgrades: [],           // owned upgrade ids
     fitted: {},             // itemId -> upgrade id. One variant per family, on purpose.
     siteUpgrades: [],       // owned site upgrade ids
-    roster: [{ id: 'p1', name: 'Operative 1', operations: 0, condition: null, commendations: [] }],
+    /* ⚠ THE NAME IS WRITTEN INTO THE PROFILE AND SAVED, so it is fixed in the locale that
+     * created the character rather than following the one being read. That is the right
+     * answer for a name: an operative called Operative 1 on the day they were rostered does
+     * not become Opérative 1 because somebody changed a setting. */
+    roster: [{ id: 'p1', name: msg('campaign.roster.starting'), operations: 0, condition: null, commendations: [] }],
     containment: [],        // one entry per anomaly in custody, with operational history
     history: [],            // one entry per closed operation, newest last
   };
@@ -1019,6 +1054,12 @@ function strings(arr, keep, field, report, fromEnd = true) {
     if (typeof s === 'string') out.push(s.slice(0, 240));
     else bad++;
   }
+  /* ⚠ THE ONE `n === 1 ? a : b` LEFT IN THIS FILE, AND IT IS DELIBERATE. Four others were
+   * player-facing and are now plural GROUPS selected by Intl.PluralRules. This one writes into
+   * `report.dropped`, which is a developer diagnostic and is never printed at a player — the
+   * base screen prints `report.notices` and nothing else, and `tools/i18n-tests.js` J9 asserts
+   * that. A diagnostic nobody translates does not need a plural rule; making it one would put
+   * an untranslatable field path into the message table for no reader. */
   if (bad) drop(report, field, `${bad} entr${bad === 1 ? 'y was' : 'ies were'} not text`, null);
   if (arr.length > keep) drop(report, field, `held ${arr.length}; ${keep} were kept`, null);
   return fromEnd ? out.slice(-keep) : out.slice(0, keep);
@@ -1056,7 +1097,7 @@ function sanitiseRoster(arr, report) {
     }
     out.push({
       id,
-      name: typeof r.name === 'string' && r.name ? r.name.slice(0, 14) : 'Operative',
+      name: typeof r.name === 'string' && r.name ? r.name.slice(0, 14) : msg('campaign.roster.unnamed'),
       operations: counted(r.operations, { max: CEILINGS.operations, field: `roster[${id}].operations`, report }),
       condition,
       commendations: strings(r.commendations, 8, `roster[${id}].commendations`, report, false),
@@ -1197,7 +1238,7 @@ export function migrateWithReport(data) {
   if (typeof data !== 'object' || Array.isArray(data)) {
     report.outcome = 'repaired';
     drop(report, '(root)', `the save is ${Array.isArray(data) ? 'an array' : typeof data}, not a profile`, data);
-    tell(report, 'The stored profile was not readable, so this session starts fresh. The original has not been deleted.');
+    tell(report, msg('save.notice.unreadable'));
     return { profile: defaultProfile(), report };
   }
 
@@ -1213,8 +1254,11 @@ export function migrateWithReport(data) {
   if (version > PROGRESSION_VERSION) {
     report.outcome = 'refused';
     drop(report, 'version', `is ${version}; this build understands up to ${PROGRESSION_VERSION}`, version);
-    tell(report, `This profile was written by a newer build (save format ${version}; this one reads ${PROGRESSION_VERSION}).`
-      + ' It has been left exactly as it was and this session starts fresh — open the newer build to pick it up where you left off.');
+    /* ⚠ ONE MESSAGE, NOT TWO STUCK TOGETHER. This was a template literal `+` a second
+     * sentence, which is sentence assembly at runtime: a language that wants the advice
+     * before the diagnosis cannot move the halves, because it is only ever handed them
+     * already joined. Interpolation is allowed and concatenation is not. */
+    tell(report, msg('save.notice.newerBuild', { version, reads: PROGRESSION_VERSION }));
     return { profile: defaultProfile(), report };
   }
 
@@ -1234,7 +1278,7 @@ export function migrateWithReport(data) {
         break;
       }
     }
-    tell(report, 'Your profile was saved by an older build and has been brought forward. Nothing was lost.');
+    tell(report, msg('save.notice.olderBuild'));
   } else {
     report.outcome = 'loaded';
   }
@@ -1310,7 +1354,10 @@ export function migrateWithReport(data) {
   const noticeable = report.dropped.filter((x) => /^(requisition|research|standing|knowledge|roster|containment|history|upgrades|siteUpgrades|fitted)/.test(x.field));
   if (noticeable.length && report.outcome !== 'refused') {
     if (report.outcome === 'loaded') report.outcome = 'repaired';
-    tell(report, `Part of your saved profile could not be read and was repaired: ${noticeable.length} field${noticeable.length === 1 ? '' : 's'} were reset. Everything else was kept.`);
+    /* ⚠ `field${n === 1 ? '' : 's'} were reset` — English's plural rule written out, AND it
+     * did not even agree with itself: one field "were reset". A plural group is two whole
+     * sentences and Intl.PluralRules picks, which is also how Polish gets its third form. */
+    tell(report, plural('save.notice.repaired', noticeable.length));
   }
   return { profile, report };
 }
@@ -1356,7 +1403,7 @@ export function loadProfileWithReport() {
   if (!s) {
     report.outcome = 'fresh';
     drop(report, '(storage)', 'localStorage is unavailable; nothing will be saved this session', null);
-    tell(report, 'This browser is not allowing local storage, so nothing from this session will be kept. Private-browsing windows do this.');
+    tell(report, msg('save.notice.noStorage'));
     return { profile: defaultProfile(), report };
   }
   let raw;
@@ -1370,8 +1417,7 @@ export function loadProfileWithReport() {
     report.outcome = 'repaired';
     drop(report, '(root)', `the save is not valid JSON (${e && e.message})`, null);
     quarantine(s, raw, report, 'the save could not be parsed');
-    tell(report, 'The stored profile was damaged and could not be read, so this session starts fresh.'
-      + ' The damaged copy has been kept rather than deleted.');
+    tell(report, msg('save.notice.damaged'));
     return { profile: defaultProfile(), report };
   }
 
@@ -1443,14 +1489,14 @@ export function reconcileProfile(profile, { site = null, report = null } = {}) {
     if (entry.cellId && !cellIds.has(entry.cellId) && !isOverflow(entry.cellId)) {
       drop(report, `containment[${entry.anomalyId}].cellId`,
         `names holding position "${entry.cellId}", which this site does not have; recorded as unplaced so it stays on the corridor list`, entry.cellId);
-      tell(report, 'A holding position named in your profile no longer exists at this site. What was in it is now listed as unplaced and will be given a real cell when one is free.');
+      tell(report, msg('save.notice.cellGone'));
       entry.cellId = null;
     }
     if (!known.has(entry.anomalyId)) {
       /* Kept. A build that stops shipping an anomaly does not empty its cells. */
       entry.unknownAnomaly = true;
       drop(report, `containment[${entry.anomalyId}]`, 'names an anomaly this build has no dossier for; kept, and marked', entry.anomalyId);
-      tell(report, 'Something in the containment corridor was filed under an anomaly this build no longer carries a dossier for. It is still listed, and still occupies its position.');
+      tell(report, msg('save.notice.unknownAnomaly'));
     } else {
       entry.unknownAnomaly = false;
     }
@@ -1463,7 +1509,7 @@ export function reconcileProfile(profile, { site = null, report = null } = {}) {
     return false;
   });
   if (profile.siteUpgrades.length !== before) {
-    tell(report, 'A facility upgrade recorded in your profile is not one this build has. It was doing nothing and has been removed.');
+    tell(report, msg('save.notice.upgradeGone'));
   }
   return profile;
 }
@@ -1662,12 +1708,12 @@ export class Progression {
 
   buyUpgrade(upgradeId) {
     const up = UPGRADES_BY_ID.get(upgradeId);
-    if (!up) return 'No such upgrade.';
-    if (this.owns(upgradeId)) return 'Already requisitioned.';
+    if (!up) return msg('campaign.refuse.noSuchUpgrade');
+    if (this.owns(upgradeId)) return msg('campaign.refuse.alreadyRequisitioned');
     const price = this.priceOf(up);
-    if (this.profile.requisition < price) return `Requisition short by ${price - this.profile.requisition}.`;
+    if (this.profile.requisition < price) return msg('campaign.refuse.requisitionShort', { amount: price - this.profile.requisition });
     if ((up.costResearch || 0) > this.profile.research) {
-      return `Research data short by ${up.costResearch - this.profile.research}.`;
+      return msg('campaign.refuse.researchShort', { amount: up.costResearch - this.profile.research });
     }
     this.profile.requisition -= price;
     this.profile.research -= (up.costResearch || 0);
@@ -1687,9 +1733,9 @@ export class Progression {
   fitUpgrade(itemId, upgradeId) {
     if (upgradeId === null) { delete this.profile.fitted[itemId]; this.save(); return null; }
     const up = UPGRADES_BY_ID.get(upgradeId);
-    if (!up) return 'No such upgrade.';
-    if (up.family !== itemId) return `${up.name} does not fit a ${itemId}.`;
-    if (!this.owns(upgradeId)) return 'Not requisitioned yet.';
+    if (!up) return msg('campaign.refuse.noSuchUpgrade');
+    if (up.family !== itemId) return msg('campaign.refuse.doesNotFit', { upgrade: up.name, item: itemId });
+    if (!this.owns(upgradeId)) return msg('campaign.refuse.notRequisitioned');
     this.profile.fitted[itemId] = upgradeId;
     this.save();
     return null;
@@ -1706,16 +1752,16 @@ export class Progression {
 
   buySiteUpgrade(id) {
     const found = this.siteUpgradeById(id);
-    if (!found) return 'No such site upgrade.';
+    if (!found) return msg('campaign.refuse.noSuchSiteUpgrade');
     const { upgrade: u } = found;
-    if (this.profile.siteUpgrades.includes(id)) return 'Already built.';
+    if (this.profile.siteUpgrades.includes(id)) return msg('campaign.refuse.alreadyBuilt');
     if (u.requiresUpgrade && !this.profile.siteUpgrades.includes(u.requiresUpgrade)) {
-      return 'Depends on work that has not been done.';
+      return msg('campaign.refuse.blocked');
     }
-    if ((u.clearanceRequired || 0) > this.clearance) return `Requires ${clearanceTier(u.clearanceRequired).name}.`;
+    if ((u.clearanceRequired || 0) > this.clearance) return msg('campaign.refuse.requiresTier', { tier: clearanceTier(u.clearanceRequired).name });
     const price = this.priceOf(u);
-    if (this.profile.requisition < price) return `Requisition short by ${price - this.profile.requisition}.`;
-    if ((u.costResearch || 0) > this.profile.research) return `Research data short by ${u.costResearch - this.profile.research}.`;
+    if (this.profile.requisition < price) return msg('campaign.refuse.requisitionShort', { amount: price - this.profile.requisition });
+    if ((u.costResearch || 0) > this.profile.research) return msg('campaign.refuse.researchShort', { amount: u.costResearch - this.profile.research });
     this.profile.requisition -= price;
     this.profile.research -= (u.costResearch || 0);
     this.profile.siteUpgrades.push(id);
@@ -1730,11 +1776,17 @@ export class Progression {
     const wing = (this.site && this.site.containmentWing) || { cells: [] };
     const extra = this.effects().containmentCells;
     const cells = (wing.cells || []).slice();
+    /* ⚠ EVERY DECLARED CELL IS CONTENT AND THESE TWO LINES ARE NOT. A holding position the
+     * site file names carries its own label and its own holding description and the corridor
+     * interpolates both; an overflow position is INVENTED here when the specialised-storage
+     * upgrade is built — numbered rather than declared — and there is nowhere in content for
+     * its words to live, so the engine has to be able to say them. Built fresh on every call,
+     * so the lookup is live rather than frozen at construction. */
     for (let i = 0; i < extra; i++) {
       cells.push({
         id: `overflow-${i + 1}`,
-        label: `Specialised storage ${i + 1}`,
-        holding: 'Built out of the requisition budget. Climate and sensor ports on the same bus as the main run.',
+        label: msg('campaign.cell.overflowLabel', { index: i + 1 }),
+        holding: msg('campaign.cell.overflowHolding'),
       });
     }
     return cells;
@@ -1746,12 +1798,30 @@ export class Progression {
    *  always field a character — an injury is a handicap, never a bench. */
   fieldable() { return this.profile.roster.slice(); }
 
+  /**
+   * ⚠ NOT `{ ...eff }`. Spreading an injury row copies its `name` and `note` GETTERS' values
+   * at the moment of the spread, and the reason the tables are accessors in the first place
+   * is that a copied value cannot answer differently after the locale changes. The spread
+   * here happens on every render rather than at module load, so it would have been wrong
+   * only in the window between a locale change and the next repaint — which is exactly the
+   * kind of defect that passes every assertion and shows up as one stale label on a screen.
+   * The id, the operations figure and the effect block are data and are copied; the two
+   * words stay live lookups into the row.
+   */
   conditionOf(operativeId) {
     const op = this.profile.roster.find((r) => r.id === operativeId);
     if (!op || !op.condition) return null;
     const eff = INJURY_BY_ID.get(op.condition.id);
     if (!eff) return null;
-    return { ...eff, operationsRemaining: op.condition.operationsRemaining };
+    return Object.defineProperties({
+      id: eff.id,
+      operations: eff.operations,
+      effect: eff.effect,
+      operationsRemaining: op.condition.operationsRemaining,
+    }, {
+      name: { get: () => eff.name, enumerable: true },
+      note: { get: () => eff.note, enumerable: true },
+    });
   }
 
   /** The loadout modifiers a squad carries into the field because of injuries. */
@@ -1775,15 +1845,17 @@ export class Progression {
    */
   treat(operativeId, treatmentId) {
     const op = this.profile.roster.find((r) => r.id === operativeId);
-    if (!op) return 'No such operative.';
-    if (!op.condition) return 'Nothing to treat.';
+    if (!op) return msg('campaign.refuse.noSuchOperative');
+    if (!op.condition) return msg('campaign.refuse.nothingToTreat');
+    /* ⚠ `t` IS THE TREATMENT HERE, which is why the translator is imported as `msg`. */
     const t = TREATMENTS_BY_ID.get(treatmentId);
-    if (!t) return 'No such treatment.';
+    if (!t) return msg('campaign.refuse.noSuchTreatment');
     const beds = this.treatmentCapacity();
     const inUse = this.profile.roster.filter((r) => r.condition && r.condition.treatedThisRotation).length;
-    if (t.capacity > 0 && inUse + t.capacity > beds) return `The site has ${beds} isolation bed${beds === 1 ? '' : 's'} and ${inUse} in use.`;
+    /* `bed${beds === 1 ? '' : 's'}` was English's plural rule written out; the group selects. */
+    if (t.capacity > 0 && inUse + t.capacity > beds) return plural('campaign.refuse.bedsInUse', beds, { inUse });
     const price = Math.round(t.costRequisition * (1 + this.effects().treatmentCostPct / 100));
-    if (this.profile.requisition < price) return `Requisition short by ${price - this.profile.requisition}.`;
+    if (this.profile.requisition < price) return msg('campaign.refuse.requisitionShort', { amount: price - this.profile.requisition });
     this.profile.requisition -= price;
     op.condition.operationsRemaining -= t.clears;
     if (op.condition.operationsRemaining <= 0) op.condition = null;
@@ -2018,9 +2090,13 @@ export class Progression {
       const since = this.profile.operationsCompleted - entry.lastCheckedOperation;
       if (since < interval) continue;
       entry.lastCheckedOperation = this.profile.operationsCompleted;
+      /* The note itself is CONTENT — `containmentWing.maintenanceNotes` in content/site.json,
+       * written to be reviewed as writing — and only the frame around it is the engine's.
+       * The fallback exists for a site file that declares no notes at all, which is a shape
+       * the validator permits, and the engine has to be able to say something then. */
       const template = (wing.maintenanceNotes || [])[entry.maintenance.length % Math.max(1, (wing.maintenanceNotes || []).length)]
-        || 'Scheduled check due. Sensor log reviewed, no change recorded.';
-      const note = `Operation ${this.profile.operationsCompleted}: ${template}`;
+        || msg('campaign.corridor.maintenanceDefault');
+      const note = msg('campaign.corridor.maintenanceNote', { operation: this.profile.operationsCompleted, note: template });
       entry.maintenance.push(note);
       entry.maintenance = entry.maintenance.slice(-4);
       notes.push({ anomalyId: entry.anomalyId, note });
@@ -2038,7 +2114,23 @@ export class Progression {
     const dossier = this.dossierFor(anomalyId);
     const existing = this.profile.containment.find((c) => c.anomalyId === anomalyId);
     const opN = this.profile.operationsCompleted;
-    const line = `Operation ${opN}: custody verified${minutes ? ` at ${Number(minutes).toFixed(1)} min` : ''}. Transferred under ${(dossier && dossier.holding) || 'standard escort'}.`;
+    /**
+     * ⚠ FOUR WHOLE MESSAGES, NOT ONE SENTENCE WITH TWO HOLES OPTIONALLY FILLED. The line was
+     * assembled from two conditionals — a timing clause that appears only when the operation
+     * was measured, and an escort clause whose value comes from the dossier when there is one
+     * — and a sentence built that way cannot be moved: a language that puts the measure first,
+     * or that inflects the verb for the presence of the escort, is only ever handed the pieces
+     * already welded in English order. Interpolation is allowed and concatenation is not.
+     *
+     * `dossier.holding` is CONTENT and is interpolated. The standard-escort wording is the
+     * engine's own fallback for an anomaly with no dossier, so it is a message of its own
+     * rather than a fragment substituted into the placeholder.
+     */
+    const timed = minutes ? 'Timed' : '';
+    const holding = (dossier && dossier.holding) || null;
+    const line = holding
+      ? msg(`campaign.corridor.custody${timed}`, { operation: opN, minutes: Number(minutes).toFixed(1), holding })
+      : msg(`campaign.corridor.custodyStandard${timed}`, { operation: opN, minutes: Number(minutes).toFixed(1) });
     if (existing) {
       existing.history.push(line);
       existing.history = existing.history.slice(-8);
@@ -2084,9 +2176,9 @@ export class Progression {
       maintenance: [],
     };
     if (improvised) {
-      entry.history.push(`Placed in ${cell.label || cell.id}, which is not rated ${need}. Logged as an improvised position pending a rated one.`);
+      entry.history.push(msg('campaign.corridor.improvised', { cell: cell.label || cell.id, rating: need }));
     } else if (!cell) {
-      entry.history.push('No holding position was free. Held on the vehicle bay bus and recorded as unplaced.');
+      entry.history.push(msg('campaign.corridor.unplaced'));
     }
     this.profile.containment.push(entry);
     return entry;
@@ -2137,7 +2229,11 @@ export function dimWord(result, idOrName) {
  * now; the regex survives only as a fallback for a result stored by an older build.
  */
 export function minutesFrom(result) {
-  const d = dimOf(result, 'time') || dimOf(result, 'Time to stabilisation');
+  /* ⚠ THE SECOND LOOKUP WAS THE ENGLISH DISPLAY NAME, SPELLED OUT. `dimOf` normalises what
+   * it is given and what it finds, so `DIMENSION_KEY_BY_ID.time` — 'timetostabilisation' —
+   * matches the same old results the literal did, without an English sentence sitting in an
+   * engine file where a spelling pass or a translation could quietly stop it matching. */
+  const d = dimOf(result, 'time') || dimOf(result, DIMENSION_KEY_BY_ID.time);
   if (d && typeof d.value === 'number' && Number.isFinite(d.value) && d.value > 0) return d.value;
   const n = Number(String((d && d.word) || '').replace(/[^0-9.]/g, ''));
   return Number.isFinite(n) && n > 0 ? n : null;

@@ -36,7 +36,8 @@ import { PING_KINDS, COMMS_CAPTIONS } from '../src/sim/comms.js';
 import { PROCEDURE_FIELDS, MAINTAINED, ABORTS } from '../src/ui/panels.js';
 import { CLAIMS } from '../src/sim/evidence.js';
 import {
-  Progression, loadSite, DEPARTMENTS, UPGRADES, TREATMENTS, CLEARANCE_TIERS,
+  Progression, loadSite, UPGRADES, SIDEGRADE_AXES, migrateWithReport, defaultProfile,
+  earningsFor, PROGRESSION_VERSION,
 } from '../src/sim/progression.js';
 import { Input } from '../src/core/input.js';
 import { varyContent, WEATHER, TIMES } from '../src/sim/variation.js';
@@ -49,6 +50,11 @@ const CONVERTED = [
   'src/ui/commswheel.js', 'src/sim/comms.js', 'src/audio/audio.js',
   'src/sim/evidence.js', 'src/sim/instances.js', 'src/sim/variation.js',
   'src/sim/site.js', 'src/sim/anomaly.js', 'src/sim/perception.js', 'src/core/input.js',
+  /* The last one, and the biggest: the campaign's own tables — six departments, four
+   * clearance tiers, five standing bands, eight sidegrade axes, eleven equipment variants,
+   * three injuries, two treatments — plus every debrief ledger line, every counter refusal,
+   * every containment history line and every sentence the migration report says. */
+  'src/sim/progression.js',
 ];
 
 /**
@@ -208,6 +214,55 @@ async function sectionCC() {
   const usMessages = Object.values(flatten(await (await fetch('/content/locales/en-US.json')).json())).join(' ');
   ok('CC7 and it does not convert a number a rule is stated in',
     !/\bft\b|\binch|Fahrenheit|°F/.test(usMessages), usMessages.slice(0, 120));
+
+  /**
+   * ⚠ THE SET OF SPELLINGS IS DERIVED AND NOT REMEMBERED, because remembering it failed.
+   *
+   * `en-US.json`'s own note said "'stabilised' is 'stabilized' — that is the whole change",
+   * and it was untrue when it was written: `settings.blurb.vision` said Colour and
+   * `base.ops.locked` said authorised, neither overridden. So an American player read the
+   * accessibility screen in British spelling and the debrief in American — the half-and-half
+   * outcome the fallback exists to prevent, arriving through the front door because the list
+   * of what to override lived in a sentence rather than in a check.
+   *
+   * CC6 above is a NAMED regression list over the eight that were found first. This is the
+   * sweep: every message in the default locale carrying one of these words must be overridden,
+   * and the partial locale must not itself carry one.
+   */
+  const SPELLINGS = [['authorised', 'authorized'], ['stabilis', 'stabiliz'], ['specialis', 'specializ'],
+    ['organis', 'organiz'], ['recognis', 'recogniz'],
+    /* ⚠ `analyse`, NOT `analys`. The VERB differs and the NOUN does not: "analysis" and
+     * "analytical" are spelled the same on both sides of the Atlantic, and the shorter stem
+     * flagged three messages that were already correct — a check that reports a message it
+     * would be wrong to change is a check people learn to skip. */
+    ['analyse', 'analyze'],
+    ['behaviour', 'behavior'], ['armour', 'armor'], ['honour', 'honor'], ['colour', 'color'],
+    ['favour', 'favor'], ['defence', 'defense'], ['licence', 'license'], ['centre', 'center'],
+    ['grey', 'gray'], ['travelled', 'traveled'], ['cancelled', 'canceled'], ['labelled', 'labeled']];
+  /**
+   * ⚠ TWO EXEMPTIONS, AND BOTH ARE THE SAME ONE. Each of these echoes the NAME
+   * `content/site.json` gives the facility upgrade that builds an overflow holding position.
+   * A locale may translate what the engine says; it may not rename a thing the content package
+   * named, or the corridor and the armory end up calling one upgrade two things. Listed here
+   * rather than pattern-matched away, so adding a third is something somebody has to defend.
+   */
+  const SPELLING_EXEMPT = ['campaign.cell.overflowLabel', 'campaign.clearance.2.grants'];
+  const gbDoc = await (await fetch('/content/locales/en-GB.json')).json();
+  const usDoc = await (await fetch('/content/locales/en-US.json')).json();
+  const gbFlat = flatten(gbDoc);
+  const usFlat = flatten(usDoc);
+  const british = (s) => SPELLINGS.filter(([gb]) => new RegExp(gb, 'i').test(String(s))).map(([gb]) => gb);
+  const unoverridden = Object.keys(gbFlat)
+    .filter((k) => usFlat[k] === undefined && !SPELLING_EXEMPT.includes(k) && british(gbFlat[k]).length)
+    .map((k) => `${k} (${british(gbFlat[k]).join(', ')})`);
+  eq(`CC14 every message spelled the British way is overridden by the American locale${
+    unoverridden.length ? ` — ${unoverridden.join(' · ')}` : ''}`, unoverridden.length, 0);
+  const stillBritish = Object.keys(usFlat).filter((k) => british(usFlat[k]).length)
+    .map((k) => `${k} (${british(usFlat[k]).join(', ')})`);
+  eq(`CC15 and the American locale does not itself carry one${
+    stillBritish.length ? ` — ${stillBritish.join(' · ')}` : ''}`, stillBritish.length, 0);
+  note(`${Object.keys(usFlat).length} en-US overrides over ${Object.keys(gbFlat).length} en-GB messages; `
+    + `${SPELLING_EXEMPT.length} exempt because they echo a name content/site.json gave a thing`);
 
   await loadLocale(DEFAULT_LOCALE);
   eq('CC8 and going back to the default restores it', t('mission.refuse.nothingToStabilise'), 'Nothing to stabilise.');
@@ -532,7 +587,20 @@ async function walkScreens(content, host, seed) {
 
   /* ── Regional Site 19 ─────────────────────────────────────────────────── */
   const site = await loadSite();
-  const pr = new Progression({ site });
+  /**
+   * ⚠ `autosave: false`, AND THE PSEUDOLOCALE WALK IS WHY.
+   *
+   * This was a plain `new Progression({ site })`, which autosaves — so section G's walk wrote
+   * a campaign into the browser's real profile slot, and section HH's walk then LOADED it.
+   * The containment history lines that section G had composed in en-GB came back as stored
+   * text under the pseudolocale and were reported as English surviving the screens, every run,
+   * for a reason that had nothing to do with the code under test. `transferred×3` in the HH
+   * word list was that, and only that.
+   *
+   * It also means the suite no longer eats whoever is running it's campaign, which
+   * tools/audit-tests.js is careful about and this file was not.
+   */
+  const pr = new Progression({ site, autosave: false });
   const base = new BaseScreen(host, { progression: pr, site, items: content.items });
   base.show('operations'); snap();
   /* ⚠ CLEARANCE GATES FOUR OF THE FIVE ROOMS, so a walk at level zero silently renders the
@@ -550,9 +618,176 @@ async function walkScreens(content, host, seed) {
     custody: 'verified', minutes: 15, observations: 3, squad: g.players,
     scenario: { seed: 'i18n', weather: 'Hard frost', time: 'Night', faulted: ['circuit-office'], shut: ['door-freight'] },
   });
+  /* ⚠ AN UNINJURED ROSTER RENDERS NONE OF THE ISOLATION BENCH. The three §12.5 conditions and
+   * the two treatments each have their own name and their own note, and every one of them is
+   * unreachable on a squad that came home fit — so the roster is given one of each, which is
+   * a state the campaign produces and a walk otherwise never sees. */
+  pr.profile.roster = [
+    { id: 'p1', name: 'One', operations: 3, condition: { id: 'strain', operationsRemaining: 2 }, commendations: [] },
+    { id: 'p2', name: 'Two', operations: 3, condition: { id: 'exposure', operationsRemaining: 1 }, commendations: [] },
+    { id: 'p3', name: 'Three', operations: 3, condition: { id: 'fatigue', operationsRemaining: 3 }, commendations: [] },
+    { id: 'p4', name: 'Four', operations: 3, condition: null, commendations: [] },
+  ];
+  /* And the overflow holding positions, which only exist once the specialised storage is
+   * built — the one pair of strings in the corridor the engine invents rather than reads. */
+  pr.buySiteUpgrade('specialised-storage');
+  /* ⚠ THE OPERATIONS BOARD HAS TO BE DRAWN AGAIN AFTER THE ROSTER CHANGES. It was rendered
+   * once, at the top of this walk, on a squad that was fit — so the readiness list's unfit
+   * row, the cargo and stabilisation warnings and the heading over them were unreachable by
+   * a walk that had already been past. Four messages, invisible for the same reason the
+   * one-emitter coverage warning is: the branch is in the state the walk did not revisit. */
+  base.show('operations'); snap();
   for (const tab of ['archive', 'logistics', 'containment', 'research']) { base.show(tab); snap(); }
   base.notice = STUB; base.refresh(); snap();
+
+  /* ── §25.4's notices, every document, opened ──────────────────────────────
+   * `content/site.json` has listed "Read the attribution and licensing record" among the
+   * archive's affordances since the file was written and nothing rendered it. Each document
+   * is a whole page, and a page nothing opens is a page nobody has read. */
+  const noticeDocs = (site.notices && site.notices.documents) || [];
+  const docTexts = [];
+  base.show((site.notices && site.notices.room) || 'archive');
+  const indexText = host.textContent;
+  snap();
+  for (const d of noticeDocs) {
+    base.page = d.id;
+    base.refresh();
+    docTexts.push({ id: d.id, text: host.textContent });
+    snap();
+  }
+  base.page = null;
+  base.refresh();
   base.hide();
+
+  /**
+   * ── the save report, on a profile that actually needed work ────────────────
+   *
+   * Driven through a real `Progression` rather than by hand-setting a flag: the banner's
+   * whole job is to print what the MODEL decided, and a report the suite wrote itself would
+   * prove only that the suite can write a report. This profile is a v1 save that also names
+   * a holding position the site does not have, an anomaly it has no dossier for, a facility
+   * upgrade it does not declare, and a research balance that is a string — five different
+   * notices out of one load.
+   */
+  const damagedHost = document.createElement('div');
+  host.appendChild(damagedHost);
+  const hurt = new Progression({
+    site,
+    autosave: false,
+    profile: {
+      version: 1,
+      requisition: 900,
+      research: 'lots',
+      siteUpgrades: ['warp-core'],
+      roster: [{ id: 'p1' }],
+      containment: [{ anomalyId: 'nothing-this-build-ships', designation: 'X-00', cellId: 'no-such-position' }],
+    },
+  });
+  const flagged = new BaseScreen(damagedHost, { progression: hurt, site, items: content.items });
+  flagged.show('operations');
+  const bannerText = damagedHost.textContent;
+  snap();
+  flagged.migrationDismissed = true;
+  flagged.refresh();
+  const dismissedText = damagedHost.textContent;
+  snap();
+  flagged.hide();
+
+  /* And a load with nothing to say, which must render no banner at all rather than an empty
+   * reassurance that the save is fine. A silent load is the normal case. */
+  const cleanHost = document.createElement('div');
+  host.appendChild(cleanHost);
+  /* ⚠ `defaultProfile()` AND NOT `{ version: 2 }`. A bare version stanza is not a clean save:
+   * `requisition` is absent from it, which `counted()` correctly reports as a field it had to
+   * restore — so the "nothing wrong with it" case was quietly the "one thing wrong with it"
+   * case, and it said so. The real shape a first run writes is the one to test silence on. */
+  const clean = new Progression({ site, autosave: false, profile: defaultProfile() });
+  const quiet = new BaseScreen(cleanHost, { progression: clean, site, items: content.items });
+  quiet.show('operations');
+  const quietText = cleanHost.textContent;
+  snap();
+  quiet.hide();
+  damagedHost.remove();
+  cleanHost.remove();
+
+  /**
+   * ── §12.6's ledger, every line of it ──────────────────────────────────────
+   *
+   * `earningsFor` is PURE, which is why the whole economy can be asked for its sentences
+   * without playing the one operation that happens to produce all of them at once. Nothing
+   * renders these yet — the debrief screen prints the dimensions and not the ledger — but
+   * they are the model's own words about a player's money, they were the densest block of
+   * English left in `sim/progression.js`, and two of them carried a written-out plural.
+   *
+   * One good operation and one bad one: rules read, every behaviour tally including a capped
+   * one, two aborts, an overall bonus, gear written off, an analysis uplift, and both sides
+   * of the stabilisation window.
+   */
+  const ledger = [
+    earningsFor(
+      { overall: 'Exemplary', claims: { correct: 3, wrong: 1, total: 4 }, dims: [{ id: 'time', name: 'T', value: 9 }] },
+      {
+        tally: {
+          rescues: 9, treatments: 1, circuitsRestored: 1, deployablesPlaced: 1,
+          contacts: 1, custodyLosses: 1, deployablesLost: 2,
+        },
+        abortCount: 2,
+      },
+      { effects: { researchBonusPct: 10 } },
+    ),
+    earningsFor({ overall: 'Failed', dims: [{ id: 'time', name: 'T', value: 40 }] }, null, { itemsLost: 1 }),
+  ];
+
+  /**
+   * The save sentences a walk cannot reach by playing. These are MODEL CALLS and not probes:
+   * `migrateWithReport` is the function that composes them, so asking it is asking the thing
+   * that has to be right rather than asking the message table whether it has a key.
+   */
+  const saveNotices = [
+    ...migrateWithReport('this is not a profile').report.notices,
+    ...migrateWithReport({ version: PROGRESSION_VERSION + 97 }).report.notices,
+  ];
+
+  /* ── every refusal the counter can give, driven on the model ──────────────
+   * The base screen renders the string progression.js returned and never re-derives it, so
+   * these are the sentences a player reads after clicking Order, Build, Fit or Treat. */
+  const poor = new Progression({ site, autosave: false, profile: { version: PROGRESSION_VERSION, requisition: 0, research: 0 } });
+  /* ⚠ `treat()` REFUSES IN ORDER, so an operative with nothing wrong with them never reaches
+   * the no-such-treatment branch — it is answered by "nothing to treat" three lines earlier.
+   * Two operatives, one hurt and one fit, is what makes both sentences reachable. */
+  poor.profile.roster = [
+    { id: 'p1', name: 'Fit', operations: 1, condition: null, commendations: [] },
+    { id: 'p2', name: 'Hurt', operations: 1, condition: { id: 'strain', operationsRemaining: 2 }, commendations: [] },
+  ];
+  const rich = new Progression({ site, autosave: false, profile: { version: PROGRESSION_VERSION, requisition: 99999, research: 9999 } });
+  const firstSiteUpgrade = ((site.rooms || []).flatMap((r) => r.upgrades || [])[0] || {}).id || 'none';
+  const counterRefusals = [
+    poor.buyUpgrade('no-such-upgrade-ships'),
+    poor.buyUpgrade(UPGRADES[0].id),
+    poor.buySiteUpgrade('no-such-site-upgrade'),
+    poor.buySiteUpgrade(firstSiteUpgrade),
+    poor.fitUpgrade('thermal-imager', 'trauma-kit-sealed'),
+    poor.fitUpgrade('trauma-kit', 'trauma-kit-sealed'),
+    poor.treat('nobody-by-that-id', 'observation-rest'),
+    poor.treat('p1', 'observation-rest'),
+    poor.treat('p2', 'no-such-treatment'),
+    rich.buyUpgrade(UPGRADES[0].id),
+    rich.buyUpgrade(UPGRADES[0].id),
+    (() => {
+      /* Research-short needs requisition it can afford and research it cannot. */
+      const half = new Progression({ site, autosave: false, profile: { version: PROGRESSION_VERSION, requisition: 99999, research: 0 } });
+      return half.buyUpgrade((UPGRADES.find((u) => u.costResearch > 0) || UPGRADES[0]).id);
+    })(),
+    (() => {
+      /* Two treatments in one rotation, which is what the isolation beds actually gate. */
+      const bench = new Progression({ site, autosave: false, profile: { version: PROGRESSION_VERSION, requisition: 99999 } });
+      bench.profile.roster = [
+        { id: 'p1', name: 'A', operations: 1, condition: { id: 'strain', operationsRemaining: 2, treatedThisRotation: true }, commendations: [] },
+        { id: 'p2', name: 'B', operations: 1, condition: { id: 'strain', operationsRemaining: 2 }, commendations: [] },
+      ];
+      return bench.treat('p2', 'infirmary-course');
+    })(),
+  ].filter(Boolean);
 
   /* ── the settings screen, every group ─────────────────────────────────── */
   const settings = new Settings();
@@ -635,12 +870,54 @@ async function walkScreens(content, host, seed) {
     'mission.refuse.caseTooFar', 'mission.refuse.nothingInHandToLog',
     'mission.refuse.tooFarFromCase', 'mission.refuse.handsFull',
     'mission.refuse.noCustodyProcedure',
+    /* §12/§13 campaign lines a walk cannot produce. A corridor with nothing rated free needs
+     * a site whose every position is occupied by something that does not fit it; the two
+     * storage notices need localStorage taken away mid-session; and `campaign.resource.*.name`
+     * and `.rewards`/`.grants`/`.note` are the model's own words for a screen that does not
+     * print them yet — kept because the table is the §12.2/§12.3 table and a resource with no
+     * name is not one. Every one of these is a PROBE and proves only that the message exists. */
+    'campaign.corridor.improvised', 'campaign.corridor.unplaced',
+    'campaign.corridor.custody', 'campaign.corridor.custodyStandard',
+    'campaign.corridor.custodyStandardTimed', 'campaign.corridor.maintenanceDefault',
+    'campaign.corridor.maintenanceNote',
+    'campaign.roster.unnamed', 'campaign.refuse.alreadyBuilt', 'campaign.refuse.blocked',
+    'campaign.refuse.requiresTier', 'campaign.refuse.notRequisitioned',
+    'campaign.standingTier.Working.name', 'campaign.clearance.2.name',
+    'campaign.resource.standing.what',
+    'campaign.resource.requisition.name', 'campaign.resource.research.name',
+    'campaign.resource.standing.name', 'campaign.resource.clearance.name',
+    'campaign.department.research.rewards', 'campaign.department.engineering.rewards',
+    'campaign.department.medical.rewards', 'campaign.department.security.rewards',
+    'campaign.department.ethics.rewards', 'campaign.department.logistics.rewards',
+    'campaign.clearance.0.grants', 'campaign.clearance.1.grants',
+    'campaign.clearance.2.grants', 'campaign.clearance.3.grants',
+    'campaign.standingTier.Obstructive.name', 'campaign.standingTier.Obstructive.note',
+    'campaign.standingTier.Cool.name', 'campaign.standingTier.Cool.note',
+    'campaign.standingTier.Working.note', 'campaign.standingTier.Trusted.name',
+    'campaign.standingTier.Trusted.note', 'campaign.standingTier.Sponsor.name',
+    'campaign.standingTier.Sponsor.note',
+    'campaign.treatment.observation-rest.note', 'campaign.treatment.infirmary-course.note',
+    'save.notice.damaged', 'save.notice.noStorage',
+    'base.migration.outcome.fresh', 'base.migration.outcome.loaded',
+    'base.migration.outcome.refused', 'base.migration.outcome.repaired',
+    'base.migration.preserved', 'base.notices.empty',
+    'grade.Unassessed',
   ];
   for (const k of probes) t(k, { key: 'X', action: 'x', actions: 'x', group: 'x', tier: 'x', rating: 'x', name: 'x', volume: 1, percent: 1, distance: 1, radius: 1, cell: 'x', value: 1 });
   for (const key of ['ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight', 'AltLeft', 'AltRight',
     'Space', 'Tab', 'Enter', 'Backspace', 'CapsLock', 'Numpad4', null]) keyLabel(key);
 
-  return { refusals, boardRefusals, simRefusals, shots };
+  return {
+    refusals, boardRefusals, simRefusals, shots,
+    notices: {
+      room: (site.notices && site.notices.room) || 'archive', documents: noticeDocs, indexText, docTexts,
+    },
+    migration: {
+      report: hurt.migration, bannerText, dismissedText, quietText, quietReport: clean.migration, saveNotices,
+    },
+    counterRefusals,
+    ledger,
+  };
 }
 
 async function sectionG(content) {
@@ -651,7 +928,8 @@ async function sectionG(content) {
    * hand it every message section E had just proved reachable as "not reached". */
   const host = document.createElement('div');
   document.body.appendChild(host);
-  const { refusals, boardRefusals, simRefusals } = await walkScreens(content, host, 'i18n-screens');
+  const walked = await walkScreens(content, host, 'i18n-screens');
+  const { refusals, boardRefusals, simRefusals } = walked;
 
   const missing = missingKeys().filter((k) => k !== 'nothing.here.at.all');
   eq(`G1 every message the screens asked for exists${missing.length ? ` — ${missing.slice(0, 12).join(', ')}` : ''}`,
@@ -687,6 +965,7 @@ async function sectionG(content) {
 
   host.remove();
   emit();
+  return walked;
 }
 
 /* ── H. the pseudolocale, over the same screens ───────────────────────────── */
@@ -772,9 +1051,23 @@ async function sectionHH(content) {
     for (const w of JSON.stringify(doc).match(/[A-Za-z][A-Za-z'-]{2,}/g) || []) contentWords.add(w.toLowerCase());
   };
   eat(content.incident); eat(content.anomaly); eat(content.map); eat(content.items); eat(site);
-  /* Progression's own tables are content in the same sense: department names, upgrade names,
-   * treatment names and condition names are authored data the panel interpolates. */
-  eat({ d: DEPARTMENTS, u: UPGRADES, t: TREATMENTS, c: CLEARANCE_TIERS });
+  /**
+   * ⚠ PROGRESSION'S TABLES USED TO BE SUBTRACTED HERE AND THEY ARE NOT CONTENT.
+   *
+   * This walk read `eat({ DEPARTMENTS, UPGRADES, TREATMENTS, CLEARANCE_TIERS })` on the
+   * argument that department names and upgrade names are authored data the panel
+   * interpolates. They are authored data, but they are authored IN `src/sim/progression.js`
+   * — they ship with the engine, they are identical on every site, and a locale can and must
+   * translate them. Subtracting them told this check to ignore roughly sixty English words
+   * that were coming through the armory and the standing block on every render, which is
+   * precisely the class of finding the pseudolocale walk exists to make visible.
+   *
+   * The line the subtraction actually draws is the DOCUMENT boundary: what a loaded package
+   * says is the package's to translate (`content/`, `content/site.json`), and what the engine
+   * says is `content/locales`'. So the site file is eaten above and the engine's tables are
+   * not — and H3 below now fails on a sidegrade axis that lost its label, the same way it
+   * already fails on a mission phase that lost one.
+   */
   /* And section D's two exempt regions, which are content that happens to live in src/. The
    * exemption and this subtraction have to agree or the walk reports the planner's own abort
    * condition — "Pressure reaches Breach" — as a pressure stage that lost its label. */
@@ -814,8 +1107,17 @@ async function sectionHH(content) {
   for (const s of [...PROCEDURE_FIELDS.flatMap((f) => [f.label, ...f.options]),
     ...MAINTAINED, ...ABORTS, ...CLAIMS.map((c) => c.text)]) scan = scan.split(s).join(' ');
 
+  /**
+   * ⚠ THE EIGHT SIDEGRADE AXES JOINED THIS LIST AND THEY ARE THE REASON IT IS WORTH HAVING.
+   *
+   * `+portability` and `−range` were printed straight out of `SIDEGRADE_AXES`, which is an id
+   * table `validateSidegrades()` compares against character-for-character — the same shape as
+   * `PHASE` and `CONFIG.pressure.stageNames`, found the same way and fixed the same way. They
+   * were invisible to this walk while `eat()` subtracted the progression tables as content;
+   * they are visible now, and the assertion is what stops them coming back.
+   */
   const regressions = [];
-  for (const w of [...Object.values(PHASE), ...CONFIG.pressure.stageNames,
+  for (const w of [...Object.values(PHASE), ...CONFIG.pressure.stageNames, ...SIDEGRADE_AXES,
     'Exemplary', 'Controlled', 'Costly', 'Compromised', 'Failed']) {
     if (new RegExp(`(^|[^A-Za-z])${w}([^A-Za-z]|$)`).test(scan)) regressions.push(w);
   }
@@ -833,6 +1135,127 @@ async function sectionHH(content) {
 
   host.remove();
   await loadLocale(DEFAULT_LOCALE);
+  emit();
+}
+
+/* ── J. the two screens that had data and no renderer ─────────────────────── */
+/**
+ * ⚠ BOTH OF THESE EXISTED AS DATA AND AS NOTHING ELSE.
+ *
+ * `Progression.migration` has carried `{outcome, fromVersion, dropped, notices, preservedAs}`
+ * on every load since the migration report was written, and the notices are whole sentences
+ * addressed to a player — "your profile was written by a newer build and has been set aside".
+ * Nothing printed them, so a save could be brought forward, quarantined or repaired field by
+ * field and the person it happened to was shown a starting balance and told nothing. §18.1
+ * does not allow the interface to misrepresent state, and a profile is the one thing in this
+ * build a player can lose.
+ *
+ * `content/site.json` has listed "Read the attribution and licensing record" among the archive
+ * terminal's affordances since the file was written, and `docs/licensing-audit.md` carries it
+ * as finding 7: the string is there, the audit checks that the string is there, and nothing
+ * rendered the document. §25.4 requires attribution to be REACHABLE rather than buried in end
+ * credits, and a menu item naming a document the game does not contain is a §18.1 problem as
+ * much as a §25 one.
+ */
+async function sectionJ(walked, site) {
+  heading('J. the migration report and §25.4\'s notices, rendered rather than merely held');
+
+  const n = walked.notices;
+  const m = walked.migration;
+
+  /* ── §25.4 ─────────────────────────────────────────────────────────────── */
+  const rooms = (site.rooms || []).map((r) => r.id);
+  ok(`J1 the room the site file hangs its notices off is a room the site has — ${n.room}`,
+    rooms.includes(n.room), rooms.join(', '));
+  ok('J2 and it carries documents, so §25.4\'s notice is a thing that exists',
+    n.documents.length > 0, `${n.documents.length} document(s)`);
+  note(`${n.documents.length} notice document(s): ${n.documents.map((d) => d.id).join(', ')}`);
+
+  /* Every document is reachable from the index — by title, which is what a player clicks. */
+  const unlisted = n.documents.filter((d) => !n.indexText.includes(d.title || d.id));
+  eq(`J3 every document is named on the index, so none of them is reachable only by knowing it is there${
+    unlisted.length ? ` — ${unlisted.map((d) => d.id).join(', ')}` : ''}`, unlisted.length, 0);
+
+  /* And every document actually renders every section it declares. A reader that silently
+   * dropped the last section of the privacy statement would be worse than no reader. */
+  const short = [];
+  for (const d of n.documents) {
+    const shot = (n.docTexts.find((x) => x.id === d.id) || {}).text || '';
+    for (const s of d.sections || []) {
+      if (s.heading && !shot.includes(s.heading)) short.push(`${d.id}: heading "${s.heading}"`);
+      for (const p of s.body || []) if (!shot.includes(p)) short.push(`${d.id}: a paragraph of "${s.heading}"`);
+      for (const b of s.bullets || []) if (!shot.includes(b)) short.push(`${d.id}: a bullet of "${s.heading}"`);
+    }
+  }
+  eq(`J4 and every heading, paragraph and bullet of every document reaches the screen${
+    short.length ? ` — ${short.slice(0, 4).join(' · ')}` : ''}`, short.length, 0);
+  const paras = n.documents.reduce((a, d) => a + (d.sections || []).reduce(
+    (b, s) => b + (s.body || []).length + (s.bullets || []).length, 0), 0);
+  note(`${paras} paragraphs and bullets across ${n.documents.length} documents, all rendered`);
+
+  /**
+   * ⚠ AND THE SCREEN CONTRIBUTES NO PROSE OF ITS OWN, which is what the site file's own
+   * `_noticesNote` asks for: these are legal and privacy statements whose exact wording is
+   * the point, and a locale that paraphrased one would be making a different claim. So the
+   * document page is checked to contain nothing but the site file's strings and the handful
+   * of furniture messages — five of them, and the check is that there is not a sixth.
+   */
+  const furniture = ['base.notices.head', 'base.notices.open', 'base.notices.back',
+    'base.notices.empty', 'base.notices.revision'];
+  const keyed = knownKeys().filter((k) => k.startsWith('base.notices.'));
+  eq(`J5 the notices screen has exactly the furniture and no prose of its own${
+    keyed.length ? ` — ${keyed.join(', ')}` : ''}`, keyed.length, furniture.length);
+
+  /* ── the save report ───────────────────────────────────────────────────── */
+  ok('J6 a damaged v1 profile produces notices at all, so J7 is not asserting over an empty list',
+    m.report.notices.length >= 3, `${m.report.notices.length} notice(s): ${m.report.notices.join(' | ')}`);
+  const unsaid = m.report.notices.filter((s) => !m.bannerText.includes(s));
+  eq(`J7 and every sentence the model wrote for the player is on the screen${
+    unsaid.length ? ` — ${unsaid.join(' | ')}` : ''}`, unsaid.length, 0);
+  ok('J8 with the outcome and the version it came from beside them',
+    /v?1/.test(m.bannerText) && m.bannerText.length > m.dismissedText.length,
+    `banner ${m.bannerText.length} chars, dismissed ${m.dismissedText.length}`);
+
+  /**
+   * ⚠ `dropped[]` IS FOR A DEVELOPER AND MUST NOT REACH THE SCREEN. Its `why` strings are
+   * diagnostics — "is not a finite number", "is a duplicate id" — deliberately not keyed,
+   * so printing one would put untranslated engine prose inside a translated panel. This is
+   * the assertion that keeps that decision honest rather than accidental.
+   */
+  const leaked = m.report.dropped.filter((d) => d.why && m.bannerText.includes(d.why));
+  eq(`J9 and no developer diagnostic leaked onto it${leaked.length ? ` — ${leaked.map((d) => d.field).join(', ')}` : ''}`,
+    leaked.length, 0);
+
+  /* Dismissal, and silence. A load with nothing to say renders no banner at all rather than
+   * an empty box reassuring the player that their save is fine. */
+  const stillThere = m.report.notices.filter((s) => m.dismissedText.includes(s));
+  eq(`J10 dismissing it takes every sentence off the screen${stillThere.length ? ` — ${stillThere.length} left` : ''}`,
+    stillThere.length, 0);
+  eq('J11 and a profile with nothing wrong with it says nothing at all', m.quietReport.notices.length, 0);
+  ok('J12 so the banner is absent rather than empty on a clean load',
+    !m.quietText.includes(t('base.migration.head')), m.quietText.slice(0, 80));
+
+  /* The two the load path composes that a walk cannot reach by playing. */
+  ok('J13 an unreadable save and one from a newer build each say so in a sentence',
+    m.saveNotices.length === 2 && m.saveNotices.every((s) => s && !/^save\./.test(s)),
+    m.saveNotices.join(' | '));
+
+  /* ── and every counter refusal is a sentence rather than a key ─────────── */
+  const keys = walked.counterRefusals.filter((s) => /^campaign\./.test(s));
+  eq(`J14 every refusal the counter gives is a sentence rather than its own key${
+    keys.length ? ` — ${keys.join(', ')}` : ''}`, keys.length, 0);
+  ok('J15 and the walk provoked a useful number of them',
+    walked.counterRefusals.length >= 8, `${walked.counterRefusals.length}: ${walked.counterRefusals.join(' | ')}`);
+
+  /* ── §12.6's ledger, which is data with no screen yet and prose all the same ── */
+  const ledgerLines = walked.ledger.flatMap((e) => e.lines);
+  const bareLedger = ledgerLines.filter((l) => /^campaign\./.test(l.label) || /^campaign\./.test(String(l.detail)));
+  eq(`J16 every line of the debrief ledger is a sentence rather than a key${
+    bareLedger.length ? ` — ${bareLedger.map((l) => l.label).join(', ')}` : ''}`, bareLedger.length, 0);
+  ok('J17 and the two lines that carried a written-out English plural now agree with their count',
+    ledgerLines.some((l) => /2 issued items/.test(l.detail)) && ledgerLines.some((l) => /2 procedures/.test(l.detail)),
+    ledgerLines.map((l) => l.detail).filter((d) => /issued item|procedure/.test(d)).join(' | '));
+  note(`${ledgerLines.length} ledger lines over two operations: ${[...new Set(ledgerLines.map((l) => l.label))].join(', ')}`);
   emit();
 }
 
@@ -874,7 +1297,9 @@ async function sectionF() {
     await run('D', () => sectionD());
     const content = await loadContent();
     await run('E', () => sectionE(content));
-    await run('G', () => sectionG(content));
+    let walked = null;
+    await run('G', async () => { walked = await sectionG(content); });
+    await run('J', async () => sectionJ(walked, await loadSite()));
     await run('H', () => sectionH());
     await run('HH', () => sectionHH(content));
     await run('F', () => sectionF());
