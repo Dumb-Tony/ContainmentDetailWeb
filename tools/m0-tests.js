@@ -51,6 +51,17 @@ import { segmentHitsRect, moveWithWalls, dist, circleHitsRect } from '../src/sim
  * counters rather than copied — a copy would go stale the moment a section failed. */
 import { lines, counts, ok, eq, near, note, emit, run, yieldToLoop } from './harness.js';
 
+/**
+ * Every complete bot run, so §26.4's duration metric can REPORT A MEASUREMENT rather than a
+ * remembered range. The note in section AC said "~3-15 min" and had said it since there were
+ * two incident packages; there are nine now and the two newest finish in under two minutes.
+ *
+ * ⚠ A BOT TIME IS A LOWER BOUND AND NEVER AN ESTIMATE. It does not search, does not
+ * deliberate and does not get anything wrong. What this list is for is knowing what the
+ * floor actually is, and how much of the build has a floor at all.
+ */
+const BOT_RUNS = [];
+
 /* ── A. core ─────────────────────────────────────────────────────────────── */
 function sectionA() {
   lines.push('--- A. clock, seed, and the pause contract ---');
@@ -804,6 +815,7 @@ async function sectionI(content) {
   if (!g.result) { emit(); return g; }
   eq('I42 with custody established and the payload transferred', g.extracted, true);
   note(`outcome: ${g.result.overall}${g.result.failReason ? ' — ' + g.result.failReason : ''}`);
+  BOT_RUNS.push({ incident: 'cold-storage-draught', minutes: g.clock.simTimeMs / 60000, outcome: g.result.overall });
   note(`mission time ${(g.clock.simTimeMs / 60000).toFixed(1)} min · peak pressure ${g.mission.tally.peakPressure.toFixed(0)} (${g.mission.stageName}) · contacts ${g.mission.tally.contacts} · evidence ${g.ledger.entries.length}`);
   for (const d of g.result.dims) note(`  ${d.name}: ${d.word}`);
   ok('I43 and an overall assessment in Foundation language',
@@ -2594,6 +2606,7 @@ async function sectionU() {
    * thing left the floor in a box. */
   eq('U42 with the payload actually transferred', g.extracted, true);
   note(`outcome: ${g.result.overall}${g.result.failReason ? ' — ' + g.result.failReason : ''}`);
+  BOT_RUNS.push({ incident: 'ashlar-gallery-draught', minutes: g.clock.simTimeMs / 60000, outcome: g.result.overall });
   note(`contacts ${g.mission.tally.contacts} · evidence ${g.ledger.entries.length} · peak pressure ${g.mission.tally.peakPressure.toFixed(0)} (${g.mission.stageName})`);
   ok('U43 and an overall assessment in Foundation language',
     ['Exemplary', 'Controlled', 'Costly', 'Compromised', 'Failed'].includes(g.result.overall));
@@ -3921,14 +3934,34 @@ async function sectionAC() {
   ok('AC7 licensing: every anomaly ships an explicit licensing position, none claims a designation it has not earned',
     anomalies.every((a) => a.licensingRecordId === null || typeof a.licensingRecordId === 'string'));
 
-  /* "Median mission duration is 30-45 minutes." THIS IS THE ONE THE BUILD FAILS, and it
-   * is worth failing loudly rather than quietly widening the target. The bot runs are the
-   * only durations that exist and a bot does not search, does not deliberate and does not
-   * get anything wrong — so they are a LOWER BOUND on a human's time and not an estimate
-   * of it. Reported as measured, and marked OPEN because the metric is about players. */
-  note(`    OPEN — median mission duration: no human runs exist. Bot lower bounds are ~3-15 min`);
-  note('           against a 30-45 min target (§2.4, §26.4). A bot does not search or hesitate,');
-  note('           so this is not evidence the missions are too short — it is the absence of evidence.');
+  /**
+   * "Median mission duration is 30-45 minutes." THIS IS THE ONE THE BUILD FAILS, and it is
+   * worth failing loudly rather than quietly widening the target. The bot runs are the only
+   * durations that exist, and a bot does not search, does not deliberate and does not get
+   * anything wrong — so they are a LOWER BOUND on a human's time and not an estimate of it.
+   *
+   * ⚠ THIS NOTE USED TO SAY "~3-15 min" AND IT WAS A REMEMBERED RANGE. It had said it since
+   * there were two incident packages. There are nine now, the two newest finish in under two
+   * minutes, and nobody had reason to look at the sentence again — which is the whole failure
+   * mode this project keeps finding in its own comments. It reports what was actually
+   * measured this run, and how many incidents have no bot at all, because "the floor is two
+   * minutes" and "seven of nine have never been driven end to end" are different facts and
+   * only one of them was being reported.
+   */
+  const mins = BOT_RUNS.map((r) => r.minutes).sort((a, b) => a - b);
+  if (mins.length) {
+    const med = mins.length % 2 ? mins[(mins.length - 1) / 2]
+      : (mins[mins.length / 2 - 1] + mins[mins.length / 2]) / 2;
+    note(`    OPEN — median mission duration. MEASURED this run, ${mins.length} complete bot run(s) of `
+      + `${INCIDENTS.length} incidents: ${BOT_RUNS.map((r) => `${r.incident} ${r.minutes.toFixed(1)}min (${r.outcome})`).join(', ')}`);
+    note(`           median ${med.toFixed(1)} min, range ${mins[0].toFixed(1)}-${mins[mins.length - 1].toFixed(1)}, `
+      + `against a 30-45 min target (§2.4, §26.4).`);
+  } else {
+    note('    OPEN — median mission duration: no complete bot run reached this section.');
+  }
+  note(`           ${INCIDENTS.length - BOT_RUNS.length} of ${INCIDENTS.length} incidents have no end-to-end bot in this suite at all,`);
+  note('           which is a gap in the evidence and not a gap in the missions. A bot does not');
+  note('           search or hesitate, so none of this is evidence the missions are too short.');
 
   for (const m of [
     '80% can use the evidence board without facilitator help',
