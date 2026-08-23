@@ -497,11 +497,24 @@ the next, a suite that hangs cannot take the others with it, and a suite that pr
 result block at all counts as a **failure** rather than as zero assertions and no problem.
 A crashed page reporting green is the failure mode the whole harness exists to avoid.
 
-**1,946 assertions across ten suites, all headless.** The ten are the milestone-0 suite
+**1,959 assertions across eleven suites, all headless.** The eleven are the milestone-0 suite
 (everything true of *every* package), the content suite (the numbers that make one incident
 the incident it is), the net suite, the tablet suite, and six that arrived with the
 milestones they check: licensing and rollback, localization, onboarding, telemetry,
-platform, and security.
+platform, and security — plus one that does nothing but start the game.
+
+That last one exists because nothing else did. Ten suites and 1,946 assertions all built a
+world the same way — `loadContent()`, then `new Game(...)` — which is the right shape for
+testing rules and means **`src/main.js` was covered by nothing at all.** It is not a thin
+wrapper: it installs the crash boundary, resolves a locale and awaits a message table, reads
+`?incident=`, constructs a WebGL renderer, an audio graph, a Progression against real
+storage, a lobby and a net session, and registers a service worker. Every one of those is a
+way for a build to be broken for a player while every suite stays green, and two of them were
+added during this session. `boot-tests.js` starts all nine incidents in real iframes and asks
+the page what it became: four buildings, eight anomalies, no crash banner, `__CD` whole, and
+an incident that does not exist **refusing in words** rather than sitting on "Loading the
+site" for ever — because a page that hung and a page that stopped look identical to the
+person in front of it.
 
 Section I is the one that matters: it plays a complete
 solo containment through the same interfaces a keyboard reaches — walks to the vehicle,
