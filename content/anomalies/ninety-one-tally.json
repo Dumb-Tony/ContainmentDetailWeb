@@ -177,6 +177,7 @@
       "type": "instrumental",
       "dimension": "presence",
       "revealsRule": "first-logged",
+      "channel": "instrument",
       "requiredEquipment": ["thermal-imager"],
       "isFalseLead": false
     },

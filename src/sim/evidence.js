@@ -119,6 +119,11 @@ export class EvidenceLedger {
       /* Straight from content. Not paraphrased, not interpreted. */
       raw: rule.rawObservation,
       type: rule.type,
+      /* How it reached the squad, which is not what `type` says. `environmental` covers
+       * both the frost bloom you SEE and the quiet hollow you HEAR, and §19.1 cannot
+       * recover that difference from the word. Carried through so the session record can
+       * count discovery by channel; `'unstated'` rather than a guess if content omits it. */
+      channel: rule.channel || null,
       dimension: rule.dimension,
       reliability: rule.reliability,
       isFalseLead: !!rule.isFalseLead,

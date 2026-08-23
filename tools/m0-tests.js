@@ -41,7 +41,7 @@ import {
   CommsWheel, WHEEL_ORDER, sectorAt, sectorPos, projectPoint, aimPoint, KIND_VARS,
 } from '../src/ui/commswheel.js';
 import { Progression, loadSite, DEPLOYMENT_COST, DEPARTMENT_IDS, migrate } from '../src/sim/progression.js';
-import { anomalyIsVisible, anomalyForm, ANOMALY_FORMS } from '../src/render/renderer.js';
+import { anomalyIsVisible, anomalyOnThermal, anomalyForm, ANOMALY_FORMS } from '../src/render/renderer.js';
 import { Input, DEFAULT_BINDINGS, isReservedCode, PAD_BUTTONS, HOLD_MODE } from '../src/core/input.js';
 import { segmentHitsRect, moveWithWalls, dist, circleHitsRect } from '../src/sim/geometry.js';
 
@@ -1140,6 +1140,65 @@ async function sectionK() {
   ok('K24b which the same file says twice: it is the only one declaring `presence.instances`',
     !!(tally.anomaly.presence && tally.anomaly.presence.instances)
     && [...byAnom.values()].filter((s) => s.key !== 'none').every((s) => s.id !== tally.anomaly.id));
+
+  /**
+   * ⚠ AND THE OTHER CAMERA WAS OBEYING NOTHING AT ALL.
+   *
+   * K16 made layer 0 read `perception.channels`. Layer 1 — the imager — stayed hardcoded,
+   * so every anomaly appeared on it whatever its file said. `coldharbour-passenger`
+   * declares `visible`, `physical-trace` and `recorded`, not `thermal`, and its resting
+   * tell is "Nothing. What it is on looks exactly like what it is on"; it showed as a
+   * floating cold mass on the instrument regardless. An instrument that answers a question
+   * the content says it cannot is worse than one that answers nothing.
+   */
+  const thermals = [...byAnom.values()].map((s) => s.id);
+  const onImager = [], offImager = [];
+  for (const id of INCIDENTS) {
+    const pack = await loadContent({ incident: id });
+    (anomalyOnThermal(pack.anomaly) ? onImager : offImager).push(pack.anomaly.id);
+  }
+  const off = [...new Set(offImager)].filter((x) => !onImager.includes(x));
+  note(`  the imager registers ${[...new Set(onImager)].length} of ${new Set(thermals).size}; off it: ${off.join(', ') || '(none)'}`);
+  ok(`K26 the imager registers only the anomalies whose content says it can — ${off.length} are off it`,
+    off.length >= 1 && off.length < new Set(thermals).size);
+  const passenger = await loadContent({ incident: INCIDENTS.find((i) => i.includes('passenger')) });
+  ok('K26a including the one that says "what it is on looks exactly like what it is on", which was drawn on the instrument anyway',
+    !anomalyOnThermal(passenger.anomaly) && anomalyIsVisible(passenger.anomaly));
+  ok('K26b and `instrumental` is not read as `thermal` — it labels microphones and cell meters too, and reading it that way would invent the claim',
+    anomalyOnThermal({ perception: { channels: ['instrumental'] } }) === false
+    && anomalyOnThermal({ perception: { channels: ['thermal'] } }) === true
+    && anomalyOnThermal({ perception: { channels: ['instrument-only'] } }) === true
+    && anomalyOnThermal(null) === false);
+
+  /**
+   * ⚠ AND `evidenceRules[].channel` WAS THE EIGHTEENTH DEAD CONTENT KEY.
+   *
+   * Nothing in `src/` read it. That is what a field nobody reads looks like from the
+   * outside: ALL EIGHT of `blackthorn-caller`'s entries had stopped carrying one, and one
+   * of the tally's, and no run noticed. It is not a duplicate of `type` — `documentary` is
+   * always `document`, but `environmental` splits into the frost bloom you SEE and the
+   * quiet hollow you HEAR, and §19.1 cannot recover that from the word "environmental".
+   * `Evidence.log` carries it now and the §21 session record counts discovery by it.
+   */
+  const CH = new Set(['document', 'visual', 'witness', 'instrument', 'sensory']);
+  const OFTYPE = { documentary: ['document'], testimonial: ['witness'], instrumental: ['instrument'], environmental: ['visual', 'sensory'] };
+  const chBad = [], chMissing = [];
+  const seenCh = new Set();
+  for (const id of INCIDENTS) {
+    const pack = await loadContent({ incident: id });
+    for (const e of pack.anomaly.evidenceRules || []) {
+      if (!e.channel) { chMissing.push(`${pack.anomaly.id}/${e.id}`); continue; }
+      seenCh.add(e.channel);
+      if (!CH.has(e.channel)) chBad.push(`${pack.anomaly.id}/${e.id}=${e.channel}`);
+      else if (OFTYPE[e.type] && !OFTYPE[e.type].includes(e.channel)) chBad.push(`${pack.anomaly.id}/${e.id}: ${e.type} on ${e.channel}`);
+    }
+  }
+  eq(`K27 every observation states how it reached the squad${chMissing.length ? ` — ${chMissing.slice(0, 4).join(', ')}` : ''}`,
+    chMissing.length, 0);
+  eq(`K28 on a channel the vocabulary has, and one its own type allows${chBad.length ? ` — ${chBad.slice(0, 4).join(', ')}` : ''}`,
+    chBad.length, 0);
+  ok(`K29 and every word in that vocabulary is used by something — ${[...seenCh].sort().join(', ')}`,
+    [...CH].every((c) => seenCh.has(c)), [...CH].filter((c) => !seenCh.has(c)).join(', '));
 
   /* ⚠ EVERY CONFIG LEAF MUST BE READ BY SOMETHING.
    *

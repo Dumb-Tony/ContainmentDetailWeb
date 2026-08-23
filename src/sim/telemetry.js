@@ -150,6 +150,30 @@ export function sessionRecord(game, opts = {}) {
       falseLeads: game.ledger.entries.filter((e) => e.isFalseLead).length,
       claimsCorrect: claims.correct,
       claimsWrong: claims.wrong,
+      /**
+       * ⚠ BY CHANNEL, BECAUSE `channel` WAS ON EVERY ENTRY AND READ BY NOTHING.
+       *
+       * 199 keys across `content/` were checked against the engine once already and
+       * seventeen came back unread; this is the eighteenth, found by asking a different
+       * question. `evidenceRules[].channel` sat beside every observation in seven of the
+       * eight anomaly files — and was ABSENT from all eight entries of `blackthorn-caller`
+       * and from one of the tally's, which is what a field nothing reads looks like from
+       * the outside: it stops being written and no run notices.
+       *
+       * It is not a duplicate of `type`. `documentary` is always `document` and
+       * `testimonial` is always `witness`, but `environmental` splits: the frost bloom is
+       * SEEN and the quiet hollow is HEARD, and §19.1 cares about that difference in a way
+       * no accessibility layer can recover from the word "environmental".
+       *
+       * Counted here because §21.1 asks which evidence a team finds, and "four of five
+       * through one channel" is the answer that matters to an external test — a build where
+       * every squad discovers everything by document has a reading exercise, not a floor.
+       */
+      byChannel: game.ledger.entries.reduce((m, e) => {
+        const c = e.channel || 'unstated';
+        m[c] = (m[c] || 0) + 1;
+        return m;
+      }, {}),
     },
 
     /* §21.1: how often do teams revise a procedure. */

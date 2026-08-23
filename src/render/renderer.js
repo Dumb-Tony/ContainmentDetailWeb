@@ -162,6 +162,28 @@ export function anomalyIsVisible(def) {
 }
 
 /**
+ * Does the content say the IMAGER registers it?
+ *
+ * ⚠ THE BODY WAS ON THE THERMAL LAYER UNCONDITIONALLY, so `perception.channels` was being
+ * obeyed for one camera and ignored for the other. `coldharbour-passenger` declares
+ * `visible`, `physical-trace` and `recorded` — not `thermal`, not `instrumental` — and its
+ * resting tell is *"Nothing. What it is on looks exactly like what it is on."* It showed up
+ * on the imager as a floating cold mass anyway, which is the §18.1 failure that costs
+ * somebody an operation: the instrument answered a question the content says it cannot.
+ *
+ * `thermal` and `instrument-only` are the two words that mean the imager. `instrumental` is
+ * deliberately NOT one of them: it appears on three anomalies and the evidence sets it
+ * labels are microphones, cell meters and cameras as well as imagers, so reading it as
+ * "thermal" would be inventing a claim out of a broader word. A file that means the imager
+ * has two ways to say so and both are honoured.
+ */
+export function anomalyOnThermal(def) {
+  const ch = ((def && def.perception) || {}).channels;
+  if (!Array.isArray(ch)) return false;
+  return ch.includes('thermal') || ch.includes('instrument-only');
+}
+
+/**
  * What shape the thing is, which the content has been saying all along.
  *
  * ⚠ EVERY ANOMALY IN THE BUILD WAS THE SAME 0.78m PURPLE ICOSAHEDRON. Five of the eight
@@ -285,8 +307,10 @@ export class Renderer {
       ? form.spec.build(THREE, form.span / 2)
       : new THREE.BufferGeometry();
     this.anomalyMesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0x2b0f4a }));
-    this.anomalyMesh.layers.set(1);
-    if (this._anomalyIsVisible()) this.anomalyMesh.layers.enable(0);
+    const def = this.game && this.game.anomaly && this.game.anomaly.def;
+    this.anomalyMesh.layers.disableAll();
+    if (anomalyOnThermal(def)) this.anomalyMesh.layers.enable(1);
+    if (anomalyIsVisible(def)) this.anomalyMesh.layers.enable(0);
     this.scene.add(this.anomalyMesh);
     this.anomalyHalo = new THREE.Mesh(
       form.spec && form.spec.halo
@@ -294,7 +318,11 @@ export class Renderer {
         : new THREE.BufferGeometry(),
       new THREE.MeshBasicMaterial({ color: 0x120a24, transparent: true, opacity: 0.55, side: THREE.BackSide }),
     );
-    this.anomalyHalo.layers.set(1);
+    /* The halo is the thermal bloom around a cold mass, so it follows the body onto the
+     * imager and never onto the eye — and if the imager cannot register the body, there is
+     * nothing for it to bloom around. */
+    this.anomalyHalo.layers.disableAll();
+    if (anomalyOnThermal(def)) this.anomalyHalo.layers.enable(1);
     this.scene.add(this.anomalyHalo);
 
     /* The imager screen's own black. Not the scene background — a screen that shared the
