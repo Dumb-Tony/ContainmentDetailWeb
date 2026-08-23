@@ -60,6 +60,15 @@ placing, powering and sealing. It reads at ambient on thermal, the breakers are
 irrelevant, and its own capability browns out the cameras holding it — the fence you built
 is the thing it feeds on.
 
+![the figure, at the limit of the light](docs/m6-figure.png)
+
+It was a purple ball until recently, and so was every other anomaly in the build — the same
+0.78 m icosahedron for all eight, including the one whose whole containment is a squad
+looking at it. The tells were written and specific the entire time ("a figure at the limit
+of the light, facing away, at the wrong scale for the distance") and the renderer read none
+of them. `presence.form` names one of six shapes now, and every span comes out of a sentence
+the file already said.
+
 A squad that arrives with the first playbook finds every instinct wrong. That is the point
 (GDD §15.2: the building is the constant, the incident is the variable).
 

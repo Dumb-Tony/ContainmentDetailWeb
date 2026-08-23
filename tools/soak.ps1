@@ -85,7 +85,13 @@ if ($NoRender) { $q += "&render=0" }
 $sep = "?"
 if ($srv.Url -match '\?') { $sep = "&" }
 $url = $srv.Url + $sep + $q
-$incidentCount = 7
+# ⚠ COUNTED, NOT REMEMBERED. This was `= 7`, written when there were seven, and it is not
+# only a banner: it sizes the virtual-time budget below. Two incidents were added and the
+# run was given seven incidents' worth of time to do nine incidents' work — the shape of
+# failure being a soak that stops early and reports that nothing was still growing, which
+# is what a soak says when it passes.
+$incidentCount = @(Get-ChildItem (Join-Path $root 'content\incidents') -Filter *.json -ErrorAction SilentlyContinue).Count
+if ($incidentCount -lt 1) { $incidentCount = 7 }
 if ($Incident) { $incidentCount = 1 }
 
 Write-Host "  soaking $url" -ForegroundColor DarkGray
