@@ -52,6 +52,9 @@ const el = (tag, cls, parent) => {
 const RECENT_KEY = 'cd.lobby.recent';
 const CALLSIGN_KEY = 'cd.lobby.callsign';
 const RECENT_MAX = 8;
+/** Control characters, stripped from anything read off disk and put on the screen. Built
+ *  from a string rather than written as a literal, so the source file stays text. */
+const CONTROL_CHARS = new RegExp('[\\u0000-\\u001f\\u007f-\\u009f]', 'g');
 
 /** A duration a person reads, rather than a number of milliseconds. */
 export function ago(ms) {
@@ -71,11 +74,38 @@ export function ago(ms) {
  * suite can drive them with a fake and so a profile that refuses storage degrades to an
  * empty list rather than throwing (the same contract `Settings.restore` keeps).
  */
+/**
+ * ⚠ IT TRUSTED WHAT IT FOUND. This read the rows and handed them to the renderer as they
+ * came — so a row's `label` could be any length and any type, and `rows` could be a list of
+ * a hundred thousand of them. Every field IS escaped on the way to the DOM, so this was
+ * never markup; it was an unbounded structure read off disk into a screen, and localStorage
+ * on `<user>.github.io` is shared with every other project published under that name, so
+ * "off disk" is not the same as "written by this game".
+ *
+ * Rebuilt from a whitelist rather than filtered, which is the rule
+ * `SessionDirectory.advertise` already keeps for the same kind of data arriving the other
+ * way. The row shape is three fields and a time; anything else in the file is not a room.
+ */
 export function loadRecent(store) {
   try {
     const raw = store && store.getItem(RECENT_KEY);
     const rows = raw ? JSON.parse(raw) : [];
-    return Array.isArray(rows) ? rows.filter((r) => r && (r.code || r.room)).slice(0, RECENT_MAX) : [];
+    if (!Array.isArray(rows)) return [];
+    const out = [];
+    for (const r of rows.slice(0, RECENT_MAX * 4)) {
+      if (!r || typeof r !== 'object' || Array.isArray(r)) continue;
+      const code = String(r.code == null ? '' : r.code).trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16);
+      const room = roomSlug(r.room);
+      if (!code && !room) continue;
+      out.push({
+        code,
+        room,
+        label: String(r.label == null ? '' : r.label).replace(CONTROL_CHARS, ' ').slice(0, 40),
+        atMs: typeof r.atMs === 'number' && Number.isFinite(r.atMs) ? r.atMs : 0,
+      });
+      if (out.length >= RECENT_MAX) break;
+    }
+    return out;
   } catch { return []; }
 }
 
@@ -140,8 +170,15 @@ export class LobbyScreen {
 
   get isOpen() { return this.open !== null; }
 
+  /* ⚠ THE CALLSIGN IS CLAMPED ON THE WAY IN AND WAS NOT ON THE WAY OUT. `_saveCallsign`
+   * trims to fourteen; this read whatever was under the key, which is not necessarily what
+   * this game wrote — the origin is shared with every other project on the same
+   * `<user>.github.io` — and then sent it over the wire and put it on the roster. */
   _restoreCallsign() {
-    try { return (this.storage && this.storage.getItem(CALLSIGN_KEY)) || 'Operative'; } catch { return 'Operative'; }
+    try {
+      const raw = this.storage && this.storage.getItem(CALLSIGN_KEY);
+      return (typeof raw === 'string' ? raw.replace(CONTROL_CHARS, ' ').trim().slice(0, 14) : '') || 'Operative';
+    } catch { return 'Operative'; }
   }
 
   _saveCallsign(name) {

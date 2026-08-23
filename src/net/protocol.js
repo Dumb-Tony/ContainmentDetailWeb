@@ -86,6 +86,132 @@ const u = (v) => (v || 0) / 100;
 const q3 = (v) => Math.round((v || 0) * 1000);
 const u3 = (v) => (v || 0) / 1000;
 
+/* ── what a stranger is allowed to put in your Game ───────────────────────────
+ *
+ * ⚠ EVERY FIELD BELOW THIS LINE ARRIVED FROM ANOTHER PERSON'S BROWSER. `applySnapshot`
+ * and `applyLobby` are the two functions in this build that write a peer's JSON straight
+ * into your state, and until this section existed they took the shape on trust: an absent
+ * `ps` threw, a `hs` naming an item this build has never heard of crashed the HUD on the
+ * next frame, an `s` on the anomaly went into `t('hud.bezel.held', {state})` and out
+ * through `innerHTML`, and `ph` did the same through `t('phase.' + ph)`.
+ *
+ * The rule this section keeps, stated once:
+ *
+ *   A STRING THAT WILL BE USED AS A KEY IS AN ID; A STRING THAT WILL BE READ IS TEXT.
+ *
+ * `safeId` is for anything that gets looked up (`t('phase.' + x)`, `itemsById.get(x)`,
+ * `PHRASES[x]`) — a closed charset, bounded, and never one of `Object.prototype`'s own
+ * names, because `PHRASES['constructor']` is truthy and `PHRASES['nonsense']` is not, and
+ * exactly one of those two crashes the comms feed on every frame for the rest of the
+ * session. `safeLine` is for prose — it does not restrict the alphabet, because clipping
+ * an apostrophe out of "Contractors' store" is a worse bug than the one it prevents; it
+ * strips control characters and clamps the length, and the UI still escapes it.
+ *
+ * ⚠ NEITHER OF THESE REPLACES `escapeHtml`. They stop a hostile peer reaching a message
+ * KEY or an object lookup; they are not an HTML sanitiser and must never be treated as
+ * one. Both layers, always — this file cannot see the DOM and hud.js cannot see the wire.
+ */
+
+/** `Object.prototype`'s own names, plus the two that reach a constructor another way. A
+ *  string on this list is never a valid id, whatever it is an id for. */
+const POISON_KEYS = new Set([...Object.getOwnPropertyNames(Object.prototype), 'prototype', 'constructor']);
+
+const ID_RE = /^[A-Za-z0-9][A-Za-z0-9._:-]*$/;
+/** Control characters, stripped from anything that will be shown to a person. */
+const CONTROL_RE = new RegExp('[\\u0000-\\u001f\\u007f-\\u009f]', 'g');
+
+/** @returns {string|null} the id, or null if this is not one. */
+export function safeId(v, max = 48) {
+  if (typeof v !== 'string' || v.length === 0 || v.length > max) return null;
+  if (POISON_KEYS.has(v)) return null;
+  return ID_RE.test(v) ? v : null;
+}
+
+/** @returns {string} bounded, printable, and never `undefined` — text, not an id. */
+export function safeLine(v, max = 200) {
+  if (typeof v !== 'string') return '';
+  return v.replace(CONTROL_RE, ' ').slice(0, max);
+}
+
+const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
+/** A number, clamped. ⚠ NOT `Number(v) || fb` — see the note on `_hostRead`: JSON has no
+ *  NaN, so a field the sender could not encode arrives as `null`, and `+null` is 0. */
+const real = (v, lo, hi, fb = 0) => (isNum(v) ? Math.min(hi, Math.max(lo, v)) : fb);
+const int = (v, lo, hi, fb = 0) => Math.round(real(v, lo, hi, fb));
+const isArr = Array.isArray;
+const isObj = (v) => !!v && typeof v === 'object' && !isArr(v);
+
+/** Positions and angles, in the units the encoders above produce. One place, so a clamp
+ *  cannot drift from the quantisation it is protecting. */
+const CM = 1e6;            // ±10,000 m in centimetres — larger than any floor, finite
+const MRAD = 1e7;
+const MS = 1e12;           // ~31 years of simulation time
+
+/**
+ * Is this a snapshot at all?
+ *
+ * Exported so a suite can assert WHY one was refused rather than only that it was, and so
+ * the reason can be counted on the receiving session. A snapshot whose skeleton is wrong
+ * is refused WHOLESALE and nothing is written: a client that keeps its last good frame is
+ * one frame stale, and a client half-written from a hostile frame is broken for good.
+ *
+ * @returns {string|null} the reason it is not, or null if it is
+ */
+export function snapshotProblem(snap) {
+  if (!isObj(snap)) return 'not an object';
+  if (snap.t !== undefined && snap.t !== MSG.SNAP) return 'not a snapshot';
+  if (snap.v !== PROTOCOL_VERSION) return `protocol ${JSON.stringify(snap.v)}`;
+  if (!isNum(snap.ms)) return 'ms is not a number';
+  if (!safeId(snap.ph)) return 'ph is not a phase id';
+  for (const k of ['ps', 'dp', 'ev', 'no', 'ca', 'cl']) if (!isArr(snap[k])) return `${k} is not an array`;
+  if (!isObj(snap.an) || !isArr(snap.an.ic)) return 'an is not an anomaly';
+  if (!isObj(snap.si) || !isArr(snap.si.c) || !isArr(snap.si.d)) return 'si is not a site';
+  /* §11.1 supports one to five. A frame claiming more is not a squad, and applying it would
+   * call `addPlayer` once per row, once per frame, for as long as the host cared to send. */
+  if (snap.ps.length > MAX_SQUAD) return `${snap.ps.length} seats, past the squad of ${MAX_SQUAD}`;
+  for (const d of snap.ps) if (!isObj(d) || !safeId(d.i, 16)) return 'a player row has no seat id';
+  if (snap.dp.length > 256) return `${snap.dp.length} deployables`;
+  return null;
+}
+
+/** The same question for a lobby broadcast. @returns {string|null} */
+export function lobbyProblem(m) {
+  if (!isObj(m)) return 'not an object';
+  if (m.t !== MSG.LOBBY) return 'not a lobby broadcast';
+  if (m.v !== PROTOCOL_VERSION) return `protocol ${JSON.stringify(m.v)}`;
+  if (m.st !== undefined && !isArr(m.st)) return 'st is not an array';
+  return null;
+}
+
+/**
+ * The debrief, rebuilt from a whitelist.
+ *
+ * ⚠ `game.result = snap.rs` TOOK A STRANGER'S OBJECT VERBATIM and `panels.showDebrief`
+ * printed `d.name` and `d.word` into `innerHTML` without escaping, and put `result.overall`
+ * through `msg('grade.' + overall)` — which returns the KEY when it does not know it. So
+ * `overall: '<img src=x onerror=…>'` came back out of the message table unchanged and went
+ * into an `<h1>`. Rebuilt, never spread: the same rule `SessionDirectory.advertise` keeps
+ * for exactly the same reason.
+ */
+function sanitiseResult(rs) {
+  if (!isObj(rs)) return null;
+  return {
+    overall: safeId(rs.overall, 32) || 'Compromised',
+    failReason: rs.failReason ? safeLine(rs.failReason, 200) : null,
+    dims: (isArr(rs.dims) ? rs.dims : []).slice(0, 16).filter(isObj).map((d) => ({
+      id: safeId(d.id, 48) || '',
+      wordId: safeId(d.wordId, 48) || '',
+      name: safeLine(d.name, 64),
+      word: safeLine(d.word, 64),
+      why: safeLine(d.why, 240),
+      ...(isNum(d.value) ? { value: d.value } : {}),
+    })),
+    claims: isObj(rs.claims)
+      ? { right: int(rs.claims.right, 0, 999), wrong: int(rs.claims.wrong, 0, 999), unmarked: int(rs.claims.unmarked, 0, 999) }
+      : { right: 0, wrong: 0, unmarked: 0 },
+  };
+}
+
 /* ── commands ─────────────────────────────────────────────────────────────
  * Short keys because this goes up sixty times a second and there is no reason for it to
  * be readable on the wire; it is readable HERE.
@@ -226,41 +352,68 @@ const SLOT_IDS = ['belt1', 'belt2', 'gen1', 'gen2', 'long1'];
  * references across frames — rebuilding the player array every 80 ms would make the
  * camera jump to a new object each time (the lesson recorded against
  * SmallTownEmergencyServices `applySnapshot`).
+ *
+ * ⚠ AND IT IS A FUNCTION A STRANGER CALLS. The header of `net.js` says the host's inbox is
+ * "the one function in this build a stranger can call", and that was never true: in a
+ * NAMED or LISTED room the HOST is a stranger too, and this is the function they reach.
+ * Every field is checked; the skeleton is checked FIRST and the whole frame refused if it
+ * is wrong, so a hostile snapshot cannot half-write a Game. See `snapshotProblem`.
+ *
+ * @returns {boolean} true if the frame was applied
  */
 export function applySnapshot(game, snap, { localId = null } = {}) {
-  if (!snap || snap.v !== PROTOCOL_VERSION) return false;
+  if (snapshotProblem(snap)) return false;
 
-  game.clock.simTimeMs = snap.ms;
-  game.mission.phase = snap.ph;
-  game.mission.pressure = u3(snap.pr);
-  game.heat.ambientC = u3(snap.amb);
-  game.custody = snap.cu;
+  game.clock.simTimeMs = real(snap.ms, 0, MS, game.clock.simTimeMs);
+  game.mission.phase = snap.ph;                       // already a safeId — see snapshotProblem
+  game.mission.pressure = u3(real(snap.pr, 0, 1e6, 0));
+  game.heat.ambientC = u3(real(snap.amb, -1e6, 1e6, 0));
+  game.custody = safeId(snap.cu, 16) || 'none';
   game.extracted = !!snap.ex;
 
   /* players */
   const seen = new Set();
   for (const d of snap.ps) {
-    let p = game.playerById(d.i);
-    if (!p) { p = game.addPlayer(d.n); p.id = d.i; }
-    p.name = d.n;
-    seen.add(d.i);
+    /* ⚠ THE SEAT ID AND THE CALLSIGN ARE NOT THE SAME KIND OF STRING. The id is looked up,
+     * so it is an id; the callsign is typed by a person, so it is text — clamped to the
+     * same fourteen characters the host's own `_hostHello` clamps to, because a host that
+     * sends more than it would accept is not a host this end has to believe. */
+    const id = safeId(d.i, 16);
+    const name = safeLine(d.n, 14) || 'Operative';
+    let p = game.playerById(id);
+    if (!p) { p = game.addPlayer(name); p.id = id; }
+    p.name = name;
+    seen.add(id);
     /* The local operative's position is PREDICTED, not overwritten — see
      * `reconcileLocal`. Everything else about them still comes from the host. */
-    if (d.i !== localId) {
-      p.x = u(d.x); p.z = u(d.z); p.yaw = u3(d.y); p.pitch = u3(d.pt);
+    if (id !== localId) {
+      p.x = u(real(d.x, -CM, CM, q(p.x))); p.z = u(real(d.z, -CM, CM, q(p.z)));
+      p.yaw = u3(real(d.y, -MRAD, MRAD, q3(p.yaw))); p.pitch = u3(real(d.pt, -MRAD, MRAD, q3(p.pitch)));
     } else {
-      p.netX = u(d.x); p.netZ = u(d.z);
+      p.netX = u(real(d.x, -CM, CM, q(p.x))); p.netZ = u(real(d.z, -CM, CM, q(p.z)));
     }
-    p.crouching = !!(d.f & 1); p.sprinting = !!(d.f & 2);
-    p.downed = !!(d.f & 4); p.alive = !!(d.f & 8); p.extracted = !!(d.f & 16);
-    p.connected = !!(d.f & 64);
-    if (d.f & 32) game.imagerOnIds.add(d.i); else game.imagerOnIds.delete(d.i);
-    p.downedMs = d.dm; p.draggedBy = d.db || null;
-    p.stress = u3(d.st);
-    p.conditions.exposure.severity = d.ce; p.conditions.exposure.stabilised = !!d.cE;
-    p.conditions.mobility.severity = d.cm; p.conditions.mobility.stabilised = !!d.cM;
-    SLOT_IDS.forEach((s, i) => p.slots.set(s, d.sl[i] || null));
-    p.hands = d.hs || null; p.heldSlot = d.hd;
+    const f = int(d.f, 0, 0xffff, 0);
+    p.crouching = !!(f & 1); p.sprinting = !!(f & 2);
+    p.downed = !!(f & 4); p.alive = !!(f & 8); p.extracted = !!(f & 16);
+    p.connected = !!(f & 64);
+    if (f & 32) game.imagerOnIds.add(id); else game.imagerOnIds.delete(id);
+    p.downedMs = real(d.dm, 0, MS, 0); p.draggedBy = safeId(d.db, 16);
+    p.stress = u3(real(d.st, 0, 1e6, 0));
+    p.conditions.exposure.severity = int(d.ce, 0, 3, 0); p.conditions.exposure.stabilised = !!d.cE;
+    p.conditions.mobility.severity = int(d.cm, 0, 3, 0); p.conditions.mobility.stabilised = !!d.cM;
+    /* ⚠ AN ITEM ID THIS BUILD DOES NOT HAVE IS NOT AN ITEM. `hud.js` reads
+     * `itemsById.get(p.hands).displayName` with no guard, so one unknown id in `hs` threw
+     * out of the HUD on every frame for the rest of the session — a two-character denial
+     * of service against a client, from the host. Filtered here rather than guarded there,
+     * because the same lookup is made in four places and only one of them was guarded. */
+    const slots = isArr(d.sl) ? d.sl : [];
+    SLOT_IDS.forEach((s, i) => {
+      const it = safeId(slots[i], 48);
+      p.slots.set(s, it && game.itemsById.has(it) ? it : null);
+    });
+    const hands = safeId(d.hs, 48);
+    p.hands = hands && game.itemsById.has(hands) ? hands : null;
+    p.heldSlot = SLOT_IDS.includes(d.hd) ? d.hd : null;
   }
   for (let i = game.players.length - 1; i >= 0; i--) {
     if (!seen.has(game.players[i].id)) game.players.splice(i, 1);
@@ -269,56 +422,106 @@ export function applySnapshot(game, snap, { localId = null } = {}) {
 
   /* anomaly */
   const a = game.anomaly;
-  a.x = u(snap.an.x); a.z = u(snap.an.z); a.state = snap.an.s;
-  a.escapes = snap.an.e < 0 ? undefined : snap.an.e;
-  a.icePatches = snap.an.ic.map(([x, z, r]) => ({ x: u(x), z: u(z), r: u(r), atMs: 0 }));
+  a.x = u(real(snap.an.x, -CM, CM, q(a.x))); a.z = u(real(snap.an.z, -CM, CM, q(a.z)));
+  /* ⚠ THE STATE IS A KEY. `hud.js` puts it through `t('hud.bezel.held', {state})` and out
+   * through `innerHTML`, so a free string here is markup on four other machines the moment
+   * anybody raises the imager. It is an id or it is the last one we had. */
+  a.state = safeId(snap.an.s, 32) || a.state;
+  const esc = int(snap.an.e, -1, 999, -1);
+  a.escapes = esc < 0 ? undefined : esc;
+  a.icePatches = snap.an.ic.slice(0, 64).filter(isArr).map(([x, z, r]) => ({
+    x: u(real(x, -CM, CM, 0)), z: u(real(z, -CM, CM, 0)), r: u(real(r, 0, CM, 0)), atMs: 0,
+  }));
 
   /* deployables — same identity trick, keyed on uid */
   const depSeen = new Set();
   for (const d of snap.dp) {
-    let e = game.deployables.list.find((x) => x.uid === d.u);
+    if (!isObj(d)) continue;
+    const uid = int(d.u, 0, 1e9, -1);
+    const itemId = safeId(d.it, 48);
+    /* An item this build does not have cannot be placed: `deployables.place(undefined, …)`
+     * is a crash on the client, from one field of one row. */
+    if (uid < 0 || !itemId || !game.itemsById.has(itemId)) continue;
+    const x = u(real(d.x, -CM, CM, 0)), z = u(real(d.z, -CM, CM, 0)), yaw = u3(real(d.y, -MRAD, MRAD, 0));
+    let e = game.deployables.list.find((v) => v.uid === uid);
     if (!e) {
-      e = game.deployables.place(game.itemsById.get(d.it), u(d.x), u(d.z), u3(d.y));
-      e.uid = d.u;
+      e = game.deployables.place(game.itemsById.get(itemId), x, z, yaw);
+      e.uid = uid;
     }
-    depSeen.add(d.u);
-    e.x = u(d.x); e.z = u(d.z); e.yaw = u3(d.y);
-    e.batteryMs = d.b; e.on = !!(d.f & 1); e.sealed = !!(d.f & 2); e.fedByPack = !!(d.f & 4);
-    e.custodyHeldMs = d.ch;
+    depSeen.add(uid);
+    const f = int(d.f, 0, 0xffff, 0);
+    e.x = x; e.z = z; e.yaw = yaw;
+    e.batteryMs = real(d.b, 0, MS, 0); e.on = !!(f & 1); e.sealed = !!(f & 2); e.fedByPack = !!(f & 4);
+    e.custodyHeldMs = real(d.ch, 0, MS, 0);
   }
   for (let i = game.deployables.list.length - 1; i >= 0; i--) {
     if (!depSeen.has(game.deployables.list[i].uid)) game.deployables.list.splice(i, 1);
   }
   a.sealedIn = game.deployables.list.find((d) => d.sealed) || null;
 
-  /* site */
-  for (const [id, on] of snap.si.c) game.site.setCircuit(id, !!on);
-  for (const [id, open] of snap.si.d) {
-    const door = game.site.doors.find((x) => x.id === id);
-    if (door) game.site.setDoorOpen(door, !!open);
+  /* site — the client already has the floor, so a circuit or a door it does not know is a
+   * row from a different building and is dropped rather than invented. */
+  for (const row of snap.si.c) {
+    if (!isArr(row)) continue;
+    const c = game.site.circuits.get(row[0]);
+    if (c) game.site.setCircuit(row[0], !!row[1]);
+  }
+  for (const row of snap.si.d) {
+    if (!isArr(row)) continue;
+    const door = game.site.doors.find((x) => x.id === row[0]);
+    if (door) game.site.setDoorOpen(door, !!row[1]);
   }
 
-  game.cache = new Map(snap.ca);
-  game.itemBattery.set('thermal-imager', snap.ib);
+  /* ⚠ THE CARGO MANIFEST IS RENDERED BY ID. `panels._renderCache` reads
+   * `itemsById.get(itemId).displayName`, so a cache key naming nothing crashes the manifest
+   * screen — and `new Map(snap.ca)` accepted whatever was in the field, including a string,
+   * which throws here instead. */
+  const cache = new Map();
+  for (const row of snap.ca.slice(0, 128)) {
+    if (!isArr(row)) continue;
+    const itemId = safeId(row[0], 48);
+    if (itemId && game.itemsById.has(itemId)) cache.set(itemId, int(row[1], 0, 9999, 0));
+  }
+  game.cache = cache;
+  game.itemBattery.set('thermal-imager', real(snap.ib, 0, MS, 0));
 
-  /* the ledger is append-only, so only ever grows toward the host's copy */
-  for (const e of snap.ev) {
-    if (game.ledger.has(e.e)) continue;
-    game.ledger.record(e.e, {
-      simTimeMs: e.ms, x: u(e.x), z: u(e.z), room: e.r, source: e.so, integrity: e.ig,
+  /* the ledger is append-only, so only ever grows toward the host's copy. `record` already
+   * refuses an id with no rule behind it; the prose fields are clamped because they are
+   * printed, and `escapeHtml` on the tablet is the second half of that and not the first. */
+  for (const e of snap.ev.slice(0, 256)) {
+    if (!isObj(e)) continue;
+    const evId = safeId(e.e, 64);
+    if (!evId || game.ledger.has(evId)) continue;
+    game.ledger.record(evId, {
+      simTimeMs: real(e.ms, 0, MS, 0),
+      x: u(real(e.x, -CM, CM, 0)), z: u(real(e.z, -CM, CM, 0)),
+      room: safeLine(e.r, 64), source: safeLine(e.so, 64), integrity: safeLine(e.ig, 32),
     });
   }
+  /* ⚠ ONLY CLAIMS THE BOARD ALREADY HAS. `claimState.set(id, v)` on a raw key let a host
+   * grow an unbounded Map in a client that never reads a single one of the entries — the
+   * board iterates `ledger.claims`, which is content. */
   for (const [id] of game.ledger.claimState) game.ledger.claimState.set(id, null);
-  for (const [id, v] of snap.cl) game.ledger.claimState.set(id, v);
+  for (const row of snap.cl.slice(0, 128)) {
+    if (!isArr(row) || !game.ledger.claimState.has(row[0])) continue;
+    game.ledger.claimState.set(row[0], row[1] === 'believed' || row[1] === 'excluded' ? row[1] : null);
+  }
 
-  game.notices = snap.no.map(([atMs, text]) => ({ atMs, text }));
-  game.comms.decode(snap.pg || []);
-  game.instances.decode(snap.ix || []);
+  game.notices = snap.no.slice(-6).filter(isArr)
+    .map(([atMs, text]) => ({ atMs: real(atMs, 0, MS, 0), text: safeLine(text, 200) }));
+  /* ⚠ `PHRASES[phrase]` IS NOT A MEMBERSHIP TEST. `comms.decode` guards with it and
+   * `PHRASES['constructor']` is truthy, so `pg: [[1,'p1','constructor',0,0,0]]` got past the
+   * guard and then threw on `ANCHORS[undefined].placed` in the feed — every frame, for
+   * ever. `safeId` refuses every own name of `Object.prototype`, which is the actual set. */
+  game.comms.decode(snap.pg === undefined ? [] : (isArr(snap.pg) ? snap.pg : []).slice(0, 64)
+    .filter((r) => isArr(r) && r.length >= 6 && safeId(r[2], 48) && safeId(r[1], 16))
+    .map((r) => [int(r[0], 0, 1e9, 0), r[1], r[2], real(r[3], -CM, CM, 0), real(r[4], -CM, CM, 0), real(r[5], 0, MS, 0)]));
+  game.instances.decode(isArr(snap.ix) ? snap.ix.slice(0, 128).filter(isArr) : []);
   /* ⚠ ABSENT MEANS UNCHANGED, NOT NULL. `snap.rs || null` would clear the debrief on the
    * very next frame after it arrived, because the field is only sent when it changes. The
    * one field in this function that is not a full overwrite, and the comment is here so
    * nobody tidies it back into the pattern the others follow. */
-  if (snap.rs !== undefined) game.result = snap.rs || null;
+  if (snap.rs !== undefined) game.result = sanitiseResult(snap.rs);
   return true;
 }
 
@@ -381,23 +584,36 @@ export function encodeLobby(lobby) {
  * The same argument applies to the client's own READY flag, which is why a client never
  * sets it locally: it asks, and the host's echo is the answer. An optimistic local toggle
  * would be right for exactly as long as it took the next broadcast to arrive.
+ *
+ * ⚠ AND EVERY FIELD OF IT IS THE HOST'S CLAIM. `callsign: s.n` was written straight
+ * through — so a host could hand every client a megabyte of "callsign" for a seat that
+ * does not exist, at whatever rate it liked, while its own `_hostHello` clamped its own
+ * players to fourteen characters. A host that sends more than it would accept is not one
+ * this end has to believe. Refused wholesale on a bad skeleton; see `lobbyProblem`.
  */
 export function applyLobby(lobby, m) {
-  if (!m || m.t !== MSG.LOBBY || m.v !== PROTOCOL_VERSION) return false;
-  lobby.phase = m.ph;
-  lobby.visibility = m.vs;
-  lobby.roomName = m.rm || '';
-  lobby.code = m.cd || null;
-  if (m.mx) lobby.maxSeats = m.mx;
-  lobby.operation = m.op ? { id: m.op.i, label: m.op.l, incident: m.op.n } : null;
+  if (lobbyProblem(m)) return false;
+  lobby.phase = safeId(m.ph, 24) || lobby.phase;
+  lobby.visibility = safeId(m.vs, 24) || lobby.visibility;
+  lobby.roomName = safeLine(m.rm, 24);
+  lobby.code = m.cd ? safeLine(m.cd, 16) : null;
+  const mx = int(m.mx, 1, MAX_SQUAD, 0);
+  if (mx) lobby.maxSeats = mx;
+  lobby.operation = isObj(m.op)
+    ? { id: safeId(m.op.i, 48) || '', label: safeLine(m.op.l, 64), incident: safeId(m.op.n, 48) || '' }
+    : null;
   lobby.seats.clear();
-  for (const s of m.st || []) {
-    lobby.seats.set(s.i, {
-      seatId: s.i,
-      callsign: s.n,
-      ready: !!(s.f & 1),
-      connected: !!(s.f & 2),
-      host: !!(s.f & 4),
+  for (const s of (m.st || []).slice(0, MAX_SQUAD)) {
+    if (!isObj(s)) continue;
+    const seatId = safeId(s.i, 16);
+    if (!seatId || lobby.seats.has(seatId)) continue;
+    const f = int(s.f, 0, 0xffff, 0);
+    lobby.seats.set(seatId, {
+      seatId,
+      callsign: safeLine(s.n, 14) || 'Operative',
+      ready: !!(f & 1),
+      connected: !!(f & 2),
+      host: !!(f & 4),
       sinceMs: 0,
     });
   }

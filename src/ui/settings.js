@@ -66,7 +66,10 @@
 
 import { CONFIG } from '../config.js';
 import { BUSES } from '../audio/audio.js';
-import { DEFAULT_HOLD_MODES, HOLD_MODE, HOLDABLE, DEFAULT_BINDINGS } from '../core/input.js';
+import {
+  DEFAULT_HOLD_MODES, HOLD_MODE, HOLDABLE, DEFAULT_BINDINGS,
+  sanitiseBindings, sanitiseHoldModes,
+} from '../core/input.js';
 import { escapeHtml } from './hud.js';
 import { t as msg } from '../core/i18n.js';
 
@@ -346,13 +349,38 @@ export function saveSettings(plain) {
   catch { return false; }
 }
 
+/**
+ * ⚠ THE SAVE THAT COULD NOT BE READ WAS THROWN AWAY WITHOUT A WORD, and `progression.js`
+ * spent this week learning why that is not acceptable. One slot; the newest unreadable
+ * settings blob wins. Never read on the load path — it exists so a bug report can carry the
+ * file that broke the boot.
+ */
+export const SETTINGS_QUARANTINE_KEY = 'cd.settings.unreadable';
+
 export function loadSettings() {
   const s = probeStorage();
   if (!s) return null;
   let raw;
   try { raw = s.getItem(SETTINGS_KEY); } catch { return null; }
   if (!raw) return null;
-  try { return migrateSettings(JSON.parse(raw)); } catch { return null; }
+  let parsed;
+  try { parsed = JSON.parse(raw); } catch { _quarantine(s, raw); return null; }
+  const clean = migrateSettings(parsed);
+  if (!clean) _quarantine(s, raw);
+  return clean;
+}
+
+function _quarantine(s, raw) {
+  try {
+    if (typeof raw === 'string' && raw.length <= 512 * 1024) s.setItem(SETTINGS_QUARANTINE_KEY, raw);
+  } catch { /* the profile refused the write; the original is still where it was */ }
+}
+
+/** The quarantined copy, for a rescue tool or a bug report. Never read on the load path. */
+export function quarantinedSettings() {
+  const s = probeStorage();
+  if (!s) return null;
+  try { return s.getItem(SETTINGS_QUARANTINE_KEY); } catch { return null; }
 }
 
 export function clearSettings() {
@@ -361,21 +389,94 @@ export function clearSettings() {
   try { s.removeItem(SETTINGS_KEY); return true; } catch { return false; }
 }
 
-/** An unknown or damaged save falls back to the defaults rather than half-applying itself.
- *  Future versions get their branch here; version 1 simply is the shape. */
-export function migrateSettings(data) {
-  if (!data || typeof data !== 'object') return null;
+/**
+ * ⚠ `__proto__` IS AN OWN PROPERTY AFTER `JSON.parse`, AND `setPath` WALKED INTO IT.
+ *
+ * This is the same defect `progression.js` was hardened against this week and it was worse
+ * here, because it did not stop at the profile. `JSON.parse('{"__proto__":{"x":1}}')`
+ * produces an object whose OWN keys include `__proto__`, so `patch`'s `Object.entries` walk
+ * handed it over, built the path `__proto__.x`, and `setPath` did:
+ *
+ *     cur = this.values['__proto__']      // → Object.prototype, an object, so it descends
+ *     cur['x'] = 1                        // → Object.prototype.x = 1
+ *
+ * — global prototype pollution of the whole page, on boot, from one word in localStorage.
+ * And localStorage on GitHub Pages is keyed to the ORIGIN, which for `<user>.github.io` is
+ * shared by every project that user has ever published. It is not a same-page-only reach.
+ *
+ * ⚠ THE OTHER HALF IS THAT AN UNREADABLE SAVE MUST NOT THROW ON BOOT. `Settings.restore()`
+ * is called before anything is on screen, and `_recompute` reads `v.safety.photosensitive`
+ * and `volumes()` does `name in this.values.volume` — so a blob with `"safety": null` or
+ * `"volume": "x"` was a TypeError with no game behind it. A damaged save degrades to the
+ * defaults, keeps a copy, and says which fields it refused.
+ *
+ * @returns {object|null} a save this build will apply, or null
+ */
+export function migrateSettings(data, refused = null) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
   if (data.version !== SETTINGS_VERSION) return null;
-  return data;
+  return sanitiseSettings(data, refused);
+}
+
+/** Keys that are never a settings path, whatever they are spelled as. */
+const POISON_KEYS = Object.freeze(['__proto__', 'constructor', 'prototype']);
+
+/**
+ * Rebuild a save from the shape this build has, dropping anything else.
+ *
+ * The whitelist is the DEFAULTS' own top-level keys: a group the defaults do not have is a
+ * group nothing reads, and a group of the wrong type is one that crashes the first consumer
+ * to touch it. `input.bindings` is opaque to the schema and goes through `sanitiseBindings`,
+ * which is the validator `input.js` already exports and which `Settings.bindings()` was
+ * never routed through.
+ *
+ * @param refused  optional array; every dropped key is pushed onto it, for the suite and
+ *   for anyone who wants to tell a player what happened to their settings.
+ */
+export function sanitiseSettings(data, refused = null) {
+  const note = (k, why) => { if (refused && refused.length < 40) refused.push(`${k}: ${why}`); };
+  const out = { version: SETTINGS_VERSION };
+  for (const key of Object.keys(data)) {
+    if (key === 'version') continue;
+    if (POISON_KEYS.includes(key)) { note(key, 'reserved key'); continue; }
+    if (!Object.prototype.hasOwnProperty.call(DEFAULT_SETTINGS, key)) { note(key, 'not a settings group'); continue; }
+    const v = data[key];
+    const want = DEFAULT_SETTINGS[key];
+    if (!v || typeof v !== 'object' || Array.isArray(v) || typeof want !== 'object') {
+      note(key, `is ${Array.isArray(v) ? 'an array' : v === null ? 'null' : typeof v}, not a group`);
+      continue;
+    }
+    const group = {};
+    for (const leaf of Object.keys(v)) {
+      if (POISON_KEYS.includes(leaf)) { note(`${key}.${leaf}`, 'reserved key'); continue; }
+      if (!Object.prototype.hasOwnProperty.call(want, leaf)) { note(`${key}.${leaf}`, 'not a field'); continue; }
+      group[leaf] = v[leaf];
+    }
+    if (key === 'input') {
+      /* Two opaque sub-tables, both with a validator already written for them next door and
+       * neither of which the load path had ever been routed through. ⚠ EMPTY STILL MEANS
+       * "THE SHIPPED TABLE" — see `bindings()` — so an empty table stays empty rather than
+       * being expanded into a copy of the defaults that would then never follow them. */
+      const b = group.bindings;
+      group.bindings = (b && typeof b === 'object' && !Array.isArray(b) && Object.keys(b).length)
+        ? sanitiseBindings(b) : {};
+      group.holdModes = sanitiseHoldModes(group.holdModes);
+    }
+    out[key] = group;
+  }
+  return out;
 }
 
 /* ── value plumbing ───────────────────────────────────────────────────────── */
 
+/* ⚠ `out['__proto__'] = x` ON A PLAIN OBJECT DOES NOT CREATE A KEY — it calls the accessor
+ * and replaces the object's prototype. `JSON.parse` puts `__proto__` in `Object.entries`,
+ * so a copy of a save file was where that happened. Skipped, not copied. */
 function clone(v) {
   if (Array.isArray(v)) return v.map(clone);
   if (v && typeof v === 'object') {
     const out = {};
-    for (const [k, x] of Object.entries(v)) out[k] = clone(x);
+    for (const [k, x] of Object.entries(v)) { if (!POISON_KEYS.includes(k)) out[k] = clone(x); }
     return out;
   }
   return v;
@@ -390,11 +491,20 @@ function getPath(obj, path) {
   return cur;
 }
 
+/**
+ * ⚠ THIS FUNCTION IS WHERE THE PROTOTYPE POLLUTION HAPPENED, so the refusal lives here as
+ * well as in `sanitiseSettings`. `Settings` is a public class: `new Settings(obj)` and
+ * `patch(obj)` are both reachable without going near the load path, and a guard that is
+ * only on the load path is a guard somebody routes around next month. `__proto__` as an
+ * intermediate key made the walk DESCEND INTO `Object.prototype` and the last assignment
+ * landed on it. Refused, and the write does not happen at all.
+ */
 function setPath(obj, path, value) {
   const keys = path.split('.');
+  if (keys.some((k) => POISON_KEYS.includes(k))) return obj;
   let cur = obj;
   for (let i = 0; i < keys.length - 1; i++) {
-    if (typeof cur[keys[i]] !== 'object' || cur[keys[i]] === null) cur[keys[i]] = {};
+    if (typeof cur[keys[i]] !== 'object' || cur[keys[i]] === null || Array.isArray(cur[keys[i]])) cur[keys[i]] = {};
     cur = cur[keys[i]];
   }
   cur[keys[keys.length - 1]] = value;
@@ -514,8 +624,20 @@ export class Settings {
    */
   get effective() { return this._effective; }
 
+  /**
+   * ⚠ THIS THREW ON BOOT FOR A SAVE THAT SAID `"safety": null`.
+   *
+   * `Settings.restore()` runs before anything is on screen and this is the first thing it
+   * calls, so `v.safety.photosensitive` on a group that is not a group was a TypeError with
+   * no game behind it — a blank page from one word in localStorage, and localStorage on
+   * `<user>.github.io` is shared with every other project that user has published. The load
+   * path refuses that shape now; this holds the line for `new Settings(anything)`, which is
+   * public and does not go through it.
+   */
   _recompute() {
     const v = this.values;
+    const grp = (k) => (v[k] && typeof v[k] === 'object' && !Array.isArray(v[k]) ? v[k] : (v[k] = clone(DEFAULT_SETTINGS[k])));
+    for (const k of Object.keys(DEFAULT_SETTINGS)) if (k !== 'version') grp(k);
     const safe = v.safety.photosensitive;
     const cam = { ...v.camera };
     if (safe) {
@@ -546,12 +668,23 @@ export class Settings {
     return out;
   }
 
-  holdModes() { return { ...this.values.input.holdModes }; }
+  holdModes() { return sanitiseHoldModes(this.values.input && this.values.input.holdModes); }
 
-  /** The saved binding table, or the shipped one when the player has never rebound. */
+  /**
+   * The saved binding table, or the shipped one when the player has never rebound.
+   *
+   * ⚠ IT WENT TO `new Input(...)` UNVALIDATED. `input.js` exports `sanitiseBindings` and
+   * documents it as taking "a save file, a network payload"; the only caller was
+   * `Input.fromJSON`, which the boot path does not use — `main.js` does
+   * `new Input(window, settings.bindings(), …)`, and `Input.setBindings` goes straight to
+   * `Array.from(codes)`. So `{"sprint": null}` in localStorage was `Array.from(null)`, a
+   * TypeError, before the first frame. The validator existed; nothing on the boot path had
+   * been pointed at it.
+   */
   bindings() {
-    const b = this.values.input.bindings;
-    return b && Object.keys(b).length ? clone(b) : clone(DEFAULT_BINDINGS);
+    const b = this.values.input && this.values.input.bindings;
+    return b && typeof b === 'object' && !Array.isArray(b) && Object.keys(b).length
+      ? sanitiseBindings(b) : clone(DEFAULT_BINDINGS);
   }
 
   setBindings(table) {

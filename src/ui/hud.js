@@ -225,10 +225,23 @@ export class Hud {
     /* ── top left: where, when, how bad ── */
     const room = g.site.roomNameAt(p.x, p.z);
     const left = g.site.circuits;
-    const power = Array.from(left.values()).map((c) => `<i class="${c.on ? 'on' : 'off'}"></i>${c.displayName.replace(' circuit', '')}`).join('');
+    const power = Array.from(left.values()).map((c) => `<i class="${c.on ? 'on' : 'off'}"></i>${escapeHtml(String(c.displayName || '').replace(' circuit', ''))}`).join('');
+    /**
+     * ⚠ `t()` INTERPOLATES RAW, AND A MISSING KEY RETURNS THE KEY.
+     *
+     * Both halves matter and only together. `t('phase.' + m.phase)` looks like a lookup
+     * against a closed vocabulary, and it is — until `m.phase` comes off a snapshot, at
+     * which point an unknown phase resolves to the literal string `phase.<whatever the host
+     * sent>` and `t('hud.clock', {phase})` drops it into this template unescaped. The wire
+     * layer now refuses a phase that is not an id, and this escapes what survives; neither
+     * alone is enough, because the wire cannot know this ends up in `innerHTML` and this
+     * cannot know the value came from a stranger.
+     */
     this._set('tl', this.topLeft, `
-      <div class="row big">${room}</div>
-      <div class="row">${t('hud.clock', { time: GameClock.formatMs(now), phase: t(`phase.${m.phase}`) })}</div>
+      <div class="row big">${escapeHtml(room)}</div>
+      <div class="row">${t('hud.clock', {
+    time: GameClock.formatMs(now), phase: escapeHtml(t(`phase.${m.phase}`)),
+  })}</div>
       <div class="row stage s${m.stage}">${t('hud.pressure', { stage: `<b>${t(`pressure.${m.stageName}`)}</b>` })}</div>
       <div class="row power">${power}</div>`);
 
@@ -260,7 +273,13 @@ export class Hud {
       return `<div class="slot ${held ? 'held' : ''} ${item ? '' : 'empty'}">
         <b>${i + 1}</b><span>${item ? item.displayName : t('hud.slotEmpty')}</span>${sub}</div>`;
     }).join('');
-    const hands = p.hands ? `<div class="slot hands held"><b>✋</b><span>${g.itemsById.get(p.hands).displayName}</span></div>` : '';
+    /* ⚠ `itemsById.get(p.hands).displayName` WITH NO GUARD, ON THE 60 Hz PATH. `p.hands` is
+     * written by `applySnapshot` from a field the host chose, so one item id this build does
+     * not have threw out of the HUD on every frame for the rest of the session — a client
+     * killed by two characters of somebody else's JSON. The wire layer drops unknown ids
+     * now; this is the guard that should always have been here. */
+    const handItem = p.hands ? g.itemsById.get(p.hands) : null;
+    const hands = handItem ? `<div class="slot hands held"><b>✋</b><span>${escapeHtml(handItem.displayName)}</span></div>` : '';
     this._set('slots', this.slots, slotHtml + hands);
 
     /* ── condition and stress ── */
@@ -378,7 +397,11 @@ export class Hud {
       this.bezel.style.top = `${r.top}px`;
       this.bezel.style.width = `${r.size}px`;
       this.bezel.style.height = `${r.size}px`;
-      const state = a.isLoose ? a.state : 'contained';
+      /* ⚠ THE ANOMALY'S STATE COMES OFF THE WIRE AND GOES INTO `innerHTML`. `a.state` is
+       * written by `applySnapshot`; it lands in `t('hud.bezel.held', {state})`, which
+       * interpolates raw, and then in `bezelLabel.innerHTML` below. It is an id at the wire
+       * and it is escaped here, for the same both-layers reason as the phase above. */
+      const state = escapeHtml(a.isLoose ? a.state : 'contained');
       const held = a.isHeld;
       this.bezel.classList.toggle('held', held);
       this.bezel.classList.toggle('hot', a.stateKind === 'hunting');
@@ -404,7 +427,12 @@ export class Hud {
     if (g.custody === 'verified') {
       const carrier = g.players.find((q) => q.hands === 'reinforced-transit-case');
       if (carrier === me) return t('hud.objective.carry');
-      if (carrier) return t('hud.objective.carrierHas', { name: carrier.name });
+      /* ⚠ THE ONE PLACE A CALLSIGN REACHED `innerHTML` UNESCAPED. The squad list, the notice
+       * feed, the lobby roster, the comms feed and the moderation log all escape; this line
+       * did not, because `t()` looks like it is doing something and all it does is
+       * `String(params[name])`. A callsign is fourteen characters a stranger typed, and the
+       * objective panel is on screen for the whole operation. */
+      if (carrier) return t('hud.objective.carrierHas', { name: escapeHtml(carrier.name) });
       return t('hud.objective.lift');
     }
     if (g.custody === 'sealed') {
@@ -448,8 +476,25 @@ export class Hud {
   }
 }
 
+/**
+ * The one escaper, exported and used by every screen in the build.
+ *
+ * ⚠ THE APOSTROPHE WAS NOT ON THE LIST. Four characters were escaped and `'` was not, which
+ * is correct for every attribute in this build TODAY because every one of them is written
+ * with double quotes — and is a landmine, because the day somebody writes
+ * `title='${escapeHtml(x)}'` the escaper says it handled it and it did not. An escaper that
+ * is only safe if you also remember a convention is not an escaper. Five characters, always,
+ * so the guarantee is about the function and not about the caller.
+ *
+ * ⚠ AND IT IS NOT THE ONLY LAYER. `src/net/protocol.js` refuses a wire string that will be
+ * used as a message KEY or an object lookup, because escaping does nothing about
+ * `t('phase.' + x)` returning its own key or `PHRASES['constructor']` being truthy. Both
+ * layers, always: this file cannot see the wire and that one cannot see the DOM.
+ */
 function escapeHtml(s) {
-  return String(s).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+  return String(s).replace(/[&<>"']/g, (ch) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[ch]));
 }
 
 export { escapeHtml };

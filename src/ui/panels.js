@@ -252,7 +252,7 @@ export class Panels {
           <h2>${msg('panels.squad.hostHead')}</h2>
           <p>${msg('panels.squad.hostBody')}</p>
           <button class="wide" data-host ${net.online ? 'disabled' : ''}>${msg('panels.squad.hostButton')}</button>
-          ${net.code ? `<div class="code">${net.code}</div>` : ''}
+          ${net.code ? `<div class="code">${escapeHtml(net.code)}</div>` : ''}
 
           <h2>${msg('panels.squad.joinHead')}</h2>
           <div class="joiner">
@@ -317,7 +317,7 @@ export class Panels {
     const rows = g.content.items.items.map((it) => {
       const n = this.manifest.get(it.id) || 0;
       return `<tr class="${n ? 'taken' : ''}">
-        <td class="name"><b>${it.displayName}</b><span>${escapeHtml(it.summary || '')}</span></td>
+        <td class="name"><b>${escapeHtml(it.displayName)}</b><span>${escapeHtml(it.summary || '')}</span></td>
         <td class="vol">${it.cargoVolume}</td>
         <td class="qty">
           <button data-dec="${it.id}" ${n ? '' : 'disabled'}>−</button><b>${n}</b><button data-inc="${it.id}">+</button>
@@ -556,10 +556,14 @@ export class Panels {
      * and `stageNames[0]` is 'Latent'; both are compared against and carried in a snapshot,
      * and both were also printed here raw — an English word inside an otherwise translated
      * line, which is exactly what the pseudolocale showed on the HUD. */
+    /* ⚠ AND THE PHASE IS THE HOST'S TOO. `mission.phase` is written by `applySnapshot`, so
+     * `msg('phase.' + phase)` resolves to its own key for anything the table does not carry
+     * and lands in `<p>${sub}</p>` unescaped — the same shape as the debrief's grade, on the
+     * screen the squad has open most often. */
     this._shell(msg('tablet.shell.title'), msg('tablet.shell.sub', {
-      phase: msg(`phase.${g.mission.phase}`),
+      phase: escapeHtml(msg(`phase.${g.mission.phase}`)),
       time: GameClock.formatMs(g.clock.simTimeMs),
-      stage: msg(`pressure.${g.mission.stageName}`),
+      stage: escapeHtml(msg(`pressure.${g.mission.stageName}`)),
     }),
     `<nav class="tabs">${nav}</nav>${body}`,
     this.tab === 'procedure'
@@ -598,19 +602,25 @@ export class Panels {
 
   _renderCache() {
     const g = this.game;
+    /* ⚠ `itemsById.get(itemId).displayName` WITH NO GUARD, ON A MAP THE HOST FILLS.
+     * `game.cache` is replaced wholesale by `applySnapshot`, so one key naming an item this
+     * build does not have threw here and the manifest screen would not open again for the
+     * rest of the operation. The wire layer drops unknown ids; this stops caring. */
     const rows = Array.from(g.cache, ([itemId, n]) => {
       const it = g.itemsById.get(itemId);
+      if (!it) return '';
       return `<tr class="${n ? '' : 'gone'}">
-        <td class="name"><b>${it.displayName}</b><span>${escapeHtml(it.summary || '')}</span></td>
+        <td class="name"><b>${escapeHtml(it.displayName)}</b><span>${escapeHtml(it.summary || '')}</span></td>
         <td class="vol">${it.bulk}</td><td class="qty">${n}</td>
-        <td><button data-take="${itemId}" ${n ? '' : 'disabled'}>${msg('panels.cache.take')}</button></td></tr>`;
+        <td><button data-take="${escapeHtml(itemId)}" ${n ? '' : 'disabled'}>${msg('panels.cache.take')}</button></td></tr>`;
     }).join('');
     const held = g.player.heldItemId;
+    const heldItem = held ? g.itemsById.get(held) : null;
     this._shell(msg('panels.cache.title'), msg('panels.cache.sub'),
       `<div class="pad"><table class="items"><tbody>${rows}</tbody></table>
        <p class="small">${msg('panels.cache.slots')}</p></div>`,
-      `${held ? `<button class="ghost" data-return>${
-        msg('panels.cache.returnItem', { name: g.itemsById.get(held).displayName })}</button>` : ''
+      `${heldItem ? `<button class="ghost" data-return>${
+        msg('panels.cache.returnItem', { name: escapeHtml(heldItem.displayName) })}</button>` : ''
       }<button class="go" data-close>${msg('panels.cache.close')}</button>`);
 
     this.node.querySelectorAll('[data-take]').forEach((b) => b.onclick = () => {
@@ -625,10 +635,28 @@ export class Panels {
 
   /* ── the debrief ─────────────────────────────────────────────────────────── */
 
+  /**
+   * ⚠ THE WHOLE DEBRIEF IS THE HOST'S OBJECT AND THIS SCREEN PRINTED IT.
+   *
+   * On a client `game.result` is written by `applySnapshot` from the `rs` field, verbatim
+   * until this milestone. Three of the four things drawn below went into `innerHTML` with
+   * no escaping — `d.name`, `d.word`, and `msg('grade.' + result.overall)`, which is the
+   * worst of them: `t()` returns the KEY when it does not recognise it, so an `overall` of
+   * `<img src=x onerror=…>` came back out of the message table unchanged and went straight
+   * into an `<h1>` on every machine in the squad. `d.why` was escaped, which is what made
+   * the other three look deliberate.
+   *
+   * `sanitiseResult` in protocol.js now rebuilds the object from a whitelist before it ever
+   * reaches a Game, and everything here is escaped. Both, for the reason the escaper's own
+   * note gives: the wire layer cannot know this is `innerHTML`, and this cannot know the
+   * object came from a stranger — a solo player's `result` comes from `mission.grade`.
+   */
   showDebrief(result) {
     this.open = 'debrief';
     const g = this.game;
-    const dims = result.dims.map((d) => `<li><b>${d.name}</b><span class="w">${d.word}</span><p>${escapeHtml(d.why)}</p></li>`).join('');
+    const rows = Array.isArray(result.dims) ? result.dims : [];
+    const dims = rows.map((d) => `<li><b>${escapeHtml(d.name)}</b><span class="w">${
+      escapeHtml(d.word)}</span><p>${escapeHtml(d.why)}</p></li>`).join('');
     const rules = g.ledger.claims.map((c) => {
       const s = g.ledger.claimState.get(c.id);
       const mark = s === null ? msg('debrief.screen.unmarked') : (s === 'believed') === c.truth ? '✓' : '✕';
@@ -642,7 +670,7 @@ export class Panels {
 
     /* ⚠ `result.overall` IS AN ID. base.js maps it onto a CSS pill and a saved profile has a
      * whole history written in it, so the value stays English and the label sits beside it. */
-    this._shell(msg('debrief.screen.title', { grade: msg(`grade.${result.overall}`) }),
+    this._shell(msg('debrief.screen.title', { grade: escapeHtml(msg(`grade.${result.overall}`)) }),
       result.failReason ? escapeHtml(result.failReason) : msg('debrief.screen.closed'),
       `<div class="cols">
         <section><h2>${msg('debrief.screen.assessment')}</h2><ul class="dims">${dims}</ul></section>

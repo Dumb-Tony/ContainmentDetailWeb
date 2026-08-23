@@ -20,6 +20,7 @@
 import {
   MSG, ACT, LACT, PROTOCOL_VERSION, MAX_SQUAD,
   encodeCommand, decodeCommand, encodeSnapshot, encodeFullSnapshot, applySnapshot, encodeLobby, applyLobby,
+  safeId, safeLine,
 } from './protocol.js';
 import {
   Lobby, SessionDirectory, LOBBY_PHASE, VISIBILITY, LOG_KIND, REMOVAL_REASONS,
@@ -47,6 +48,42 @@ const DIRECTORY_ID = `${ROOM_PREFIX}directory-1`;
 
 /** How often a listed room re-announces itself, in frames' worth of milliseconds. */
 const ADVERT_EVERY_MS = 20000;
+
+/**
+ * How much discrete action a seat may spend, and how fast it comes back.
+ *
+ * ⚠ THESE TWO NUMBERS ARE THE ONLY THING BETWEEN A MODIFIED CLIENT AND THE HOST'S FRAME
+ * BUDGET, so both ends of the range matter. `ACT_BURST` has to clear anything a person can
+ * do in one breath — a slot change, an interact, a use, and the four the tablet fires when
+ * a procedure is committed — or the game refuses a real player. `ACT_PER_SEC` has to sit
+ * well under a send loop, which is 60 Hz, or the limit is decoration. Twelve a second is
+ * four times the fastest anybody has been measured playing and a fifth of the wire.
+ */
+export const ACT_BURST = 30;
+export const ACT_PER_SEC = 12;
+
+/** A centimetre field off the wire. ⚠ NOT `(m.x || 0) / 100` — see `_hostRead`: JSON has no
+ *  NaN, and `null / 100` is 0, so the coercing form accepts a field the sender could not
+ *  encode and turns it into a real coordinate of zero. */
+function num100(v) { return typeof v === 'number' && Number.isFinite(v) ? v / 100 : 0; }
+
+/**
+ * The procedure card, rebuilt from a whitelist.
+ *
+ * Five fields of prose the squad picked off the planner, plus the list they promised to
+ * maintain. `commitProcedure` spread whatever object arrived and stored it on the mission;
+ * a card is not a place for a client to park data, and every one of these strings is
+ * printed on the tablet.
+ */
+function procedureCard(card) {
+  const c = card && typeof card === 'object' && !Array.isArray(card) ? card : {};
+  const one = (v) => safeLine(v, 160);
+  return {
+    target: one(c.target), state: one(c.state), trigger: one(c.trigger),
+    transfer: one(c.transfer), abort: one(c.abort),
+    maintained: (Array.isArray(c.maintained) ? c.maintained : []).slice(0, 12).map(one).filter(Boolean),
+  };
+}
 
 /** Five characters, none of them ones that get misheard over a radio. */
 export function randCode(rand = Math.random) {
@@ -162,6 +199,8 @@ export class NetSession {
 
     /** host: playerId -> {link, token}. client: the single link to the host. */
     this.seats = new Map();
+    /** seatId -> {tokens, atMs}. The mission-action budget; see `_chargeAct`. */
+    this._actBudget = new Map();
     this.link = null;
     this.localPlayerId = 'p1';
     /** Handed back by the host so a dropped operative can reclaim their own slot. */
@@ -180,6 +219,22 @@ export class NetSession {
     /** Messages the host could not read at all. §20.9: never trust client claims — and
      *  never let one throw out of the inbox and take the session with it. */
     this.malformed = 0;
+    /**
+     * ⚠ AND THE SAME COUNTER FOR THE OTHER DIRECTION, WHICH DID NOT EXIST.
+     *
+     * The header of this file says the host's inbox is "the one function in this build a
+     * stranger can call". That was never true. A PRIVATE room is a code somebody read
+     * aloud, but a NAMED room is a word on a broker shared with the whole internet and a
+     * LISTED one is advertised to anybody who asks — so in two of the three shapes this
+     * build ships, THE HOST IS A STRANGER, and `_clientOnMessage` is the function they
+     * reach. It was the only inbox with no wrapper, no counter and no validation.
+     */
+    this.hostMalformed = 0;
+    /** Snapshots and lobby broadcasts this end refused outright, with the last reason. */
+    this.framesRefused = 0;
+    this.lastRefusal = null;
+    /** ACTs dropped for spending the seat's budget. See `_hostAct`. */
+    this.actsFlooded = 0;
   }
 
   get online() { return this.role !== ROLE.SOLO; }
@@ -298,7 +353,7 @@ export class NetSession {
       seat.link.send({ t: MSG.KICK, why: rec.reason });
       seat.link.close();
     }
-    this.seats.delete(seatId);
+    this.seats.delete(seatId); this._actBudget.delete(seatId);
     /* The order matters: the kit comes off the operative while they are still on the
      * roster, because `removePlayer` is the only thing that knows how to put it down. */
     this.game.removePlayer(seatId);
@@ -376,7 +431,29 @@ export class NetSession {
 
   _hostRead(link, m) {
     if (!m || typeof m !== 'object') { this.malformed++; return; }
-    if (m.t === MSG.HELLO) return this._hostHello(link, m);
+    if (m.t === MSG.HELLO) {
+      /**
+       * ⚠ ONE CONNECTION COULD TAKE THE WHOLE SQUAD.
+       *
+       * Nothing checked whether this link already held a seat, and `_hostHello` allocates
+       * unconditionally — so a modified client that sent HELLO five times got five
+       * operatives, five sets of kit and every remaining slot, from one data channel. The
+       * board then said "full" and no real person could join, which is §11.7's anti-griefing
+       * list in one line of somebody else's JavaScript. It was invisible because the honest
+       * client sends exactly one and `_seatOf` returns the FIRST match, so even the host's
+       * own roster read as if one person had joined.
+       *
+       * ⚠ AND THE RESUME PATH STILL WORKS, because a resume arrives on a link that does NOT
+       * yet hold a seat — that is what makes it a reconnect. The guard is on the link, not
+       * on the token.
+       */
+      if (this._seatOf(link)) {
+        this.malformed++;
+        this.lobby.record(LOG_KIND.MALFORMED, this.lobby.seatOf(this._seatOf(link).id) || {}, this.now());
+        return;
+      }
+      return this._hostHello(link, m);
+    }
 
     const found = this._seatOf(link);
     if (!found) return;                       // talking before saying hello
@@ -438,7 +515,7 @@ export class NetSession {
       /* The callsign is the one free-text field a player owns, and it is theirs to change
        * until the squad deploys. It is clamped here and NEVER put on the analytics bus —
        * §21.2, and `tools/m0-tests.js` AN5 fails the build if it ever is. */
-      const name = String(m.n || '').trim().slice(0, 14);
+      const name = safeLine(m.n, 14).trim();
       const p = this.game.playerById(id);
       if (name && p && this.lobby.phase !== LOBBY_PHASE.DEPLOYED) {
         p.name = name;
@@ -471,9 +548,16 @@ export class NetSession {
 
   _hostHello(link, m) {
     if (m.v !== PROTOCOL_VERSION) {
-      this._refuse(link, `Protocol ${m.v} against ${PROTOCOL_VERSION}. Somebody needs to reload.`);
+      /* ⚠ THE VERSION IS ECHOED BACK INTO A SENTENCE THE OTHER END PRINTS. It is whatever
+       * they sent, so it is clamped before it goes anywhere near their screen — a refusal
+       * is the one message a peer is guaranteed to read, which makes it the one place a
+       * host would hand an attacker's own payload back to them at full length. */
+      this._refuse(link, `Protocol ${safeLine(String(m.v), 24)} against ${PROTOCOL_VERSION}. Somebody needs to reload.`);
       return;
     }
+    /* A resume token is a Map key here and a string this host issued. Anything else is not
+     * one, and is treated as absent rather than looked up. */
+    const token = typeof m.token === 'string' && m.token.length <= 64 ? m.token : null;
 
     /**
      * ⚠ THE BLOCK IS CHECKED BEFORE THE RESUME TOKEN, and that order is the whole of it.
@@ -482,7 +566,7 @@ export class NetSession {
      * first hands a griefer their seat straight back, kit and all, and the host's removal
      * becomes a two-second inconvenience.
      */
-    const blocked = this.lobby.blockedReason(m.token);
+    const blocked = this.lobby.blockedReason(token);
     if (blocked) {
       this._refuse(link, `You were removed from this session. ${blocked}.`);
       return;
@@ -490,9 +574,9 @@ export class NetSession {
 
     /* A resume token buys back the exact operative, with their kit — GDD §11.5,
      * "reconnect restores character state and inventory". The slot was held open. */
-    if (m.token) {
+    if (token) {
       for (const [id, seat] of this.seats) {
-        if (seat.token !== m.token) continue;
+        if (seat.token !== token) continue;
         const p = this.game.playerById(id);
         if (!p) break;
         seat.link = link;
@@ -536,11 +620,17 @@ export class NetSession {
       }
     }
 
-    const p = this.game.addPlayer((m.name || '').trim().slice(0, 14) || `Operative ${this.game.players.length + 1}`);
+    /* ⚠ THE CALLSIGN IS THE ONE FREE-TEXT FIELD IN THIS BUILD AND IT ARRIVES FROM A
+     * STRANGER. Fourteen characters, no control characters, and — this is the part that
+     * matters — it is not the only defence: it lands on `p.name`, which travels in every
+     * snapshot to every other machine, so hud.js, panels.js, lobby.js and the comms feed
+     * all escape it on the way to the DOM. Clamping is not sanitising and this line is not
+     * pretending to be. */
+    const p = this.game.addPlayer(safeLine(m.name, 14).trim() || `Operative ${this.game.players.length + 1}`);
     p.remote = true;
-    const token = `${p.id}-${randCode(() => (this.game.rng.float()))}`;
-    this.seats.set(p.id, { link, token, lastAct: 0 });
-    link.send(this._welcome(p.id, token));
+    const issued = `${p.id}-${randCode(() => (this.game.rng.float()))}`;
+    this.seats.set(p.id, { link, token: issued, lastAct: 0 });
+    link.send(this._welcome(p.id, issued));
     this.lobby.take(p.id, { callsign: p.name, atMs: this.now() });
     this._say(`${p.name} joined`);
     this._roster();
@@ -557,6 +647,32 @@ export class NetSession {
        * mean unknown. */
       snap: encodeFullSnapshot(this.game),
     };
+  }
+
+  /**
+   * The ACT budget: a token bucket per seat, kept here rather than on the Lobby because a
+   * mission action is not a lobby action and sharing one bucket would let a squad that
+   * changed its mind about ready starve itself of the ability to open a door.
+   *
+   * ⚠ IT IS KEYED ON THE SEAT, WHICH IS THE LINK'S. Nothing a client sends decides which
+   * bucket it spends, so a seat cannot exhaust another seat's budget — the same property
+   * that makes `_hostAct` unable to act for somebody else.
+   *
+   * @returns {boolean} true if the action may proceed
+   */
+  _chargeAct(seatId) {
+    const atMs = this.now();
+    let b = this._actBudget.get(seatId);
+    if (!b) { b = { tokens: ACT_BURST, atMs }; this._actBudget.set(seatId, b); }
+    b.tokens = Math.min(ACT_BURST, b.tokens + (Math.max(0, atMs - b.atMs) / 1000) * ACT_PER_SEC);
+    b.atMs = atMs;
+    if (b.tokens < 1) return false;
+    b.tokens -= 1;
+    /* Back above half means the burst is over, so the NEXT one is a second event on the
+     * record rather than being swallowed by the first. A flag that is set and never cleared
+     * is a log that reports one flood per session however many there were. */
+    if (b.tokens > ACT_BURST / 2) b.logged = false;
+    return true;
   }
 
   /**
@@ -580,10 +696,50 @@ export class NetSession {
      * applying it would be acting on an intent the operative has already moved on from.
      */
     const seat = this.seats.get(id);
-    const n = Number(m.sq);
-    if (seat && Number.isFinite(n)) {
+    /**
+     * ⚠ AND THE GUARD WAS OPT-IN FOR THE ATTACKER. `Number(undefined)` is NaN, so
+     * `Number.isFinite(n)` was false and the whole replay check was SKIPPED for any message
+     * that simply left `sq` out — which is one deleted field away from the exact defect the
+     * comment above describes. A well-formed client always sends it (`act()` stamps it on
+     * every message), so requiring it costs nothing and closes the hole.
+     */
+    const n = typeof m.sq === 'number' && Number.isFinite(m.sq) ? m.sq : null;
+    if (n === null) { this.actsDropped = (this.actsDropped || 0) + 1; return; }
+    if (seat) {
       if (n <= seat.lastAct) { this.actsDropped = (this.actsDropped || 0) + 1; return; }
       seat.lastAct = n;
+    }
+
+    /**
+     * ⚠ THE BUDGET COVERED THE CHEAP PATH AND NOT THE EXPENSIVE ONE.
+     *
+     * `_hostLobbyAct` was rate-limited because "a client that holds the ready key down can
+     * make the host rebroadcast the roster as fast as its send loop runs". Every word of
+     * that applies harder here: `doInteract` walks the floor's blocking rects, `PROCEDURE`
+     * allocates a card and moves the mission phase, and `ABORT` moves it back — none of
+     * which had any limit at all, so the griefing this session's moderation work exists to
+     * stop was available at sixty hertz to any modified client. §20.9 says "rate-limit
+     * interaction and chat events" and only the second half was done.
+     *
+     * A SEPARATE bucket from the lobby's, and a much wider one: a lobby action is a person
+     * clicking and an ACT is a person playing, so the limit has to sit above the fastest
+     * anybody plays and below the slowest thing a send loop can do. Charged on the SEAT,
+     * which is the link's, so nothing here can be spent on somebody else's behalf.
+     */
+    if (!this._chargeAct(id)) {
+      this.actsFlooded++;
+      /* ⚠ ONE LOG ENTRY PER BURST, NOT ONE PER MESSAGE. Four hundred messages is one event —
+       * "they flooded" — and a moderation record with four hundred identical lines in it has
+       * rolled every other thing that seat did off the end of the log, which is the one
+       * question the record exists to answer. `Lobby.noteFlood` cannot be reused here: it
+       * reads the LOBBY's bucket, and a seat that floods ACTs may never have sent a lobby
+       * message at all, so it had nothing to read and said nothing. */
+      const b = this._actBudget.get(id);
+      if (b && !b.logged) {
+        b.logged = true;
+        this.lobby.record(LOG_KIND.FLOOD, this.lobby.seatOf(id) || { seatId: id }, this.now());
+      }
+      return;
     }
     this.actsReceived++;
     const g = this.game;
@@ -592,16 +748,22 @@ export class NetSession {
       case ACT.INTERACT: err = g.doInteract(id); break;
       case ACT.USE: err = g.useHeld(id); break;
       case ACT.IMAGER: err = g.toggleImager(id); break;
-      case ACT.SLOT: g.selectSlot(id, m.n | 0); break;
-      case ACT.TAKE: err = g.takeFromCache(String(m.id || ''), id); break;
+      case ACT.SLOT: g.selectSlot(id, typeof m.n === 'number' && Number.isFinite(m.n) ? (m.n | 0) : 0); break;
+      case ACT.TAKE: err = g.takeFromCache(safeId(m.id, 48) || '', id); break;
       case ACT.RETURN: err = g.returnToCache(id); break;
-      case ACT.PROCEDURE: err = g.commitProcedure(m.card || {}); break;
+      /* ⚠ THE CARD IS FIVE FIELDS OF PROSE THE SQUAD TYPED, NOT AN ARBITRARY OBJECT.
+       * `commitProcedure({ ...card })` spread whatever arrived — which is not prototype
+       * pollution (spread defines, it does not assign) but is an unbounded object stored on
+       * the mission, graded, and printed on the tablet. Rebuilt from a whitelist. */
+      case ACT.PROCEDURE: err = g.commitProcedure(procedureCard(m.card)); break;
       case ACT.ABORT: g.abortProcedure(); break;
-      case ACT.CLAIM: g.setClaim(String(m.id || ''), m.v || null, id); break;
+      /* A claim state is one of two words or nothing. It rides the snapshot to every other
+       * client, so an unconstrained value here is a field one client writes into four. */
+      case ACT.CLAIM: g.setClaim(safeId(m.id, 64) || '', m.v === 'believed' || m.v === 'excluded' ? m.v : null, id); break;
       /* `id` is the seat this link is in, never a field the client sent — so a client
        * cannot put a callout on the board under somebody else's name. The refusal that
        * comes back goes to this one operative, not to the squad feed. */
-      case ACT.PING: err = g.ping(id, m.p, (m.x || 0) / 100, (m.z || 0) / 100); break;
+      case ACT.PING: err = g.ping(id, safeId(m.p, 48) || '', num100(m.x), num100(m.z)); break;
       default: err = 'unknown action'; break;
     }
     if (err && err !== 'OPEN_CACHE') {
@@ -678,7 +840,7 @@ export class NetSession {
       const p = this.game.playerById(c.id);
       const away = Math.round((now - c.since) / 60000);
       this.game.notice(`${p.name} has been off the air for ${away} minutes. Their seat has gone to somebody who is here.`);
-      this.seats.delete(c.id);
+      this.seats.delete(c.id); this._actBudget.delete(c.id);
       this.lobby.release(c.id, now);
       this.game.removePlayer(c.id);
       freed++;
@@ -695,7 +857,7 @@ export class NetSession {
     if (andRemove && p) {
       this.game.notice(`${p.name} signed off. Their kit is back at the vehicle.`);
       this.game.removePlayer(found.id);
-      this.seats.delete(found.id);
+      this.seats.delete(found.id); this._actBudget.delete(found.id);
       this.lobby.release(found.id, this.now(), LOG_KIND.LEFT);
     }
     this._say('a seat opened');
@@ -729,17 +891,52 @@ export class NetSession {
     return this;
   }
 
+  /**
+   * ⚠ THE CLIENT'S INBOX IS THE OTHER FUNCTION A STRANGER CAN CALL, AND IT HAD NO WRAPPER.
+   *
+   * `_hostOnMessage` has been wrapped since the first version of this file, with a long
+   * comment about a malformed `{t:'cmd'}` taking a host's whole shift down. The mirror
+   * image was never written, because the header of this file assumes the host is somebody
+   * you know. In a PRIVATE room that is true. In a NAMED room the host is whoever claimed
+   * a word on a broker shared with the internet, and in a LISTED one they are a row on a
+   * directory a joiner was handed by a third stranger — so in two of the three shapes this
+   * build ships, the host is exactly as unknown as the client.
+   *
+   * One message was enough: `ix: [1]` made `instances.decode` destructure a number and
+   * throw straight out of PeerJS's data handler. Same one-line denial of service, aimed
+   * the other way.
+   */
   _clientOnMessage(m) {
+    try {
+      this._clientRead(m);
+    } catch (e) {
+      this.hostMalformed++;
+    }
+  }
+
+  _clientRead(m) {
+    if (!m || typeof m !== 'object') { this.hostMalformed++; return; }
     if (m.t === MSG.WELCOME) {
-      this.localPlayerId = m.id;
-      this.game.localId = m.id;      // the renderer and the HUD follow this seat
-      this.token = m.token;
-      if (m.snap) { applySnapshot(this.game, m.snap, { localId: this.localPlayerId }); this.lastSnapshot = m.snap; }
+      /* ⚠ THE SEAT ID IS A KEY. `game.localId` decides whose eyes the renderer is behind
+       * and is compared against every seat in the roster; a free string here is a client
+       * that renders nobody. An id or the welcome is not one. */
+      const id = safeId(m.id, 16);
+      if (!id) { this.hostMalformed++; return; }
+      this.localPlayerId = id;
+      this.game.localId = id;        // the renderer and the HUD follow this seat
+      this.token = typeof m.token === 'string' ? m.token.slice(0, 64) : null;
+      if (m.snap) {
+        if (applySnapshot(this.game, m.snap, { localId: this.localPlayerId })) this.lastSnapshot = m.snap;
+        else this._refuseFrame('the welcome carried a snapshot this build will not apply');
+      }
       this._say('connected');
       this._roster();
       return;
     }
-    if (m.t === MSG.REFUSE) { this.refusedWhy = m.why || 'refused'; this._say(this.refusedWhy); return; }
+    /* A refusal is free text the host wrote, printed on the lobby screen. Clamped here so a
+     * hostile host cannot hand a client a megabyte of "reason"; escaped there, because this
+     * file cannot see the DOM and that one cannot see the wire. */
+    if (m.t === MSG.REFUSE) { this.refusedWhy = safeLine(m.why, 200) || 'refused'; this._say(this.refusedWhy); return; }
     /**
      * ⚠ THE REMOVAL NOTICE IS THIS FEATURE'S VERSION OF THE DESTROYED REFUSAL.
      *
@@ -752,23 +949,51 @@ export class NetSession {
      * out of the structure that gets replaced.
      */
     if (m.t === MSG.KICK) {
-      this.removedWhy = REMOVAL_REASONS[m.why] || REMOVAL_REASONS[DEFAULT_REASON];
+      /* ⚠ `REMOVAL_REASONS[m.why]` IS NOT A MEMBERSHIP TEST — the same defect as
+       * `PHRASES[phrase]` in the comms board. `REMOVAL_REASONS['constructor']` is the
+       * Object constructor, which is truthy, so `{t:'kick', why:'constructor'}` put a
+       * function through a template literal and printed its source at the player. A closed
+       * vocabulary has to be asked whether it OWNS the key. */
+      this.removedWhy = (typeof m.why === 'string' && Object.prototype.hasOwnProperty.call(REMOVAL_REASONS, m.why)
+        ? REMOVAL_REASONS[m.why] : REMOVAL_REASONS[DEFAULT_REASON]);
       this._say(`Removed from the session: ${this.removedWhy}.`);
       this.game.noticeLocal(`You were removed from the session. ${this.removedWhy}.`);
       return;
     }
     if (m.t === MSG.LOBBY) {
-      applyLobby(this.lobby, m);
+      if (!applyLobby(this.lobby, m)) { this._refuseFrame('a lobby broadcast this build will not apply'); return; }
       if (this.onLobby) this.onLobby(this.lobby, this);
       return;
     }
-    if (m.t === MSG.EVENT) { this.game.noticeLocal(m.text); return; }
+    if (m.t === MSG.EVENT) {
+      const text = safeLine(m.text, 200);
+      if (text) this.game.noticeLocal(text);
+      return;
+    }
     if (m.t === MSG.SNAP) {
+      /**
+       * ⚠ A REFUSED FRAME IS NOT A DROPPED ONE, AND `lastSnapshot` IS THE DIFFERENCE.
+       *
+       * `lastSnapshot` was written before the frame was applied, so a snapshot this end
+       * refused would still have been the thing the session reported as its state. A frame
+       * that was not applied did not happen; the client keeps the last one that did, which
+       * is one frame stale and correct, rather than a Game half-written from a hostile one.
+       */
+      if (!applySnapshot(this.game, m, { localId: this.localPlayerId })) {
+        this._refuseFrame('a snapshot this build will not apply');
+        return;
+      }
       this.snapsReceived++;
       this.lastSnapshot = m;
-      applySnapshot(this.game, m, { localId: this.localPlayerId });
       this._roster();
     }
+  }
+
+  /** Count and remember a frame this end would not take. Never a notice: a client under a
+   *  hostile host would otherwise have its own feed filled by the attacker. */
+  _refuseFrame(why) {
+    this.framesRefused++;
+    this.lastRefusal = why;
   }
 
   /** Queue a discrete request. Reliable and ordered, so it needs no retry of its own. */
@@ -868,7 +1093,7 @@ export class NetSession {
      * it cannot. Hand it back. */
     try { if (this._dirPeer) this._dirPeer.destroy(); } catch { /* ditto */ }
     try { if (this._dirConn) this._dirConn.close(); } catch { /* ditto */ }
-    this.seats.clear();
+    this.seats.clear(); this._actBudget.clear();
     this.link = null; this.peer = null;
     this._dirPeer = null; this._dirConn = null;
     this.directory = null;
@@ -1043,15 +1268,36 @@ export class NetSession {
       this._say('holding the session list for other hosts');
     });
     peer.on('connection', (conn) => {
+      /**
+       * ⚠ A WITHDRAWAL IS A DELETE, AND IT WAS UNAUTHENTICATED.
+       *
+       * `dir.withdraw(m.code)` removed whatever row the sender named. Every code and room
+       * name on the directory is printed on the browse screen of everybody who asks, so a
+       * stranger could read the list and then send one `unadv` per row and empty it — a
+       * silent denial of service against every host on the list, from one connection, with
+       * nothing in the design to notice.
+       *
+       * An advertisement cannot be authenticated on this transport and the UI already says
+       * so: every row is an unverified claim, and a host that overwrites another host's row
+       * is an accepted and stated limit. A DELETE is different, because it is the one
+       * operation that costs somebody else something, so it is scoped to the connection
+       * that made the claim. A host reconnecting simply advertises again.
+       */
+      const mine = new Set();
       conn.on('data', (m) => {
         /* ⚠ EVERYTHING ARRIVING HERE IS FROM A STRANGER. `SessionDirectory.advertise`
          * rebuilds the row from a whitelist and clamps every field; this handler must not
          * be tempted to do anything cleverer than hand it over. */
         try {
           if (!m || typeof m !== 'object') return;
-          if (m.t === MSG.ADVERT) dir.advertise(m.e, this.now());
-          else if (m.t === MSG.UNADVERT) dir.withdraw(m.code);
-          else if (m.t === MSG.LIST) conn.send({ t: MSG.ROOMS, r: dir.encode(this.now()) });
+          if (m.t === MSG.ADVERT) {
+            const entry = dir.advertise(m.e, this.now());
+            if (entry) mine.add(entry.code || `R:${entry.room}`);
+          } else if (m.t === MSG.UNADVERT) {
+            const code = typeof m.code === 'string' ? m.code : '';
+            const key = code.trim().toUpperCase();
+            if (mine.has(key) || mine.has(`R:${roomSlug(code)}`)) { dir.withdraw(code); mine.delete(key); }
+          } else if (m.t === MSG.LIST) conn.send({ t: MSG.ROOMS, r: dir.encode(this.now()) });
         } catch { /* a stranger's message is not this session's problem */ }
       });
     });
@@ -1077,13 +1323,24 @@ export class NetSession {
       const conn = peer.connect(DIRECTORY_ID, { reliable: true });
       conn.on('open', () => conn.send({ t: MSG.LIST }));
       conn.on('data', (m) => {
-        if (!m || m.t !== MSG.ROOMS) return;
-        const now = this.now();
-        const dir = new SessionDirectory();
-        for (const e of Array.isArray(m.r) ? m.r : []) dir.advertise(e, now - (Number(e.ageMs) || 0));
-        this.rooms = dir.list(now);
-        cb(this.rooms, null);
-        try { conn.close(); } catch { /* gone */ }
+        /* ⚠ THE DIRECTORY IS A THIRD STRANGER AND ITS REPLY IS NOT TRUSTED EITHER. A row of
+         * `null` made `Number(e.ageMs)` throw out of PeerJS's data handler, and a NEGATIVE
+         * age dated a row into the future, where `list()` clamps it to zero and it reads as
+         * the freshest room on the page. Both are one field on a message the joiner asked
+         * for and did not choose the answer to. */
+        try {
+          if (!m || m.t !== MSG.ROOMS) return;
+          const now = this.now();
+          const dir = new SessionDirectory();
+          for (const e of (Array.isArray(m.r) ? m.r : []).slice(0, 200)) {
+            if (!e || typeof e !== 'object') continue;
+            const age = typeof e.ageMs === 'number' && Number.isFinite(e.ageMs) ? Math.max(0, e.ageMs) : 0;
+            dir.advertise(e, now - age);
+          }
+          this.rooms = dir.list(now);
+          cb(this.rooms, null);
+          try { conn.close(); } catch { /* gone */ }
+        } catch { /* a stranger's list is not this session's problem */ }
       });
       conn.on('error', () => cb([], 'nobody is holding the session list right now'));
     };
