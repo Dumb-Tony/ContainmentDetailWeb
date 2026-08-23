@@ -15,6 +15,12 @@ window.addEventListener('cd-ready', ({ detail: cd }) => {
 
   panels.hide();
   panels.node.style.display = 'none';
+  /* ⚠ AND THE BASE. It opens over the world on boot, and this pose did not hide it, so
+   * re-shooting the README's hero image produced a photograph of the operations board with
+   * the bay four per cent visible down the left edge. Nothing about the pose had changed;
+   * the base screen had. A pose script has to put every layer where it wants it, including
+   * the ones that were not there when it was written. */
+  if (cd.base) { cd.base.hide(); cd.base.node.style.display = 'none'; }
   game.commitLoadout([
     { itemId: 'thermal-imager', qty: 1 },
     { itemId: 'floodlight-tripod', qty: 3 },
