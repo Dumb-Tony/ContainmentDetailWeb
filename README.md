@@ -497,7 +497,7 @@ the next, a suite that hangs cannot take the others with it, and a suite that pr
 result block at all counts as a **failure** rather than as zero assertions and no problem.
 A crashed page reporting green is the failure mode the whole harness exists to avoid.
 
-**1,929 assertions across ten suites, all headless.** The ten are the milestone-0 suite
+**1,946 assertions across ten suites, all headless.** The ten are the milestone-0 suite
 (everything true of *every* package), the content suite (the numbers that make one incident
 the incident it is), the net suite, the tablet suite, and six that arrived with the
 milestones they check: licensing and rollback, localization, onboarding, telemetry,
