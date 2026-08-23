@@ -168,6 +168,22 @@ It is not the stocktake with a hunter bolted on. The tally is an accounting prob
 nothing hunts you and the count is the unknown; here the count is on the ground in front of
 you and the scarce thing is the minutes you have to move it.
 
+**And it can be put back down**, which for a long time it could not. It sat in that compound
+for nine days before anybody called it in, and the state machine had no way back to the state
+those nine days were spent in: one operative straying inside eleven metres in the first
+minute escalated the whole yard permanently. It settles again after twenty seconds with
+nothing warm inside eleven metres — but `no-heat-within` measures from the *anomaly*, and the
+anomaly is walking at 0.8 m/s, so twenty seconds of clearance actually costs **27 m of
+standing gap**. Measured: an operative who wakes it at 9 m and then walks the entire compound
+to the gate buys 15.8 m, stands still, and watches it close to zero.
+
+The route that works is the decoy. Put a floodlight between the squad and the bed, withdraw,
+and it takes the 60 °C lamp over a 37 °C person and sits on it; when the cell dies with
+nobody within eleven metres, it beds down twenty seconds later. And the cell dies fast — 84 s
+of a 330 s battery — because `bleeds-cells` drains power at 4.5 m in exactly the three states
+it hunts in, so **the thing you lured onto the lamp is standing on the lamp eating it.**
+Nobody wrote that down anywhere; it falls out of two independent content entries agreeing.
+
 **The toll.** A night attendant on level 2 was found sitting on the floor beside a drainage
 gully with cold burns to both hands and no memory of the previous twenty minutes. He was not
 trapped and nothing was holding him. He says he crouched down to look at something, that it
@@ -456,7 +472,10 @@ this machine run the same server.
 
 ## Tests
 
-There is no Node.js here, so the harness is a browser.
+The harness is a browser, because the thing under test needs one: WebGL, `AudioContext`,
+`localStorage`, `CacheStorage`, a service worker, `Intl.PluralRules` and the real module
+loader are not things to stub. Node is used for exactly one thing here — `node --check` as a
+40 ms syntax gate before a suite is worth starting.
 
 ```bash
 powershell -ExecutionPolicy Bypass -File tools/run-tests.ps1
@@ -469,7 +488,13 @@ the next, a suite that hangs cannot take the others with it, and a suite that pr
 result block at all counts as a **failure** rather than as zero assertions and no problem.
 A crashed page reporting green is the failure mode the whole harness exists to avoid.
 
-**1,517 assertions across seven suites, all headless.** Section I is the one that matters: it plays a complete
+**1,929 assertions across ten suites, all headless.** The ten are the milestone-0 suite
+(everything true of *every* package), the content suite (the numbers that make one incident
+the incident it is), the net suite, the tablet suite, and six that arrived with the
+milestones they check: licensing and rollback, localization, onboarding, telemetry,
+platform, and security.
+
+Section I is the one that matters: it plays a complete
 solo containment through the same interfaces a keyboard reaches — walks to the vehicle,
 takes kit, throws breakers, opens doors, baits, fences, seals, waits out custody and
 carries the case to the stairs. No teleports and no direct state writes, because testing
@@ -538,6 +563,15 @@ photographs it. `tools/verify-live.ps1` asks whether GitHub Pages is actually se
 current commit — by git blob hash, because the working copy is CRLF and Pages serves LF,
 so a byte comparison is off by one per line and never matches.
 
+It also asks the live page what build it *thinks* it is, which it did not until the answer
+turned out to be wrong. Production ran eight commits on a stamp reading `0e4a0aa`: every
+crash report from the live site named the wrong code, and the check printed MATCH in green
+the whole time, because `index.html` had not been restamped and was therefore not in the
+changed-file set it was comparing. It now reads the served `<meta name="cd-build">` back and
+fails if any served file has changed since the commit it names — **every** served file, not
+just the ones HEAD touched, since scoped to the changed set it would have said yes to the
+entire drift.
+
 ## Structure
 
 ```
@@ -575,9 +609,18 @@ the open questions in §25.7 about how ShareAlike applies to game code are not s
 whole discovery-to-custody loop can be built and tested while that stays open, and it has
 been.
 
-Third-party code is vendored and credited in [`assets/lib/NOTICE.md`](assets/lib/NOTICE.md).
+A solo operation makes **zero external requests**. Hosting or joining can contact up to
+**four**: the signalling broker that introduces two browsers, `stun.l.google.com` for the
+reflexive address, and PeerJS's TURN relays at `eu-0.turn.peerjs.com` and
+`us-0.turn.peerjs.com` when no direct path can be found. All four come from the library's
+own defaults, which `PEER_OPTS` does not override.
 
-A solo operation makes **zero external requests**. Hosting or joining contacts exactly one
-network host — a signalling broker that introduces two browsers and then carries no game
-traffic. That exception lives in one named file, and the suite asserts it rather than
-letting it pass by accident: section K fails if any *other* source file grows a hostname.
+This sentence said **"exactly one network host"** until it was measured, and the reason it
+was wrong is worth keeping: the one host is the only one *this repository's own code* names,
+and every check was pointed at this repository's own code. Section K still fails if any
+source file outside the named one grows a hostname — which was true, and was never the whole
+question. The audit now asserts the other three from the other end: that the vendored library
+really carries them, and that nothing here overrides them. [`assets/lib/NOTICE.md`](assets/lib/NOTICE.md)
+and the in-game privacy notice both name all four.
+
+Third-party code is vendored and credited in [`assets/lib/NOTICE.md`](assets/lib/NOTICE.md).

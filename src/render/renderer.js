@@ -161,6 +161,81 @@ export function anomalyIsVisible(def) {
   return Array.isArray(ch) && ch.includes('visible');
 }
 
+/**
+ * What shape the thing is, which the content has been saying all along.
+ *
+ * ⚠ EVERY ANOMALY IN THE BUILD WAS THE SAME 0.78m PURPLE ICOSAHEDRON. Five of the eight
+ * declare `visible` in `perception.channels`, so five of them were drawn to the naked eye,
+ * identically — including `stillwater-figure`, whose resting `visualTell` reads *"A figure
+ * at the limit of the light, facing away, at the wrong scale for the distance"* and whose
+ * entire containment is a squad looking at it. §18.1 says the presentation may not
+ * misrepresent the state; a figure drawn as a ball is not a stylisation, it is the wrong
+ * answer to the only question that operation asks.
+ *
+ * The tells were already written and already specific — "a mass about a metre across", "a
+ * hole in the floor holding its shape and its edge", "eleven brass tallies and five of them
+ * are the set". So `presence.form` names which of six shapes, and `presence.spanMetres`
+ * gives the size the file already states in prose. Nothing here is invented: every span
+ * below is a number some anomaly's own `visualTell` says out loud.
+ *
+ * ⚠ `none` IS A FORM AND NOT AN OMISSION. `ninety-one-tally` has no body — the eleven discs
+ * are the anomaly, and `_syncInstances` draws them. A ball hovering at the set's centroid
+ * is a thing the player can walk up to that does not exist, which is the worst class of
+ * §18.1 failure: not a missing cue but a false one.
+ *
+ * A file that names no form gets `mass`, the shape everything used to be, so a content
+ * error degrades to the old behaviour rather than to an invisible anomaly.
+ */
+export const ANOMALY_FORMS = Object.freeze({
+  /** A cold mass at floor level. The draught, and the lodger against its partition. */
+  mass: { span: 1.56, y: 0.9, halo: 1.5, build: (T, r) => new T.IcosahedronGeometry(r, 2) },
+
+  /** A person, at the limit of the light. Lathed rather than assembled: one mesh keeps the
+   *  layer and pulse handling identical to every other form, and a rotationally symmetric
+   *  profile is exactly right for a thing you only ever see as a silhouette. */
+  figure: {
+    span: 0.44,
+    y: 0,
+    halo: 0,
+    build: (T) => new T.LatheGeometry([
+      [0.001, 1.78], [0.10, 1.72], [0.11, 1.62], [0.06, 1.55], [0.22, 1.46],
+      [0.20, 1.05], [0.16, 0.90], [0.19, 0.80], [0.14, 0.42], [0.12, 0.06], [0.001, 0.00],
+    ].map(([x, y]) => new T.Vector2(x, y)), 18),
+  },
+
+  /** Down on the ground with its ballast round it. A dome, flattened in the geometry rather
+   *  than by a scale, because the per-frame pulse is a uniform scale and would fight it. */
+  bed: {
+    span: 1.0,
+    y: 0.0,
+    halo: 1.35,
+    build: (T, r) => {
+      const g = new T.SphereGeometry(r, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2);
+      g.scale(1, 0.62, 1);
+      return g;
+    },
+  },
+
+  /** A hole in the floor that holds its shape and its edge. No bloom: the edge IS the tell,
+   *  and a halo would be the one thing the content says it does not have. */
+  fixture: { span: 0.9, y: 0.04, halo: 0, build: (T, r) => new T.CylinderGeometry(r, r, 0.08, 24) },
+
+  /** In the thing rather than beside it. Small, and about the height of what it rides in. */
+  carried: { span: 0.35, y: 0.7, halo: 1.6, build: (T, r) => new T.IcosahedronGeometry(r, 1) },
+
+  /** No body. The set is the anomaly. */
+  none: null,
+});
+
+export function anomalyForm(def) {
+  const p = (def && def.presence) || {};
+  const key = Object.prototype.hasOwnProperty.call(ANOMALY_FORMS, p.form) ? p.form : 'mass';
+  const spec = ANOMALY_FORMS[key];
+  if (!spec) return { key, spec: null, span: 0 };
+  const span = typeof p.spanMetres === 'number' && p.spanMetres > 0 ? p.spanMetres : spec.span;
+  return { key, spec, span };
+}
+
 export class Renderer {
   constructor(THREE, canvas, game) {
     this.THREE = THREE;
@@ -204,13 +279,19 @@ export class Renderer {
      * `visible` means the eye sees it. The halo stays on layer 1 whatever happens: it is
      * the thermal bloom around a cold mass, not a thing in the room.
      */
-    const geo = new THREE.IcosahedronGeometry(0.78, 2);
+    const form = anomalyForm(this.game && this.game.anomaly && this.game.anomaly.def);
+    this._form = form;
+    const geo = form.spec
+      ? form.spec.build(THREE, form.span / 2)
+      : new THREE.BufferGeometry();
     this.anomalyMesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0x2b0f4a }));
     this.anomalyMesh.layers.set(1);
     if (this._anomalyIsVisible()) this.anomalyMesh.layers.enable(0);
     this.scene.add(this.anomalyMesh);
     this.anomalyHalo = new THREE.Mesh(
-      new THREE.IcosahedronGeometry(1.18, 2),
+      form.spec && form.spec.halo
+        ? new THREE.IcosahedronGeometry((form.span / 2) * form.spec.halo, 2)
+        : new THREE.BufferGeometry(),
       new THREE.MeshBasicMaterial({ color: 0x120a24, transparent: true, opacity: 0.55, side: THREE.BackSide }),
     );
     this.anomalyHalo.layers.set(1);
@@ -860,12 +941,15 @@ export class Renderer {
     this._syncMates();
 
     const a = g.anomaly;
-    const show = a.isLoose;
+    const form = this._form;
+    /* `none` is a form: the tally's eleven discs ARE the anomaly, and a body at their
+     * centroid would be a thing the player can walk up to that does not exist. */
+    const show = a.isLoose && !!form.spec;
     this.anomalyMesh.visible = show;
-    this.anomalyHalo.visible = show;
+    this.anomalyHalo.visible = show && !!form.spec.halo;
     if (show) {
       const pulse = 1 + Math.sin(t / 340) * 0.05 + (a.stateKind === 'hunting' ? 0.12 : 0);
-      this.anomalyMesh.position.set(a.x, 0.9, a.z);
+      this.anomalyMesh.position.set(a.x, form.spec.y, a.z);
       this.anomalyMesh.scale.setScalar(pulse);
       this.anomalyHalo.position.copy(this.anomalyMesh.position);
       this.anomalyHalo.scale.setScalar(pulse);

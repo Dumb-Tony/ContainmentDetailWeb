@@ -41,7 +41,7 @@ import {
   CommsWheel, WHEEL_ORDER, sectorAt, sectorPos, projectPoint, aimPoint, KIND_VARS,
 } from '../src/ui/commswheel.js';
 import { Progression, loadSite, DEPLOYMENT_COST, DEPARTMENT_IDS, migrate } from '../src/sim/progression.js';
-import { anomalyIsVisible } from '../src/render/renderer.js';
+import { anomalyIsVisible, anomalyForm, ANOMALY_FORMS } from '../src/render/renderer.js';
 import { Input, DEFAULT_BINDINGS, isReservedCode, PAD_BUTTONS, HOLD_MODE } from '../src/core/input.js';
 import { segmentHitsRect, moveWithWalls, dist, circleHitsRect } from '../src/sim/geometry.js';
 
@@ -892,6 +892,13 @@ async function sectionK() {
     'src/render/scene.js', 'src/render/renderer.js', 'src/render/thermalFloor.js',
     'src/sim/progression.js',
     'src/ui/hud.js', 'src/ui/panels.js', 'src/ui/settings.js', 'src/audio/audio.js',
+    /* ⚠ THIS LIST DOES NOT MAINTAIN ITSELF, AND A MODULE MISSING FROM IT IS EXEMPT FROM
+     * EVERY RULE BELOW. `src/sim/telemetry.js` was added mid-session and was outside the
+     * `Math.random`, wall-clock, DOM-leak and external-host checks until it was noticed by
+     * a reader rather than by the suite. K25 now derives the list from the tree and fails
+     * on anything absent, so the next module cannot be quietly exempt. */
+    'src/sim/telemetry.js', 'src/sim/certification.js',
+    'src/core/i18n.js', 'src/core/crash.js', 'src/ui/base.js', 'src/ui/lobby.js', 'src/net/lobby.js',
   ];
   /* ⚠ Strip comments FIRST. Every rule below is about what the code DOES, and a raw grep
    * tests what the file SAYS: rng.js explains at length that nothing may call
@@ -922,9 +929,18 @@ async function sectionK() {
   const domLeaks = simFiles.filter((f) => /\bdocument\.[A-Za-z_$]|\bwindow\.(?!fetch\b)[A-Za-z_$]/.test(src.get(f)));
   ok('K4 nor the DOM', domLeaks.length === 0, domLeaks.join(', '));
 
-  const timeLeaks = files.filter((f) => f !== 'src/main.js' && f !== 'src/audio/audio.js'
+  /* ⚠ THREE EXEMPTIONS, EACH NAMED AND EACH ARGUED WHERE IT LIVES. `main.js` is the boot
+   * loop; `audio.js` schedules against the AudioContext's own clock; and `crash.js` reads
+   * `Date.now()` once, as the DEFAULT for an injectable `now` — it is boot-layer code, and
+   * a crash report with no wall-clock stamp cannot be matched against a player's account of
+   * when it happened. That file asked for this exemption in its own header, in writing,
+   * before it was on this list. A blanket regex with a silent skip list is how the rule
+   * rots; the skip list is spelled out here and in the assertion text. */
+  const TIME_OK = ['src/main.js', 'src/audio/audio.js', 'src/core/crash.js'];
+  const timeLeaks = files.filter((f) => !TIME_OK.includes(f)
     && /(Date\.now|performance\.now|setInterval)\s*\(/.test(src.get(f)));
-  ok('K5 nothing but the boot loop reads wall-clock time', timeLeaks.length === 0, timeLeaks.join(', '));
+  ok(`K5 nothing but the boot loop, the audio graph and the crash stamp reads wall-clock time (${TIME_OK.length} named exemptions)`,
+    timeLeaks.length === 0, timeLeaks.join(', '));
 
   /* No external requests at runtime: the whole point of vendoring r128. */
   /* ⚠ THIS RULE CHANGED WHEN MULTIPLAYER LANDED, and saying so is the point of the test.
@@ -1039,6 +1055,91 @@ async function sectionK() {
   ok('K17 and an anomaly with no perception block is invisible rather than a crash',
     anomalyIsVisible({}) === false && anomalyIsVisible(null) === false
     && anomalyIsVisible({ perception: { channels: 'visible' } }) === false);
+
+  /**
+   * ⚠ AND HAVING MADE THEM VISIBLE, EVERY ONE OF THEM WAS THE SAME PURPLE BALL.
+   *
+   * K16 fixed which camera could see the anomaly and did not ask what it saw. A 0.78m
+   * icosahedron, for all eight, including `stillwater-figure` — *"A figure at the limit of
+   * the light, facing away, at the wrong scale for the distance"* — whose entire
+   * containment is a squad looking at it. §18.1 forbids a presentation that misrepresents
+   * the state, and the tells were already written and already specific.
+   *
+   * Driven through a STUB THREE rather than a WebGL context: `Renderer` takes `THREE` as a
+   * constructor argument, so a stub that records what was asked for makes the shape a pure
+   * content question, which is what it is.
+   */
+  const T = {
+    Vector2: class { constructor(x, y) { this.x = x; this.y = y; } },
+    LatheGeometry: class { constructor(points, seg) { this.kind = 'lathe'; this.points = points; this.seg = seg; } },
+    IcosahedronGeometry: class { constructor(r) { this.kind = 'ico'; this.r = r; } },
+    CylinderGeometry: class { constructor(rt, rb, h) { this.kind = 'cyl'; this.r = rt; this.h = h; } },
+    SphereGeometry: class {
+      constructor(r, w, h, ps, pl, ts, tl) { this.kind = 'sphere'; this.r = r; this.thetaLength = tl; }
+      scale(x, y, z) { this.sy = y; return this; }
+    },
+  };
+
+  const shapes = [];
+  for (const id of INCIDENTS) {
+    const pack = await loadContent({ incident: id });
+    const f = anomalyForm(pack.anomaly);
+    shapes.push({ id: pack.anomaly.id, eye: anomalyIsVisible(pack.anomaly), ...f });
+  }
+  const byAnom = new Map(shapes.map((s) => [s.id, s]));
+  note(`silhouettes: ${[...byAnom.values()].map((s) => `${s.id.split('-').pop()}=${s.key}@${s.span}m`).join(', ')}`);
+
+  eq('K18 every shipped anomaly declares a form, so none of them is drawn by a default nobody chose',
+    [...byAnom.values()].filter((s) => !s.spec && s.key !== 'none').length, 0);
+  eq('K19 and every declared form is one the renderer knows — a closed vocabulary, like every other in this build',
+    [...byAnom.values()].filter((s) => !Object.prototype.hasOwnProperty.call(ANOMALY_FORMS, s.key)).length, 0);
+
+  const eyeShapes = new Set([...byAnom.values()].filter((s) => s.eye).map((s) => `${s.key}@${s.span}`));
+  ok(`K20 the ones a squad can SEE do not all share one silhouette — ${eyeShapes.size} distinct among ${[...byAnom.values()].filter((s) => s.eye).length} visible`,
+    eyeShapes.size >= 3, [...eyeShapes].join(' '));
+
+  /* The figure, measured off the profile the renderer actually lathes. */
+  const fig = ANOMALY_FORMS.figure.build(T, ANOMALY_FORMS.figure.span / 2);
+  const tall = Math.max(...fig.points.map((p) => p.y));
+  const wide = Math.max(...fig.points.map((p) => p.x)) * 2;
+  note(`  the figure is ${tall.toFixed(2)}m tall and ${wide.toFixed(2)}m across the shoulders`);
+  ok(`K21 the figure is a person's size (${tall.toFixed(2)}m by ${wide.toFixed(2)}m), which is what "at the wrong scale for the distance" needs in order to be wrong`,
+    tall > 1.6 && tall < 1.95 && wide > 0.3 && wide < 0.6);
+  ok('K21a and it stands on the floor rather than hovering, because a figure at eye height is a different sentence',
+    ANOMALY_FORMS.figure.y === 0 && Math.min(...fig.points.map((p) => p.y)) === 0);
+
+  /* The gully, whose content insists on an edge. */
+  const gully = ANOMALY_FORMS.fixture.build(T, 0.45);
+  ok(`K22 the gully is flat (${gully.h}m proud) and carries NO bloom — "holding its shape and its edge" is the tell, and a halo is the one thing that would erase it`,
+    gully.kind === 'cyl' && gully.h < 0.2 && ANOMALY_FORMS.fixture.halo === 0);
+
+  /* The bed, which the file puts UNDER the yard. */
+  const bed = ANOMALY_FORMS.bed.build(T, 0.5);
+  ok('K23 the ballast is a flattened dome in the ground rather than a ball at chest height',
+    bed.kind === 'sphere' && bed.thetaLength <= Math.PI / 2 + 1e-9 && bed.sy < 1 && ANOMALY_FORMS.bed.y === 0);
+
+  /* ⚠ AND ONE OF THEM HAS NO BODY, WHICH IS A FORM AND NOT AN OMISSION. */
+  const bodiless = [...byAnom.values()].filter((s) => s.key === 'none');
+  eq('K24 exactly one anomaly is drawn as nothing at all', bodiless.length, 1);
+  const tally = await loadContent({ incident: INCIDENTS.find((i) => i.includes('tally')) });
+  eq('K24a and it is the one whose objects ARE the anomaly — a body at their centroid would be something the player can walk up to that does not exist',
+    bodiless[0].id, tally.anomaly.id);
+  /* ⚠ AND THE LIST THIS WHOLE SECTION READS FROM IS HAND-MAINTAINED. Ask the browser which
+   * `src/` modules it actually loaded and hold the list to that: a new engine module is
+   * then in the hygiene pass on the run it is first imported, rather than whenever somebody
+   * notices. Files the suite never imports are not checked — that is a real limit and it is
+   * the reason the list stays explicit rather than being replaced by this. */
+  const loaded = (performance.getEntriesByType('resource') || [])
+    .map((e) => { try { return new URL(e.name).pathname; } catch { return ''; } })
+    .filter((p) => /\/src\/.*\.js$/.test(p))
+    .map((p) => 'src/' + p.split('/src/').pop());
+  const unchecked = [...new Set(loaded)].filter((p) => !files.includes(p)).sort();
+  eq(`K25 every src module this suite loaded is in the hygiene list${unchecked.length ? ` — missing ${unchecked.join(', ')}` : ''}`,
+    unchecked.length, 0);
+
+  ok('K24b which the same file says twice: it is the only one declaring `presence.instances`',
+    !!(tally.anomaly.presence && tally.anomaly.presence.instances)
+    && [...byAnom.values()].filter((s) => s.key !== 'none').every((s) => s.id !== tally.anomaly.id));
 
   /* ⚠ EVERY CONFIG LEAF MUST BE READ BY SOMETHING.
    *

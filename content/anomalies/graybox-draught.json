@@ -8,6 +8,8 @@
   "_engineNote": "This file is now read by a generic engine: src/sim/anomaly.js switches on nothing this anomaly is called. `presence.field` says how it disturbs the scalar field, each trigger names a `sense` from the closed vocabulary in src/sim/senses.js, and each capability names a `verb` from the same file. A JSON key may name a QUANTITY, never an OPERATOR (GDD 20.6).",
 
   "presence": {
+    "form": "mass",
+    "_formNote": "A cold mass at floor level, and the shape everything in the build used to be. It has no visualTell to the eye at all -- \"frost bloom on the nearest metal surface\" is a mark it leaves, not a body -- so this shape is only ever seen through the imager, which is what `instrument-only` means.",
     "field": {
       "kind": "sink",
       "quantity": "heat",

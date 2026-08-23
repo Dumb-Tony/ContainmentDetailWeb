@@ -11,7 +11,14 @@ param(
   [string]$Out   = "docs\shot.png",
   [int]$Width    = 1600,
   [int]$Height   = 900,
-  [int]$Port     = 8416
+  [int]$Port     = 8416,
+  # Appended to the scratch page URL.  reads  at boot, so a pose
+  # script cannot choose the operation on its own -- by the time  fires the
+  # rules and the map are already loaded.
+  # Appended to the scratch page URL. main.js reads ?incident= at boot, so a pose script
+  # cannot choose the operation on its own: by the time cd-ready fires, the rules, the map
+  # and the evidence set are already loaded and the anomaly is already the wrong one.
+  [string]$Query   = ""
 )
 $ErrorActionPreference = "Stop"
 $root = Split-Path $PSScriptRoot -Parent
@@ -41,6 +48,10 @@ if (-not $srv) {
 }
 $server = $srv.Process
 $url = $srv.Url
+if ($Query) {
+  $sep = if ($url.Contains("?")) { "&" } else { "?" }
+  $url = $url + $sep + $Query.TrimStart("?", "&")
+}
 
 $outPath = Join-Path $root $Out
 $outDir = Split-Path $outPath -Parent
