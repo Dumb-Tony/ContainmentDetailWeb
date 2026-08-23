@@ -1,0 +1,83 @@
+{
+  "id": "content-provenance",
+  "contentRevision": "1.0.0",
+  "licensingRecordId": null,
+  "_licensingNote": "Original, not an SCP. This file is the manifest itself and has no material of its own; it is declared here so that the rule 'every content file states where it came from' has no exception, including the file that states the rule. See _note.",
+
+  "_note": "GDD §25.8 states the licensing gate at the INCIDENT PACKAGE level, and §25.3 asks for an attribution record BEFORE implementation. This file is the two things a per-file `licensingRecordId` cannot be: the coverage list for content files that cannot carry the declaration inline, and §25.3's attribution database, which until now did not exist as a file anywhere in the repository (docs/licensing-audit.md, finding 6).\n\nIT IS PARSED. tools/licence-audit.ps1 section C reads `coverage` and will not accept an entry that names a file which is absent, or one that names a file already declaring provenance inline — a stale entry is a claim about a file nobody is checking. Section F reads `attributionDatabase` and `gate`.\n\nWHY COVERAGE EXISTS AT ALL, rather than one more `licensingRecordId` per file: content/locales/** is owned by the internationalisation work and is regenerated from its own source. A declaration inserted into a generated file survives until the next generation and then silently is not there — which is the exact failure this audit is built to catch, arriving through the front door. So those files are covered from outside instead, where the coverage cannot be regenerated away.",
+
+  "coverage": [
+    {
+      "path": "content/locales/en-GB.json",
+      "licensingRecordId": null,
+      "reason": "generated-and-owned-elsewhere",
+      "note": "Original, not an SCP. Interface strings written for this build, plus the British spellings and phrasings that are the base locale. Nothing is translated from, or adapted from, another product's string table. licensingRecordId is null because there is no third-party material to record."
+    },
+    {
+      "path": "content/locales/en-US.json",
+      "licensingRecordId": null,
+      "reason": "generated-and-owned-elsewhere",
+      "note": "Original, not an SCP. A spelling overlay over en-GB, authored here. Nothing is translated from, or adapted from, another product's string table. licensingRecordId is null because there is no third-party material to record."
+    }
+  ],
+
+  "attributionDatabase": {
+    "_note": "GDD §25.3's twelve required fields, as a table rather than as a paragraph, so that credits can be generated from it as §25.3 asks. It has NO ROWS, and that is a measurement rather than an oversight: no content in this build is SCP-derived, so there is nothing to record. The value of an empty table is that the moment somebody proposes the first derived item, the schema it has to satisfy already exists and the audit already fails without it. An absent table is what lets the first derived item ship with no record at all.\n\ntools/licence-audit.ps1 enforces the link in both directions: every non-null `licensingRecordId` anywhere in content/ must have a row here whose `recordId` matches, and every row must fill all twelve fields.",
+    "fields": [
+      "designationAndArticleTitle",
+      "articleUrl",
+      "authorsAndAttributionSource",
+      "wikiBranch",
+      "pageRevisionOrAccessDate",
+      "conceptsTextCharactersOrProceduresAdapted",
+      "changesMadeForTheGame",
+      "requiredLicenceAndNotice",
+      "associatedAssetsAndTheirIndependentSources",
+      "internalContentOwner",
+      "legalReviewStatus",
+      "inGameAndDistributionCreditLocation"
+    ],
+    "records": []
+  },
+
+  "gate": {
+    "_note": "GDD §25.8's seven clauses, each answered from this repository. `status` is one of cleared, not-applicable or open. tools/licence-audit.ps1 -Strict — the content-lock gate — fails if any clause is open, which is what makes this table a gate rather than a summary. `not-applicable` is only honest here because section C and section D prove the premise on every run: every licensingRecordId in content/ is null, every designation is marked provisional, and no SCP-### string exists anywhere in content/.",
+    "clauses": [
+      {
+        "clause": "Article attribution is complete.",
+        "status": "not-applicable",
+        "recorded": "There is no article. No content in this build is derived from an SCP article, which sections C and D of tools/licence-audit.ps1 re-prove from the tree on every run."
+      },
+      {
+        "clause": "The captured source revision is archived internally.",
+        "status": "not-applicable",
+        "recorded": "There is no captured source revision, because nothing was captured. What is archived internally instead is the provenance of the two first-party imports from Dumb-Tony/ContainmentDetail — content revision 0.1.0 for content/maps/cold-storage-l2.json and 0.2.0 for content/equipment/items.json — recorded in each file's own _licensingNote."
+      },
+      {
+        "clause": "All assets have provenance and compatible permissions.",
+        "status": "cleared",
+        "recorded": "Two vendored libraries, both MIT, both hash-pinned in assets/lib/NOTICE.md with the licence text vendored beside the code. Six media files, all first-party program output, itemised in docs/licensing-audit.md. Every content file declares provenance inline or is covered above. There is no bitmap art, no third-party texture and no typeface file in the tree; the interface is system fonts and the world is generated geometry."
+      },
+      {
+        "clause": "Changes are documented.",
+        "status": "cleared",
+        "recorded": "Both vendored libraries are recorded unmodified and the SHA-256 of each is checked on every audit run, which is what makes 'unmodified' a fact rather than a claim. The two first-party imports record what was added on import in their own _webNote and _note fields."
+      },
+      {
+        "clause": "Required notices are generated and reviewed.",
+        "status": "cleared",
+        "recorded": "assets/lib/NOTICE.md plus a LICENSE file beside each vendored library, checked by tools/licence-audit.ps1 section A. In-game, content/site.json `notices` carries the credits, attribution, privacy, end-user licence and support documents, reachable from the Archive terminal, which is §25.4's 'accessible from the main menu, not buried exclusively in end credits'. Reviewed here means read and checked against the repository; it does not mean reviewed by counsel — see the next clause."
+      },
+      {
+        "clause": "Any special restrictions are resolved.",
+        "status": "cleared",
+        "recorded": "§25.6's caution about the former image of the one article it singles out does not engage: this build contains no bitmap art of any kind, and section E of the audit enumerates every binary media file in the tree to keep that true. No content file names an SCP designation at all — the audit fails on the pattern, and it caught this very sentence when it was first written with the number in it, which is the check doing exactly its job."
+      },
+      {
+        "clause": "Legal review status is recorded.",
+        "status": "cleared",
+        "recorded": "RECORDED AS NOT OBTAINED. No qualified intellectual-property attorney has reviewed this project. §25 opens by stating it is production guidance and not legal advice, and §25.7's questions about how ShareAlike interacts with software are explicitly unsettled. The clause asks that the status be recorded, and the status is: none. This is the honest answer and it must not be edited to 'cleared' by anybody who has not actually obtained a review."
+      }
+    ]
+  }
+}

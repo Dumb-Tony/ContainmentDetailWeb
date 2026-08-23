@@ -2,6 +2,8 @@
   "id": "regional-site-19",
   "displayName": "Regional Site 19",
   "contentRevision": "0.1.0-web",
+  "licensingRecordId": null,
+  "_licensingNote": "Original, not an SCP. Regional Site 19, its five rooms, its operations board and its dossiers were authored for this build. The eight designations in this file are provisional markers this project assigned to its own anomalies and are not SCP numbers: GDD §25.3 assigns a final designation only after an attribution record exists, and no attribution record exists because there is nothing third-party here to attribute. licensingRecordId is null because there is no third-party material to record, and this note is what makes that null mean 'checked, and here is why' rather than 'nobody has looked at this one'. See content/provenance.json.",
 
   "_note": "The Foundation home base as DATA — GDD §13, cut to the compact five-room slice of §26.2: operations room, armory/logistics counter, archive terminal, small research station, containment observation corridor. §13.1 asks that preparing for a mission take minutes and not a commute, so this is a screen with tabs rather than a walkable building, and every room is one page. The eight core areas of §13.2 are folded into five: the research station carries the isolation bench that a full site would give the Medical Wing, and the logistics counter carries the Engineering Bay's repair queue. That is not a shortcut, it is the fiction — an underfunded regional facility has one room doing three jobs, and §13.3 says the site begins underfunded.",
 
@@ -14,6 +16,248 @@
     "weather": "Overcast, 4C, wind from the north-east. No change expected before the window closes.",
     "region": "Three counties, one duty squad, and a coroner who has stopped asking questions.",
     "readiness": "One vehicle. One command point. Everything you take is everything you have."
+  },
+
+  "_noticesNote": "GDD §25.4 requires attribution to be reachable from the main menu rather than buried in end credits, and §23 Milestone 6 gates on store, credits, EULA, privacy and support materials being approved. `notices` is those documents AS CONTENT, so the screen that renders them contains no prose of its own and a change of wording is a content edit rather than a code edit.\n\nSHAPE, for whatever renders it: `notices.documents` is an ORDERED array. Each document is { id, title, summary, sections[] }; each section is { heading, body[], bullets[] } where `body` is an array of paragraphs and `bullets` is optional. Every string is PLAIN TEXT with no markup — escape it on the way out. Nothing here is a translation key: unlike the room furniture, these are legal and privacy statements whose exact wording is the point, and a locale that paraphrased one would be making a different claim. `notices.room` names the room the documents hang off.\n\nEVERY FACTUAL CLAIM IN THE PRIVACY DOCUMENT WAS READ OUT OF THE CODE, not out of the comments — which matters, because two of the comments are wrong. See docs/day-one-operations.md and docs/licensing-audit.md findings 8 and 9.",
+
+  "notices": {
+    "revision": "1.0.0",
+    "updated": "2026-08-23",
+    "room": "archive",
+    "documents": [
+      {
+        "id": "credits",
+        "title": "Credits",
+        "summary": "Who made this, what it was built on, and what was imported rather than re-invented.",
+        "sections": [
+          {
+            "heading": "The build",
+            "body": [
+              "Containment Detail, the browser build. One page, no installer, no account. Everything it needs is committed alongside it.",
+              "It is a second implementation of one design bible, and the bible came first. Where this build and the document disagree, the document is the authority and the disagreement is a bug in one of them."
+            ]
+          },
+          {
+            "heading": "Imported, not re-invented",
+            "body": [
+              "The design bible, the first anomaly, the first map and the equipment manifest come from Dumb-Tony/ContainmentDetail — the same game in Unity, by the same author. They were carried across rather than written again.",
+              "The draught is that repository's own content file, extended here with the fields this simulation reads. The cold-storage floor came over at content revision 0.1.0 and the equipment manifest at 0.2.0; each file records what was added on the way in. Everything since — the other seven anomalies, the other three maps, the site, the onboarding — was authored here."
+            ]
+          },
+          {
+            "heading": "Third-party code",
+            "body": [
+              "Two libraries are vendored into this build. Both are MIT, both are unmodified, and both carry their licence text in the directory beside the code, because MIT requires the notice to travel with the software rather than to be recorded somewhere near it."
+            ],
+            "bullets": [
+              "Three.js r128 — MIT. Copyright 2010-2021 Three.js Authors, transcribed from the library's own header. Full text in assets/lib/r128/LICENSE.",
+              "PeerJS 1.5.4 — MIT, on the library's own declaration in its embedded package metadata. The vendored bundle carries no copyright notice at all and this project has not invented one; the gap is recorded rather than filled in. Full text and the record in assets/lib/peerjs-1.5.4/LICENSE.",
+              "The digest of each is pinned and re-checked on every audit run, which is what makes unmodified a fact rather than a claim."
+            ]
+          },
+          {
+            "heading": "What is not third-party",
+            "body": [
+              "Everything else. All the simulation, interface, tooling and content in this build is original to the project.",
+              "There is no bitmap art anywhere in it, no third-party texture, and no typeface file. The interface is your system fonts and the world is generated geometry — which is also why there is nothing else to credit here."
+            ]
+          }
+        ]
+      },
+      {
+        "id": "attribution",
+        "title": "Attribution and licensing",
+        "summary": "Where the material came from. The short version: none of it is SCP material.",
+        "sections": [
+          {
+            "heading": "No SCP material is in this build",
+            "body": [
+              "Every anomaly here is original. Not adapted, not paraphrased, not derived — written for this game.",
+              "That is not a promise, it is a measurement, and it is re-taken every time the audit runs. Every content file states where its material came from. Every licensing record is null AND says in a sentence why it is null, which is the difference between checked and forgotten. No file names an SCP designation."
+            ]
+          },
+          {
+            "heading": "Why every designation says provisional",
+            "body": [
+              "The eight designations you see on case files are markers this project assigned to its own anomalies. They are marked provisional because a final designation is assigned only once an attribution record exists, and no attribution record exists — because there is nothing here that belongs to anybody else to attribute.",
+              "A designation that quietly lost its provisional marker would be the moment this project started making a licensing claim nobody had cleared. The audit fails on it."
+            ]
+          },
+          {
+            "heading": "If that ever changes",
+            "body": [
+              "The attribution record has twelve required fields — the article and its title, its URL, its authors, the wiki branch, the revision or access date, what was adapted, what was changed, the required licence and notice, the associated assets and their own sources, the internal owner, the legal review status, and where the credit appears.",
+              "The table exists in this build with no rows in it. That is deliberate: an empty table with a schema fails loudly the first time somebody adds derived content without a record, and an absent table is what lets that content ship with no record at all."
+            ]
+          },
+          {
+            "heading": "Checked rather than asserted",
+            "body": [
+              "None of the above is held in anybody's head. A script re-derives all of it from the repository on every run: the digest of every vendored file, the licence text beside it, every provenance declaration, every designation, and every file in the tree that is neither original nor declared.",
+              "It needs no build step, no network and no browser, because an audit that only the person who wrote it can run is not an audit."
+            ]
+          }
+        ]
+      },
+      {
+        "id": "privacy",
+        "title": "Privacy",
+        "summary": "What is stored, where it is stored, and what leaves your machine.",
+        "sections": [
+          {
+            "heading": "Nothing is collected",
+            "body": [
+              "There is no analytics, no telemetry, no crash reporting, no account, no advertising and no cookie. Nothing is sent anywhere about how you play, how long you played, or whether you finished.",
+              "The crash banner is the usual place a game grows a quiet exception, so it is worth being exact: it makes no network request of any kind. When something goes wrong it puts the report on the screen and copies it to your clipboard if you press the button. That is the whole delivery mechanism, and you are the one who delivers it."
+            ]
+          },
+          {
+            "heading": "What is stored, and it is stored on your machine",
+            "body": [
+              "The game keeps six things in your browser's local storage, under this site's own address. They never leave it unless you carry them somewhere yourself."
+            ],
+            "bullets": [
+              "Your campaign — operations completed, custodies verified, requisition and research, clearance, department standing, what you have learned about each anomaly, upgrades and fitted equipment, your squad roster, what is in containment, and your debrief history.",
+              "A quarantine copy — if the game ever finds a save it cannot read, it copies that save aside verbatim before starting fresh, so a bad load cannot destroy a campaign silently.",
+              "Your settings — controls, captions, colour and contrast, camera, volumes, assists and safety options. Numbers, switches and key codes; no text you typed.",
+              "Your callsign — the name you type before deploying, at most fourteen characters.",
+              "Rooms you have joined — up to eight, each with its room code, the room name that was typed, the operation label and when it was. No callsigns.",
+              "A language preference, which this build reads and never writes."
+            ]
+          },
+          {
+            "heading": "One thing to know if you play with other people",
+            "body": [
+              "When an operation ends, the machine running the simulation writes the squad into its campaign roster so injuries and history follow the right operative. That roster holds names — and after a co-op operation, the names of the people you played with are among them.",
+              "Concretely: up to five roster entries, each at most fourteen characters, holding the callsigns other players typed, kept in the host's browser storage until that storage is cleared. Nobody else receives them and they are not sent anywhere. But they are on disk, and this page would be wrong not to say so."
+            ]
+          },
+          {
+            "heading": "What leaves your machine",
+            "body": [
+              "A solo operation makes no external request at all. The page loads its own files and nothing else happens.",
+              "Hosting or joining is different, because two browsers cannot find each other unaided:"
+            ],
+            "bullets": [
+              "A signalling broker at 0.peerjs.com introduces the two browsers. It sees the room identifier — which, for a named room, contains the room name you typed — and the connection details the browsers exchange, and those include IP addresses. It carries no game traffic: once the link is up, everything goes browser to browser.",
+              "Connection setup also uses the networking library's default helpers: a public address-discovery server at stun.l.google.com, and, if the two browsers cannot reach each other directly, a relay at eu-0.turn.peerjs.com or us-0.turn.peerjs.com. Traffic that goes through the relay is still end-to-end between browsers, but it does pass through a machine that is not yours.",
+              "Between players: your callsign, where you are and where you are looking, what you do, and the shared state of the operation. The last few squad-feed lines travel as written sentences, and a sentence can contain somebody's callsign.",
+              "If you advertise a room, a stranger's browser can see the code, the room name, the operation and how many seats are taken — never who is in them."
+            ]
+          },
+          {
+            "heading": "The record the game keeps of a mission holds no free text",
+            "body": [
+              "The event log a mission produces is a fixed vocabulary of things that happened: a state change and its cause, an operative down, evidence logged, a procedure committed. It is capped and it is in memory.",
+              "The one part of the game that carries written prose — the squad feed, which says things like somebody is down, get to them — is dispatched to the screen and the audio cue and deliberately kept out of that record, because prose is the one thing that can contain a name somebody typed."
+            ]
+          },
+          {
+            "heading": "Clearing it",
+            "body": [
+              "Deleting your campaign and resetting your settings are both available in the game.",
+              "Being straight about the rest: the game has no button that clears your saved callsign, your list of recent rooms, or the quarantine copy of an unreadable save. Clearing site data for this address in your browser removes all six at once, and that is the only complete way to do it in this build."
+            ]
+          },
+          {
+            "heading": "How this page is kept true",
+            "body": [
+              "Every claim above was read out of the running code rather than out of a comment near it, and the ones that are checked automatically are checked on every test run: that the crash boundary makes no request, that nothing outside the networking module sends anything anywhere, that a room listing carries a seat count and not a seat holder, that the recent-rooms list holds no callsign, and that a name never reaches the durable event log.",
+              "Two of the claims are not checked automatically, and are named as gaps in the project's own audit rather than left to be discovered: the campaign roster described above, and the connection helpers the networking library reaches by default."
+            ]
+          }
+        ]
+      },
+      {
+        "id": "eula",
+        "title": "Terms of use",
+        "summary": "Plain words, honestly labelled. This is not legal advice and no lawyer has read it.",
+        "sections": [
+          {
+            "heading": "What this is",
+            "body": [
+              "A game you can play in a browser at no charge. There is nothing to buy, nothing to subscribe to, no account to make, and no payment is taken anywhere in it.",
+              "It is a prototype in active development. Things will break, saves may need migrating, and a build may be rolled back to an earlier one at short notice."
+            ]
+          },
+          {
+            "heading": "No warranty, and that is not boilerplate",
+            "body": [
+              "The game is provided as is, without warranty of any kind. It is not fit for any particular purpose and nobody is liable for anything that follows from using it.",
+              "The practical version: your campaign lives in your browser's storage. Clearing site data deletes it, a browser in private mode will not keep it, and there is no copy anywhere else because nothing is sent anywhere. If it matters to you, it is worth knowing that before it happens rather than afterwards."
+            ]
+          },
+          {
+            "heading": "Third-party components",
+            "body": [
+              "This build includes Three.js and PeerJS, both under the MIT licence. Their notices travel with the build, in the directory beside each library, and your use of those components is under their licences and not under these terms."
+            ]
+          },
+          {
+            "heading": "The project's own code",
+            "body": [
+              "The source is public and no open-source licence has been chosen for it, which is a factual statement about the repository rather than an invitation. If you want to reuse part of it, ask.",
+              "This paragraph, and this page, are a description of where things stand. They are not legal advice."
+            ]
+          },
+          {
+            "heading": "Not affiliated with anything",
+            "body": [
+              "This game is not endorsed by, affiliated with, or connected to the SCP Wiki or its contributors. It contains no SCP-derived material — see the attribution page, which explains how that is checked rather than merely stated.",
+              "No qualified intellectual-property attorney has reviewed this project. That status is recorded in the repository as not obtained, deliberately, because recording it honestly is the only version of that clause worth having."
+            ]
+          }
+        ]
+      },
+      {
+        "id": "support",
+        "title": "Support",
+        "summary": "What to do when it breaks, and what the reference number in the banner is for.",
+        "sections": [
+          {
+            "heading": "The banner with a reference on it",
+            "body": [
+              "When the game throws, a banner appears carrying a reference that looks like CD-1A2B3C4 and, on its first line, the build the game is running.",
+              "The reference is derived from where the fault happened rather than from what it said, so the same bug produces the same reference on any machine — which is what makes two reports comparable. It moves when the code moves, though, so it identifies a bug in a build rather than a bug on its own. Always quote the build line with it."
+            ]
+          },
+          {
+            "heading": "Press Copy report",
+            "body": [
+              "The button next to the banner puts the whole report on your clipboard. It contains the build, which operation and scenario and seed you were on, the page address without its host, how many faults there were and how many were distinct, a reference and a message and a stack for each, and any file that failed to load.",
+              "There is no personal data in it by design, with one honest exception: an error message can quote text you typed, most likely a callsign. The report is on your screen before it is anywhere else, so read it before you paste it."
+            ]
+          },
+          {
+            "heading": "Where to send it",
+            "body": [
+              "Open an issue on the project's repository, Dumb-Tony/ContainmentDetailWeb, and paste the report in. The reference in the title and the build line in the body are enough to find it.",
+              "Nothing sends itself. If you do not send it, nobody sees it."
+            ]
+          },
+          {
+            "heading": "Why it sometimes stops instead of carrying on",
+            "body": [
+              "After the same fault three times, or thirty faults in all, the game stops rather than continuing.",
+              "That is a decision and not a failure to recover. A game that throws once a frame and keeps painting looks like it is working: the world animates, and every number on your display quietly stopped updating twenty seconds ago. You would read a custody timer that had frozen and act on it. A game that cannot keep its promises should say so and stop."
+            ]
+          },
+          {
+            "heading": "If your campaign comes back empty",
+            "body": [
+              "Almost always this means the build you are on is older than the one that wrote your save — after a rollback, for instance. When that happens the game refuses the save rather than reading it wrongly, copies it aside untouched, and starts you fresh for the session. Your campaign is not gone; this build simply will not read it.",
+              "Opening the newer build again picks it up where you left off. ⚠ Being straight about a rough edge: this build does not yet put that sentence on the screen when it happens, so an empty campaign after a rollback currently arrives with no explanation. It is a known gap and it is written down."
+            ]
+          },
+          {
+            "heading": "Before you report anything else",
+            "body": [
+              "Two things account for most of it. Serve the game over http rather than opening the file directly, or the module loads fail. And if a co-op session will not connect, it is almost always the connection helpers rather than the game — see the privacy page for exactly which hosts a session contacts."
+            ]
+          }
+        ]
+      }
+    ]
   },
 
   "rooms": [

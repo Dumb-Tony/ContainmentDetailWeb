@@ -908,6 +908,363 @@ async function sectionE() {
   emit();
 }
 
+/* ══ F. the §25.8 content lock, from inside a browser ══════════════════════════
+ *
+ * ⚠ THIS IS NOT A SECOND COPY OF tools/licence-audit.ps1, AND THE DIFFERENCE IS THE POINT.
+ * The script walks the TREE — it is the only thing that can say "every file is accounted
+ * for", because it can enumerate a directory. It cannot say whether a browser can read
+ * them, and that is not a theoretical gap: PowerShell's ConvertFrom-Json accepts a raw
+ * newline inside a JSON string and `JSON.parse` does not, so three content files in this
+ * repository once passed a PowerShell check and were invalid in the browser that had to
+ * load them. Only a browser parse counts, and this is the browser parse.
+ *
+ * So this section asserts the two halves the script structurally cannot:
+ *
+ *   · every content file the game can reach PARSES with JSON.parse, and declares its
+ *     provenance in one of the three permitted shapes
+ *   · the licence text really is beside the code and really is the MIT text, fetched over
+ *     http exactly as a player's browser would fetch it
+ *
+ * The file list is DERIVED rather than typed: the incidents come from the loader's own
+ * INCIDENTS export, and the maps and anomalies come from what those incidents name. Adding
+ * an incident therefore extends this section automatically, which is the only version of a
+ * hard-coded list worth having.
+ */
+async function sectionF() {
+  heading('F. §25.8 content lock — every content file, parsed by a browser');
+
+  const manifestRaw = await fetchText('content/provenance.json');
+  ok('F1 content/provenance.json is served and reachable', manifestRaw.length > 0);
+  let manifest = null;
+  try { manifest = JSON.parse(manifestRaw); } catch (e) { ok('F2 and a BROWSER can parse it', false, String(e && e.message)); }
+  if (!manifest) { emit(); return; }
+  ok('F2 and a BROWSER can parse it', true);
+
+  /* ── §25.3's twelve fields, in the file rather than in a paragraph ────────── */
+  const FIELDS = [
+    'designationAndArticleTitle', 'articleUrl', 'authorsAndAttributionSource', 'wikiBranch',
+    'pageRevisionOrAccessDate', 'conceptsTextCharactersOrProceduresAdapted', 'changesMadeForTheGame',
+    'requiredLicenceAndNotice', 'associatedAssetsAndTheirIndependentSources', 'internalContentOwner',
+    'legalReviewStatus', 'inGameAndDistributionCreditLocation',
+  ];
+  const db = manifest.attributionDatabase || {};
+  const dbFields = db.fields || [];
+  eq('F3 the §25.3 attribution database names all twelve required fields', FIELDS.filter((f) => dbFields.includes(f)).length, FIELDS.length);
+  eq('F4 and names no field §25.3 does not', dbFields.filter((f) => !FIELDS.includes(f)).length, 0);
+
+  /* ── §25.8's gate ─────────────────────────────────────────────────────────── */
+  const clauses = manifest.gate ? (manifest.gate.clauses || []) : [];
+  eq('F5 §25.8 states seven clauses and seven are answered — a gate that quietly lost one would still pass', clauses.length, 7);
+  eq('F6 every clause records a reason, because §25.8\'s last clause is that the status be RECORDED',
+    clauses.filter((c) => c.clause && c.status && c.recorded).length, clauses.length);
+  const open = clauses.filter((c) => c.status === 'open');
+  eq(`F7 no clause is open${open.length ? ` — ${open.map((c) => c.clause).join(' · ')}` : ''}`, open.length, 0);
+  note(`§25.8 gate: ${clauses.map((c) => c.status).join(', ')}`);
+
+  /* ── the file list, derived ───────────────────────────────────────────────── */
+  const covered = new Set((manifest.coverage || []).map((c) => c.path));
+  const incidentDocs = [];
+  for (const id of INCIDENTS) {
+    const raw = await fetchText(`content/incidents/${id}.json`);
+    ok(`F8 content/incidents/${id}.json is served`, raw.length > 0);
+    try { incidentDocs.push({ path: `content/incidents/${id}.json`, doc: JSON.parse(raw) }); } catch (e) {
+      ok(`F9 and a BROWSER can parse content/incidents/${id}.json`, false, String(e && e.message));
+    }
+  }
+  const maps = new Set(incidentDocs.map((d) => d.doc.map).filter(Boolean));
+  const anomalies = new Set(incidentDocs.map((d) => d.doc.anomaly).filter(Boolean));
+  note(`derived from ${INCIDENTS.length} incidents: ${maps.size} map(s), ${anomalies.size} anomaly file(s)`);
+
+  const paths = [
+    'content/site.json', 'content/onboarding.json', 'content/provenance.json', 'content/equipment/items.json',
+    ...[...maps].sort().map((m) => `content/maps/${m}.json`),
+    ...[...anomalies].sort().map((a) => `content/anomalies/${a}.json`),
+    ...incidentDocs.map((d) => d.path),
+    ...covered,
+  ];
+
+  /**
+   * ⚠ THREE SHAPES ARE ACCOUNTED FOR AND A FOURTH IS NOT, and the fourth is the whole
+   * reason the field exists. A non-null record, or a null that says WHY in a sentence, or
+   * coverage from the manifest for a file that cannot carry the declaration inline — those
+   * are provenance. A bare `null` is not: it is indistinguishable from a field somebody
+   * forgot, and §25.3 makes the record a prerequisite for implementation, so the difference
+   * between those two readings is the difference between clearing the gate and not.
+   */
+  let withRecord = 0, explained = 0, byManifest = 0;
+  const bare = [], unparseable = [], absent = [];
+  for (const p of paths) {
+    const raw = await fetchText(p);
+    if (!raw) { unparseable.push(`${p} (not served)`); continue; }
+    let doc = null;
+    try { doc = JSON.parse(raw); } catch (e) { unparseable.push(`${p} (${e && e.message})`); continue; }
+    const has = Object.prototype.hasOwnProperty.call(doc, 'licensingRecordId');
+    if (has && doc.licensingRecordId !== null) withRecord++;
+    else if (has && doc._licensingNote) explained++;
+    else if (covered.has(p)) byManifest++;
+    else if (has) bare.push(p);
+    else absent.push(p);
+  }
+  eq(`F10 every content file the game can reach parses in a BROWSER${unparseable.length ? ` — ${unparseable.join(' · ')}` : ''}`,
+    unparseable.length, 0);
+  eq(`F11 none carries a bare null — a null that does not say why is a field somebody forgot${bare.length ? ` — ${bare.join(', ')}` : ''}`,
+    bare.length, 0);
+  eq(`F12 and none is silent about where its material came from${absent.length ? ` — ${absent.join(', ')}` : ''}`,
+    absent.length, 0);
+  note(`${paths.length} content files: ${withRecord} with a record, ${explained} original and say so, ${byManifest} covered by the manifest`);
+
+  /* Coverage entries must not go stale: a file that has since grown an inline declaration
+   * is stated in two places, and two statements of provenance is one more than can be kept
+   * true. The manifest is for files that CANNOT carry it, not a second place to put it. */
+  const redundant = [];
+  for (const p of covered) {
+    const raw = await fetchText(p);
+    if (raw && /"licensingRecordId"/.test(raw)) redundant.push(p);
+  }
+  eq(`F13 no manifest coverage entry duplicates an inline declaration${redundant.length ? ` — ${redundant.join(', ')}` : ''}`, redundant.length, 0);
+
+  /* Every non-null record must have a row. There are none of either today, and the
+   * assertion is what makes the first one impossible to ship without twelve fields. */
+  const rows = new Map((db.records || []).map((r) => [r.recordId, r]));
+  const orphans = [];
+  for (const p of paths) {
+    const raw = await fetchText(p);
+    if (!raw) continue;
+    let doc = null; try { doc = JSON.parse(raw); } catch { continue; }
+    if (doc.licensingRecordId && !rows.has(doc.licensingRecordId)) orphans.push(`${p} → ${doc.licensingRecordId}`);
+  }
+  eq(`F14 every licensing record claimed by a content file has a row in the §25.3 database${orphans.length ? ` — ${orphans.join(', ')}` : ''}`,
+    orphans.length, 0);
+
+  /* ── the licence text is where the code is ────────────────────────────────── */
+  const notice = await fetchText('assets/lib/NOTICE.md');
+  const block = notice.match(/```audit\s*([\s\S]*?)```/);
+  const rowsN = block ? block[1].split('\n').map((l) => l.trim()).filter(Boolean).map((l) => {
+    const c = l.split(/\s*\|\s*/);
+    return { path: c[0], licence: c[1], version: c[2], copyright: c[6] };
+  }) : [];
+  eq('F15 every NOTICE.md row carries the seventh column, the copyright line', rowsN.filter((r) => r.copyright).length, rowsN.length);
+
+  const MIT_GRANT = 'Permission is hereby granted, free of charge, to any person obtaining a copy';
+  const MIT_INCLUDE = 'The above copyright notice and this permission notice shall be included in all';
+  const MIT_ASIS = 'THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND';
+
+  for (const r of rowsN) {
+    const dir = r.path.includes('/') ? r.path.slice(0, r.path.lastIndexOf('/')) : '';
+    const licPath = `assets/lib/${dir ? `${dir}/` : ''}LICENSE`;
+    const lic = await fetchText(licPath);
+    /**
+     * ⚠ MIT IS NOT SATISFIED BY A TABLE. It requires the copyright notice and the permission
+     * notice to accompany the software, and what this project distributes is the .js file
+     * next to this LICENSE. A row in NOTICE.md is a RECORD of the licence, not a copy of
+     * it, and the audit found exactly this gap: neither library shipped its licence text.
+     */
+    ok(`F16 ${licPath} is served — MIT requires the notice to travel with the code`, lic.length > 0);
+    if (!lic) continue;
+    ok(`F17 ${licPath} carries the MIT grant, the inclusion clause and the warranty disclaimer`,
+      lic.includes(MIT_GRANT) && lic.includes(MIT_INCLUDE) && lic.includes(MIT_ASIS));
+
+    const lib = await fetchText(`assets/lib/${r.path}`);
+    const copyCount = (lib.match(/copyright/gi) || []).length;
+    if (r.copyright === 'none-in-vendored-file') {
+      /**
+       * ⚠ THE RECORDED GAP IS ITSELF CHECKED, because "we could not find a copyright line"
+       * is a claim like any other and a claim nobody re-measures is a claim that quietly
+       * stops being true. An attribution audit that fabricates an attribution is worse than
+       * one that reports a gap: the gap is a known unknown somebody can close, and the
+       * fabrication is a false statement with a green tick beside it.
+       */
+      eq(`F18 ${r.path} really does carry no copyright notice, which is why none was invented for it`, copyCount, 0);
+      ok(`F19 and ${licPath} says so in as many words rather than filling in a plausible name`,
+        /UNKNOWN/.test(lic));
+      note(`${r.path}: copyright UNKNOWN and recorded as such — ${lib.length} bytes, 0 occurrences of "copyright"`);
+    } else {
+      ok(`F20 ${r.path} contains verbatim the copyright line NOTICE.md claims — an attribution the software does not carry is one somebody wrote`,
+        lib.includes(r.copyright), r.copyright);
+      ok(`F21 and so does ${licPath}`, lic.includes(r.copyright));
+    }
+  }
+
+  /* ── §25.4: the notice a player can actually reach ────────────────────────── */
+  const site = JSON.parse(await fetchText('content/site.json'));
+  const docs = (site.notices && site.notices.documents) || [];
+  const want = ['credits', 'attribution', 'privacy', 'eula', 'support'];
+  eq(`F22 §23 Milestone 6's five documents are content the game can render${docs.length ? '' : ' — content/site.json has no notices block'}`,
+    want.filter((w) => docs.some((d) => d.id === w)).length, want.length);
+  const thin = docs.filter((d) => !d.title || !d.summary || !(d.sections || []).length);
+  eq(`F23 each has a title, a summary and at least one section${thin.length ? ` — ${thin.map((d) => d.id).join(', ')}` : ''}`, thin.length, 0);
+  const badSection = [];
+  for (const d of docs) {
+    for (const s of d.sections || []) {
+      const body = s.body || [], bullets = s.bullets || [];
+      if (!s.heading || (!body.length && !bullets.length)) badSection.push(`${d.id}/${s.heading || '(no heading)'}`);
+      if (body.some((b) => typeof b !== 'string') || bullets.some((b) => typeof b !== 'string')) badSection.push(`${d.id}: non-string body`);
+    }
+  }
+  eq(`F24 every section is a heading over plain-text paragraphs or bullets${badSection.length ? ` — ${badSection.join(', ')}` : ''}`, badSection.length, 0);
+  /**
+   * ⚠ THESE DOCUMENTS MUST NOT CONTAIN MARKUP. Whatever renders them is expected to escape,
+   * and a privacy statement that arrives with a stray tag in it is either broken text or a
+   * hole, depending on where the text came from.
+   */
+  const markup = [];
+  for (const d of docs) {
+    const all = [d.title, d.summary, ...(d.sections || []).flatMap((s) => [s.heading, ...(s.body || []), ...(s.bullets || [])])];
+    if (all.some((t) => /<[a-z/!]/i.test(String(t)))) markup.push(d.id);
+  }
+  eq(`F25 and carries no markup, because the screen escapes and a tag would be either broken text or a hole${markup.length ? ` — ${markup.join(', ')}` : ''}`,
+    markup.length, 0);
+  note(`notices: ${docs.map((d) => `${d.id}(${(d.sections || []).length})`).join(' ')}`);
+
+  /* The privacy document makes claims. These are the ones this suite can check against the
+   * shipped code, so the page cannot drift away from the build without something failing. */
+  const privacy = docs.find((d) => d.id === 'privacy');
+  const privacyText = privacy ? JSON.stringify(privacy) : '';
+  const crashSrc = await fetchText('src/core/crash.js');
+  const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+  ok('F26 the privacy page claims the crash banner makes no request, and the crash boundary makes none',
+    /no network request/i.test(privacyText)
+    && !/\bfetch\s*\(|XMLHttpRequest|sendBeacon|new\s+WebSocket|new\s+Image\s*\(/.test(strip(crashSrc)));
+  /**
+   * ⚠ THE PAGE NAMES FOUR HOSTS AND THE BUILD REACHES FOUR HOSTS. NOTICE.md and README.md
+   * both still say "exactly one network host", and that is true of `src/net/net.js` and not
+   * true of a session: PEER_OPTS sets host, port, secure and debug and does NOT set
+   * `config`, so PeerJS falls back to its own default ICE servers — a STUN server and two
+   * TURN relays, all named in the vendored bytes. A privacy page that repeated the
+   * one-host claim would be repeating a comment instead of describing the software.
+   */
+  const peer = await fetchText('assets/lib/peerjs-1.5.4/peerjs.min.js');
+  const iceHosts = ['stun.l.google.com', 'eu-0.turn.peerjs.com', 'us-0.turn.peerjs.com'];
+  const inLib = iceHosts.filter((h) => peer.includes(h));
+  eq('F27 the networking library really does default to a STUN server and two TURN relays', inLib.length, iceHosts.length);
+  const netjs = strip(await fetchText('src/net/net.js'));
+  ok('F28 and PEER_OPTS does not override them, so a session reaches those hosts and not only the broker',
+    /PEER_OPTS\s*=\s*\{[^}]*\}/.test(netjs) && !/PEER_OPTS\s*=\s*\{[^}]*config/.test(netjs));
+  const named = iceHosts.filter((h) => privacyText.includes(h));
+  eq(`F29 and the privacy page names all three rather than repeating "exactly one host"${named.length === 3 ? '' : ` — missing ${iceHosts.filter((h) => !named.includes(h)).join(', ')}`}`,
+    named.length, iceHosts.length);
+  emit();
+}
+
+/* ══ G. rollback, as a save-migration case ═════════════════════════════════════
+ *
+ * This repository is push-is-the-deploy: GitHub Pages serves `main` at root and there is no
+ * build step, so a rollback is a revert and a push. That makes an OLDER BUILD READING A
+ * NEWER PROFILE an ordinary operational event rather than an exotic one, and §23 Milestone 6
+ * asks for the rollback plan to be REHEARSED rather than written down. Section B already
+ * covers the refusal in the abstract; this covers what a rolled-back player's storage
+ * actually does, because that is what the runbook in docs/day-one-operations.md turns on.
+ *
+ * ⚠ THE SEQUENCE IS QUARANTINE THEN OVERWRITE, AND THE SECOND HALF IS THE TRAP. The refused
+ * save is copied aside — and then the very first autosave of the fresh session writes over
+ * SAVE_KEY, because the quarantine went to a different key. So rolling FORWARD again does
+ * not bring the campaign back on its own: by then it exists only in the quarantine slot,
+ * which is a single slot with newest-wins. Nothing in the plan can be right if this is
+ * assumed rather than measured.
+ */
+async function sectionG() {
+  heading('G. rollback — what an older build does to a newer save');
+
+  const s = storage();
+  ok('G1 the harness has storage to test against', !!s);
+  if (!s) { emit(); return; }
+
+  const savedProfile = s.getItem(SAVE_KEY);
+  const savedQuarantine = s.getItem(QUARANTINE_KEY);
+  try {
+    /* The realistic case is not version 999. It is exactly one ahead: the build that was
+     * live ten minutes ago, before somebody reverted it. */
+    const next = PROGRESSION_VERSION + 1;
+    const campaign = {
+      version: next, siteId: 'regional-site-19', operationsCompleted: 21, custodiesVerified: 6,
+      requisition: 1480, research: 640, clearance: 3,
+      roster: [{ id: 'p1', name: 'Vasquez', operations: 21 }],
+      history: [{ operation: 21, mapId: 'blackthorn-reserve', anomalyId: 'blackthorn-caller', overall: 'Controlled' }],
+    };
+    const raw = JSON.stringify(campaign);
+    s.removeItem(QUARANTINE_KEY);
+    s.setItem(SAVE_KEY, raw);
+
+    const out = loadProfileWithReport();
+    eq(`G2 a profile from the build one version newer is REFUSED rather than read wrongly (v${next} vs v${PROGRESSION_VERSION})`,
+      out.report.outcome, 'refused');
+    eq('G3 and the session starts on a default profile rather than a half-read campaign',
+      out.profile.requisition, STARTING_REQUISITION);
+    eq('G4 21 operations do not survive into it', out.profile.operationsCompleted, 0);
+    ok('G5 the player is TOLD, in a sentence naming both save formats',
+      out.report.notices.some((n) => /newer build/i.test(n) && n.includes(String(next))),
+      out.report.notices.join(' | '));
+    ok('G6 and told that the campaign is still there and which build to open to get it back',
+      out.report.notices.some((n) => /left exactly as it was|pick it up/i.test(n)));
+    eq('G7 the refused save is copied aside BYTE FOR BYTE, not summarised', s.getItem(QUARANTINE_KEY), raw);
+
+    /**
+     * ⚠ AND THEN THE FIRST AUTOSAVE DESTROYS THE ORIGINAL. This is the fact the rollback
+     * runbook is built around: a player who loads a rolled-back build and plays for one
+     * minute no longer has their campaign at SAVE_KEY. Rolling the deploy forward again
+     * does NOT restore it. If this assertion ever starts failing because somebody made the
+     * load path non-destructive, that is good news and the runbook gets shorter.
+     */
+    saveProfile(out.profile);
+    const afterSave = JSON.parse(s.getItem(SAVE_KEY));
+    eq('G8 the first autosave of the fresh session overwrites the newer campaign at the save key', afterSave.operationsCompleted, 0);
+    eq('G9 which is why the quarantine copy is the only thing left of it', s.getItem(QUARANTINE_KEY), raw);
+
+    /**
+     * The documented recovery, tested rather than asserted in prose: copy the quarantine
+     * slot back over the save key once the newer build is live again. This is the exact
+     * step docs/day-one-operations.md tells an operator to give a player, so it is the
+     * exact step that has to work.
+     */
+    s.setItem(SAVE_KEY, s.getItem(QUARANTINE_KEY));
+    const recovered = migrateWithReport(JSON.parse(s.getItem(SAVE_KEY)));
+    eq('G10 restoring the quarantine copy under the NEWER build is still refused by THIS one, as it must be',
+      recovered.report.outcome, 'refused');
+    const asIfNewer = JSON.parse(raw);
+    asIfNewer.version = PROGRESSION_VERSION;
+    const backAgain = migrateWithReport(asIfNewer);
+    eq('G11 and the same bytes under a build that understands them return the campaign intact — 21 operations',
+      backAgain.profile.operationsCompleted, 21);
+    eq('G12 with the requisition it had', backAgain.profile.requisition, 1480);
+
+    /**
+     * ⚠ ONE SLOT, NEWEST WINS. A second unreadable save at any point after the rescue
+     * overwrites the rescued campaign, so "we quarantined it" is only true until the next
+     * bad load. The runbook has to tell a player to export it, not to leave it there.
+     */
+    s.setItem(SAVE_KEY, '{"version":2,"requisition":700,"operationsCo');
+    loadProfileWithReport();
+    ok('G13 a second unreadable save overwrites the quarantine slot — the rescue is not durable',
+      s.getItem(QUARANTINE_KEY) !== raw, `now: ${String(s.getItem(QUARANTINE_KEY)).slice(0, 40)}`);
+
+    /* The other direction, which is what a roll-FORWARD looks like: an older save. */
+    const old = migrateWithReport({ version: 1, operationsCompleted: 9, requisition: 700 });
+    eq('G14 rolling forward is the safe direction — an older save is upgraded, not refused', old.report.outcome, 'upgraded');
+    eq('G15 and keeps its 9 operations', old.profile.operationsCompleted, 9);
+    ok('G16 while telling the player nothing was lost', old.report.notices.some((n) => /older build|nothing was lost/i.test(n)),
+      old.report.notices.join(' | '));
+
+    /**
+     * ⚠ AND NOTHING PUTS ANY OF THOSE SENTENCES ON THE SCREEN. `Progression.migration`
+     * carries the notice and no module under src/ui reads it, so today a rollback presents
+     * as a campaign that is simply gone, with no explanation — which is precisely the §18.1
+     * misrepresentation the progression module's own comment says must not happen. It is
+     * measured here rather than asserted, because the fix belongs to the UI and the gap
+     * belongs in the runbook either way.
+     */
+    const uiReads = [];
+    for (const f of ['src/ui/base.js', 'src/ui/panels.js', 'src/ui/hud.js', 'src/ui/settings.js', 'src/main.js']) {
+      if (/\bmigration\b/.test(await fetchText(f))) uiReads.push(f);
+    }
+    note(`migration notice: carried by Progression.migration, read by ${uiReads.length ? uiReads.join(', ') : 'NOTHING under src/ui — a rolled-back player is told nothing (see docs/day-one-operations.md)'}`);
+  } finally {
+    if (savedProfile === null) s.removeItem(SAVE_KEY); else s.setItem(SAVE_KEY, savedProfile);
+    if (savedQuarantine === null) s.removeItem(QUARANTINE_KEY); else s.setItem(QUARANTINE_KEY, savedQuarantine);
+  }
+  ok('G17 and the suite put the player\'s real profile back', s.getItem(SAVE_KEY) === savedProfile);
+  emit();
+}
+
 /* ══ drive ═════════════════════════════════════════════════════════════════════ */
 
 await suite('audit', async () => {
@@ -916,5 +1273,7 @@ await suite('audit', async () => {
   await run('C', () => sectionC());
   await run('D', () => sectionD());
   await run('E', () => sectionE());
+  await run('F', () => sectionF());
+  await run('G', () => sectionG());
 });
 void lines; void counts; void near;

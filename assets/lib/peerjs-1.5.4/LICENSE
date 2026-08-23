@@ -1,0 +1,68 @@
+PeerJS 1.5.4 — MIT License
+==========================
+
+WHY THIS FILE IS HERE. MIT requires that the copyright notice and this permission
+notice accompany the software. `peerjs.min.js` sits in this directory and is
+distributed by this project, so the notice has to travel with it.
+
+⚠ AN UNRESOLVED PROVENANCE GAP, RECORDED RATHER THAN PAPERED OVER
+------------------------------------------------------------------------------
+
+**The vendored file carries no copyright notice, and this project has not invented
+one.** Measured over `peerjs-1.5.4/peerjs.min.js`, 92,873 bytes: the string
+`copyright` appears zero times, in any case. There is no `@license` banner, no header
+comment of any kind — the bundle opens directly with `(()=>{function e(e,t,n,r){`.
+`tools/licence-audit.ps1` section A re-measures that zero on every run, so this
+paragraph cannot quietly stop being true.
+
+An attribution audit that fabricates an attribution is worse than one that reports a
+gap, so the copyright line below is recorded as **UNKNOWN** and `NOTICE.md` records it
+as `none-in-vendored-file`. Writing a plausible name and a plausible year here would
+have made the audit pass and made it a lie.
+
+WHAT THE FILE DOES CARRY. The bundle embeds its own package metadata, and these are
+the only rights-relevant facts that are actually IN the vendored bytes:
+
+    "name":"peerjs"
+    "version":"1.5.4"
+    "license":"MIT"
+    "homepage":"https://peerjs.com"
+    "repository":{"type":"git","url":"https://github.com/peers/peerjs"}
+    "contributors":["Michelle Bu <michelle@michellebu.com>", …]
+
+So the licence is MIT on the library's own say-so, and a contributors list exists — but
+a contributors list is not a copyright line and must not be typed into one.
+
+HOW TO CLOSE THIS. Obtain the `LICENSE` file from the upstream PeerJS 1.5.4 release
+artefact, put its exact copyright line in this file and in the `copyright` column of
+`assets/lib/NOTICE.md`, and the audit will start checking it the way it checks
+Three.js's. Until somebody does that, this gap is printed on every audit run and is
+carried as a standing finding in `docs/licensing-audit.md`. It needs network access to
+an upstream release, which is precisely the thing this audit is built not to require.
+
+-------------------------------------------------------------------------------
+
+Copyright (c) UNKNOWN — see the gap recorded above. The vendored bundle states
+"license":"MIT" and names contributors, but carries no copyright notice, and this
+project will not supply one it cannot source.
+
+The permission text below is the MIT License, which is the licence the vendored file
+declares for itself:
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

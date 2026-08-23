@@ -2,6 +2,8 @@
   "id": "cold-storage-l2",
   "displayName": "Cold storage, level 2",
   "contentRevision": "0.2.0-web",
+  "licensingRecordId": null,
+  "_licensingNote": "Original, not an SCP. Imported first-party from Dumb-Tony/ContainmentDetail — this project's own earlier Unity build, same author — at content revision 0.1.0, then extended for the browser as _webNote describes. No floor plan, survey, photograph, or third-party model or texture was used at either end of that import. licensingRecordId is null because there is no third-party material to record, and this note is what makes that null mean 'checked, and here is why' rather than 'nobody has looked at this one'. See content/provenance.json.",
   "_incident": "A cold-storage floor two levels down: four shelving aisles, a loading bay, and an office nobody has opened since the second shift stopped answering. The aisles are 4.2m wide — wider than one floodlight's 40C contour — so the fence that sealed the plant room's corridor with a single tripod needs TWO here, staggered, or a lane the draught simply walks around. Power is a two-step: the office circuit's switch is on the bay wall, the storage circuit's switch is INSIDE the office.",
   "_webNote": "Imported from Dev\\ContainmentDetail revision 0.1.0. The geometry, spawn, extraction, anomaly spawn, doors and circuits are unchanged. Added for the browser build: a perimeter, a ceiling height, the cargo cache the loadout wager needs somewhere to live, named rooms so a player can say where they are, mains luminaires per circuit, and the static evidence sources named in the anomaly file.",
 

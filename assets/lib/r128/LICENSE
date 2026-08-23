@@ -1,0 +1,47 @@
+Three.js r128 — MIT License
+===========================
+
+WHY THIS FILE IS HERE. MIT requires that the copyright notice and this permission
+notice accompany the software. `three.min.js` sits in this directory and is
+distributed by this project, so the notice has to travel with it — a licence recorded
+only in a table one directory up does not accompany anything. `assets/lib/NOTICE.md`
+records the claim; this file is the notice itself.
+
+WHERE THE COPYRIGHT LINE CAME FROM. It is transcribed character for character from the
+`@license` header of the vendored file itself, which is the first five lines of
+`r128/three.min.js`:
+
+    /**
+     * @license
+     * Copyright 2010-2021 Three.js Authors
+     * SPDX-License-Identifier: MIT
+     */
+
+Nothing below was guessed. `tools/licence-audit.ps1` section A asserts that the exact
+copyright string recorded in `NOTICE.md` appears both in `three.min.js` and in this
+file, so a copyright line that drifted from the one the library actually carries — in
+either direction — fails the audit.
+
+-------------------------------------------------------------------------------
+
+Copyright 2010-2021 Three.js Authors
+
+SPDX-License-Identifier: MIT
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

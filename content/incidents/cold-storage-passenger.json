@@ -1,6 +1,8 @@
 {
   "id": "cold-storage-passenger",
   "contentRevision": "0.1.0",
+  "licensingRecordId": null,
+  "_licensingNote": "Original, not an SCP. This file is an Incident Package manifest — the unit GDD §25.8 states the content-lock gate at — and it binds an anomaly, a map and a premise that are all first-party to this project. licensingRecordId is null because there is no third-party material in the package to record, and this note is what makes that null mean 'checked, and here is why' rather than 'nobody has looked at this one'. §25.7's ShareAlike questions do not engage. The gate status and §25.3's field table are in content/provenance.json.",
   "displayName": "What was left running",
   "anomaly": "coldharbour-passenger",
   "map": "cold-storage-l2",
