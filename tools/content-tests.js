@@ -698,6 +698,65 @@ async function sectionD2() {
   eq('D32a it is the transition out of the vulnerable state, so custody was genuinely given back',
     back[0] ? `${back[0].from}->${back[0].to}` : '(never)', 'light->lifting');
   ok('D32b and it is awake again rather than merely un-sealable', g.anomaly.isAwake, g.anomaly.state);
+
+  /**
+   * ⚠ AND IT IS REACHABLE WITH THE MASS SITTING ON THE CASE, WHICH IT WAS NOT.
+   *
+   * D30 above only proves the purge is offered when a decoy has drawn the mass away. That is
+   * the pleasant case. `contextAction` returned the SEAL from an absolute early return above
+   * the contamination check, guarded on `!isDistributed` — and `harrowbank-ballast`
+   * deliberately does not declare `presence.instances`, because it has a position, hunts,
+   * and is sealed at a real distance. So for this family the early return fired and the
+   * purge verb could not be reached at all while standing at the case.
+   *
+   * Worse: `trySeal` does not consult completeness for a non-distributed anomaly, so the
+   * case WOULD have sealed. The only recovery from an ordinary mistake was unavailable and
+   * the mistake was silently sealable. §27.2 criterion 3 asks a squad to be able to recover
+   * from one ordinary procedural error, and logging the wrong stone is the most ordinary
+   * error this family has.
+   */
+  const wrong2 = g.instances.list.find((i) => !i.anomalous && !i.deposited);
+  if (wrong2) {
+    const a2 = workNear(wrong2.x, wrong2.z, 'collect', 30000);
+    if (a2 && a2.kind === 'collect') g.doInteract();
+    const dep2 = workNear(box.x, box.z, 'deposit', 30000);
+    if (dep2 && dep2.kind === 'deposit') g.doInteract();
+    wait(600);
+    ok('D33 the case is contaminated again, so the next assertion is not vacuous', g.instances.contaminated);
+    /**
+     * The exact state the seal's early return used to win in: contaminated, held, and the
+     * mass standing on the case. `contextAction` is asked IN THE SAME FRAME, without
+     * stepping, because that is the only way to hold this state — see the measurement below.
+     */
+    const p = g.player;
+    p.x = box.x + 0.5; p.z = box.z;
+    g.anomaly.x = box.x; g.anomaly.z = box.z;
+    g.anomaly.state = 'light';
+    const heldNow = g.anomaly.isHeld;
+    const offered = g.contextAction();
+    ok('D34 with a contaminated case, held, and the mass on the box, the verb is the purge and not the seal',
+      heldNow && offered && offered.kind === 'purge',
+      `held=${heldNow} offered=${offered ? offered.kind : 'none'}`);
+
+    /**
+     * ⚠ AND THE WINDOW IS ONE FRAME, WHICH IS WHY THIS IS AN ORDERING FIX RATHER THAN A
+     * CRASH FIX. This anomaly's own content releases it the moment the case is contaminated
+     * — `instances-loose` fires and it goes back to `lifting` — so the contaminated-and-held
+     * state lasts exactly as long as measured below. In that frame the prompt under the
+     * crosshair read SEAL, on a case that could not usefully be sealed.
+     *
+     * It is worth fixing anyway because the ordering, not the duration, is the defect: a
+     * future package whose contamination does NOT release the anomaly would sit in that
+     * state permanently, with the only recovery from an ordinary mistake unreachable and the
+     * mistake silently sealable — `trySeal` does not consult completeness for a
+     * non-distributed anomaly.
+     */
+    let heldFor = 0;
+    for (let i = 0; i < 12 && g.anomaly.isHeld; i++) { heldFor++; g.skipMs(16); }
+    note(`  contaminated-and-held lasted ${heldFor} step(s) before this anomaly's own trigger took it back to ${g.anomaly.state}`);
+    ok('D34a and this content releases it almost immediately, so the window is narrow rather than absent',
+      heldFor >= 1 && heldFor <= 3, `${heldFor} steps`);
+  }
 }
 
 /* ══ E. the eighth family, driven solo ═════════════════════════════════════════

@@ -1054,6 +1054,38 @@ export class Game {
     const inTheCase = this.anomaly.isDistributed
       ? true
       : (caseDep && dist(this.anomaly.x, this.anomaly.z, caseDep.x, caseDep.z) <= sealRadius);
+    /**
+     * ⚠ A CONTAMINATED CASE OUTRANKS THE SEAL, AND IT USED TO SIT BELOW IT.
+     *
+     * This block was after the seal's absolute early return. For a DISTRIBUTED set that was
+     * harmless, because the early return is guarded on `!isDistributed` and never fires for
+     * them. For an anomaly that uses the instance system WITHOUT declaring
+     * `presence.instances` — which `harrowbank-ballast` does deliberately, because it has a
+     * position, hunts, and is sealed at a real distance — the early return fires, and the
+     * purge verb could not be reached at all while standing at the case. A squad who logged
+     * the wrong stone had no way to take it back out.
+     *
+     * Worse, `trySeal` does not consult completeness for a non-distributed anomaly, so the
+     * case would have sealed: the only recovery from an ordinary mistake was unavailable and
+     * the mistake was silently sealable. §27.2 criterion 3 asks that a squad recover from one
+     * ordinary procedural error, and logging the wrong object is the most ordinary error the
+     * family has.
+     *
+     * Offered ONLY while contaminated, so it never appears as a way to casually undo a
+     * correct deposit — and above the seal for every family, because a case with the wrong
+     * thing in it is the one state where sealing is not the move.
+     */
+    if (this.instances.contaminated) {
+      const spoiled = this.deployables.byItem('reinforced-transit-case')
+        .find((d) => !d.sealed && dist(p.x, p.z, d.x, d.z) <= reach);
+      if (spoiled) {
+        return {
+          kind: 'purge', target: spoiled,
+          text: msg('mission.verb.purge', { count: this.instances.inCase.length }),
+        };
+      }
+    }
+
     const sealable = caseDep && this.anomaly.isHeld && inTheCase;
     /**
      * ⚠ THE SEAL OUTRANKS EVERYTHING FOR A MASS, AND MUST NOT FOR A SET.
@@ -1073,22 +1105,6 @@ export class Game {
       return { kind: 'seal', text: msg('mission.verb.seal'), target: caseDep };
     }
 
-    /* A contaminated case outranks everything except the seal and a casualty, the same way
-     * the seal does — for the same reason. Standing at a case with the wrong thing in it,
-     * there is exactly one useful action, and burying it under "retrieve the transit case"
-     * would let a squad carry a case they cannot seal to a stair head they cannot leave by.
-     * Offered ONLY while contaminated, so it never appears as a way to casually undo a
-     * correct deposit. */
-    if (this.instances.contaminated) {
-      const spoiled = this.deployables.byItem('reinforced-transit-case')
-        .find((d) => !d.sealed && dist(p.x, p.z, d.x, d.z) <= reach);
-      if (spoiled) {
-        return {
-          kind: 'purge', target: spoiled,
-          text: msg('mission.verb.purge', { count: this.instances.inCase.length }),
-        };
-      }
-    }
 
     const cands = [];
     if (sealable) {
