@@ -284,6 +284,23 @@ function StripNamespaces($text) {
   # w3.org can only appear inside one of the four above; once they are gone, any left is real.
   return $t
 }
+
+# ⚠ A HOST INSIDE A CONTENT-SECURITY-POLICY IS THE OPPOSITE OF A REACH.
+#
+# Same argument as the namespace stripper above, and it needs making because check B is
+# otherwise exactly right and exactly wrong here: `index.html` names `0.peerjs.com` twice,
+# and it names it in a `connect-src` ALLOW-LIST — a sentence saying which host the page may
+# talk to, which is a restriction and not a connection. Left unstripped, adding a CSP fails
+# the audit that exists to notice new network reaches, and the lesson a reader draws is
+# "don't add a CSP".
+#
+# The count is reported rather than swallowed, so a policy that grows a host still shows up
+# on the run: a CSP is a place a host can be smuggled in, it is simply not a place one can
+# be reached from.
+function StripCsp($text) {
+  return [regex]::Replace($text,
+    '(?is)<meta\s+http-equiv\s*=\s*"Content-Security-Policy"[^>]*>', '(csp-allowlist)')
+}
 $shipped = @()
 foreach ($d in $ShippedDirs) {
   $p = Join-Path $Root $d
@@ -299,10 +316,13 @@ foreach ($f in $shipped) {
   if ($f.Extension -in @(".png", ".jpg", ".jpeg", ".gif", ".webp", ".mp3", ".ogg", ".wav", ".woff", ".woff2", ".ttf")) { continue }
   $rel = RelPath $f.FullName
   $rawBody = StripComments (Get-Content $f.FullName -Raw -Encoding UTF8) $f.Extension
-  $nsCount = ([regex]::Matches($rawBody, $HostPattern, 'IgnoreCase')).Count
-  $body = StripNamespaces $rawBody
+  $before = ([regex]::Matches($rawBody, $HostPattern, 'IgnoreCase')).Count
+  $cspStripped = StripCsp $rawBody
+  $cspCount = $before - ([regex]::Matches($cspStripped, $HostPattern, 'IgnoreCase')).Count
+  $body = StripNamespaces $cspStripped
   $m = [regex]::Matches($body, $HostPattern, 'IgnoreCase')
-  $nsCount = $nsCount - $m.Count
+  $nsCount = $before - $cspCount - $m.Count
+  if ($cspCount -gt 0) { Say ("  {0,-42} {1} host(s) in a CSP allow-list, no endpoint" -f $rel, $cspCount) "DarkGray" }
   if ($m.Count -eq 0) {
     if ($nsCount -gt 0) { Say ("  {0,-42} {1} XML namespace URI(s), no endpoint" -f $rel, $nsCount) "DarkGray" }
     continue

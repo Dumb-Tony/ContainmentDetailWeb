@@ -175,9 +175,9 @@ async function sectionC(doc, content) {
 
   /* A view, revised, then a plan. */
   const claims = g.ledger.claims;
-  g.setClaim(claims[0].id, 'supported');
+  g.setClaim(claims[0].id, 'believed');
   g.setClaim(claims[0].id, 'excluded');
-  g.setClaim(claims[1].id, 'supported');
+  g.setClaim(claims[1].id, 'believed');
   g.commitProcedure({ target: 'a', state: 'b', trigger: 'c', transfer: 'd', maintained: [], abort: 'e' });
 
   const rows = cert.rows();

@@ -311,7 +311,13 @@ export class InstanceSet {
 
   decode(rows) {
     if (!Array.isArray(rows)) return this;
-    for (const [id, xCm, zCm, st, by, ver] of rows) {
+    for (const r of rows) {
+      /* A row that is not a row. `for (const [a,b] of rows)` destructures every element,
+       * so a single number in the array throws out of the data handler and takes the
+       * frame loop with it -- one field, from a stranger. The wire refuses this shape now
+       * as well; this is the half that does not depend on a sanitiser being in front. */
+      if (!Array.isArray(r)) continue;
+      const [id, xCm, zCm, st, by, ver] = r;
       const i = this.byId(id);
       if (!i) continue;
       i.x = xCm / 100; i.z = zCm / 100;

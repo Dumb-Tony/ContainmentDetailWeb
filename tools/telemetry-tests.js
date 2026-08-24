@@ -60,7 +60,7 @@ async function drive(content, seed = 'telemetry') {
   }
 
   const claims = g.ledger.claims;
-  g.setClaim(claims[0].id, 'supported');
+  g.setClaim(claims[0].id, 'believed');
   g.setClaim(claims[0].id, 'excluded');
   const card = { target: 'a', state: 'b', trigger: 'c', transfer: 'd', maintained: [], abort: 'e' };
   g.commitProcedure(card);

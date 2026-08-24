@@ -299,7 +299,27 @@ export function missingCommsCaptions(phrases = PHRASES, captions = COMMS_CAPTION
 }
 
 export function isPhrase(id) { return Object.prototype.hasOwnProperty.call(PHRASES, id); }
-export function phraseOf(ping) { return ping ? PHRASES[ping.phrase] || null : null; }
+
+/**
+ * The phrase, or null — and the ONLY way this file is allowed to read `PHRASES`.
+ *
+ * ⚠ `PHRASES[id]` IS NOT A MEMBERSHIP TEST, AND FIVE GUARDS IN THIS FILE USED IT AS ONE.
+ * `PHRASES.constructor` is truthy, so `if (!PHRASES[phrase]) continue` waves through
+ * `constructor`, `toString` and `valueOf` — and the next line reads `ph.anchor`, which on
+ * the Object constructor is `undefined`, and `ANCHORS[undefined].placed` throws. Measured
+ * from the wire: a ping row naming `constructor` got past `decode`'s guard and then threw
+ * out of the comms feed EVERY FRAME for the rest of the session.
+ *
+ * `isPhrase` has been in this file, exported, doing the right thing with `hasOwnProperty`,
+ * the whole time; nothing called it. That is the shape worth noticing — the guard existed
+ * and the callers each wrote their own weaker one.
+ *
+ * The wire refuses these ids now too (`safeId` in `protocol.js` rejects every own name of
+ * `Object.prototype`), and that is not a reason to leave this wrong: the next caller will
+ * not have a sanitiser in front of it.
+ */
+export function phraseById(id) { return isPhrase(id) ? PHRASES[id] : null; }
+export function phraseOf(ping) { return ping ? phraseById(ping.phrase) : null; }
 export function kindOf(ping) { const ph = phraseOf(ping); return ph ? PING_KINDS[ph.kind] : null; }
 export function captionOf(ping) { return ping ? COMMS_CAPTIONS[ping.phrase] || null : null; }
 export function expiresAt(ping) { const ph = phraseOf(ping); return ph ? ping.atMs + ph.lifeMs : ping.atMs; }
@@ -376,7 +396,7 @@ export class PingBoard {
    * @returns {{ok: true, ping: object} | {ok: false, why: string}}
    */
   add(ownerId, phraseId, { x = 0, z = 0, atMs = 0 } = {}) {
-    const ph = PHRASES[phraseId];
+    const ph = phraseById(phraseId);
     /* A phrase id the vocabulary does not contain is REFUSED, not passed through as an
      * inert marker with no words. An unknown id can only come from a modified client or a
      * version skew, and both deserve a sentence rather than a blank icon. */
@@ -434,7 +454,7 @@ export class PingBoard {
   live(nowMs, ownerAt = null) {
     const out = [];
     for (const ping of this.list) {
-      const ph = PHRASES[ping.phrase];
+      const ph = phraseById(ping.phrase);
       if (!ph) continue;
       if (nowMs - ping.atMs >= ph.lifeMs) continue;
       if (!ANCHORS[ph.anchor].follows || !ownerAt) { out.push(ping); continue; }
@@ -471,7 +491,7 @@ export class PingBoard {
   prune(nowMs) {
     const before = this.list.length;
     this.list = this.list.filter((p) => {
-      const ph = PHRASES[p.phrase];
+      const ph = phraseById(p.phrase);
       return ph && nowMs - p.atMs < ph.lifeMs;
     });
     return before - this.list.length;
@@ -514,7 +534,7 @@ export class PingBoard {
     const by = new Map(this.list.map((p) => [p.id, p]));
     const next = [];
     for (const [id, owner, phrase, x, z, atMs] of rows || []) {
-      if (!PHRASES[phrase]) continue;           // a phrase this build does not have: drop it
+      if (!isPhrase(phrase)) continue;          // a phrase this build does not have: drop it
       const p = by.get(id) || { id, owner, phrase, x: 0, z: 0, atMs: 0 };
       p.owner = owner; p.phrase = phrase;
       p.x = x / 100; p.z = z / 100; p.atMs = atMs;
@@ -545,7 +565,7 @@ export class PingBoard {
  * @returns {{ok: true, ping} | {ok: false, why: string}}
  */
 export function requestPing(board, caller, phraseId, aim = {}, ctx = {}) {
-  const ph = PHRASES[phraseId];
+  const ph = phraseById(phraseId);
   if (!ph) return { ok: false, why: msg('comms.refuse.notAPhrase') };
   if (!caller || !caller.id) return { ok: false, why: msg('comms.refuse.noCaller') };
   if (caller.alive === false) return { ok: false, why: msg('comms.refuse.offTheNet') };

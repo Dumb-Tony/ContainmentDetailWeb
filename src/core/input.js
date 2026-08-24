@@ -210,7 +210,21 @@ export class Input {
   }
 
   setBindings(bindings) {
-    this.bindings = cloneBindings(bindings);
+    /**
+     * ⚠ THROUGH THE SANITISER, WHICH LIVES IN THIS FILE AND WAS ON NO PATH THE GAME TAKES.
+     *
+     * `sanitiseBindings` is documented above as accepting "a save file, a network payload"
+     * — and it was called only from `fromJSON`, which the boot path does not use. Everything
+     * real went through `cloneBindings`, which does `Array.from(codes)` and therefore throws
+     * on `{ sprint: null }`. That is a TypeError inside `new Input(...)` during boot, with
+     * no game behind it to catch it, from a settings blob on a shared `github.io` origin.
+     *
+     * It also fixes a quieter thing: a PARTIAL table used to produce an Input with actions
+     * missing, because `cloneBindings` copies only the keys it is given. Starting from the
+     * defaults means an old or truncated save loses the keys it never had rather than the
+     * ones it did.
+     */
+    this.bindings = sanitiseBindings(bindings);
     this._codeToActions = new Map();
     for (const [action, codes] of Object.entries(this.bindings)) {
       for (const code of codes) {

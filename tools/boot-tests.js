@@ -162,6 +162,22 @@ async function sectionB() {
   heading('B. the boot refuses the things a URL can say');
   /* ⚠ THE QUERY STRING IS UNTRUSTED INPUT. It is the one part of this build a stranger can
    * set by sending somebody a link, and `?incident=` is read straight into a content load. */
+  /**
+   * ⚠ THIS SUITE IS THE ONLY PLACE THE POLICY IS ACTUALLY IN FORCE.
+   *
+   * `tools/smoketest.ps1` strips the Content-Security-Policy from its scratch page — it
+   * must, because `platform-tests.js` drives `sw.js` through `new Function` — so every
+   * other suite in this repo runs with the policy off. These iframes load `/?incident=...`,
+   * the real `index.html`, and the nine boots above therefore happened UNDER it: nine
+   * module graphs, three.js, PeerJS, an audio graph and a WebGL context, all inside
+   * `script-src 'self'`. If the policy ever forbids something the game needs, A1 goes red
+   * here and nowhere else.
+   */
+  const html = await (await fetch('/index.html', { cache: 'no-store' })).text();
+  const csp = (html.match(/<meta\s+http-equiv\s*=\s*"Content-Security-Policy"\s+content\s*=\s*"([^"]*)"/i) || [])[1] || '';
+  ok('B0 and every one of them booted with the real policy in force, which is what these iframes are for',
+    /script-src\s+'self'/.test(csp) && !/unsafe-eval/.test(csp), csp.slice(0, 80));
+
   const junk = await boot('no-such-incident');
   note(`  a made-up incident: ${junk.ok ? `booted as ${junk.anomaly}` : junk.why}`);
   ok('B1 an incident that does not exist does not boot a random one', !junk.ok);

@@ -964,7 +964,23 @@ async function sectionK() {
   const html = await (await fetch(new URL('../index.html', import.meta.url).href, { cache: 'no-store' })).text();
   ok('K9 index.html loads three.js from the vendored copy', /assets\/lib\/r128\/three\.min\.js/.test(html));
   ok('K10 and peerjs from the vendored copy', /assets\/lib\/peerjs-1\.5\.4\/peerjs\.min\.js/.test(html));
-  ok('K11 and neither from a CDN', !/https?:\/\/[^"']*(three|peerjs)/.test(html));
+  /* ⚠ THE TAGS, NOT THE DOCUMENT. This read the whole file, which was right until the page
+   * grew a Content-Security-Policy — whose `connect-src` names `0.peerjs.com` as an
+   * ALLOW-LIST, a sentence about which host the page may talk to. A restriction is not a
+   * reach, and a check that fails on one teaches the reader to delete the restriction. */
+  const tags = (html.match(/<(script|link)\b[^>]*>/gi) || []).join('\n');
+  ok('K11 and neither from a CDN', !/https?:\/\/[^"']*(three|peerjs)/.test(tags));
+
+  /* And having drawn that distinction, hold the policy to it: a CSP naming a host is only
+   * harmless while it is a policy. These fail if it stops being one. */
+  const csp = (html.match(/<meta\s+http-equiv\s*=\s*"Content-Security-Policy"\s+content\s*=\s*"([^"]*)"/i) || [])[1] || '';
+  ok('K11a the page carries a Content-Security-Policy', csp.length > 0);
+  ok('K11b whose script-src is `self` alone — no CDN, no inline, and no `unsafe-eval`',
+    /script-src\s+'self'\s*;/.test(csp) && !/unsafe-eval/.test(csp), csp.slice(0, 90));
+  ok('K11c and which forbids plugins and retargeting every relative URL on the page',
+    /object-src\s+'none'/.test(csp) && /base-uri\s+'none'/.test(csp));
+  ok('K11d and names the broker in `connect-src`, because `default-src \'self\'` alone would refuse the session',
+    /connect-src[^;]*0\.peerjs\.com/.test(csp));
 
   /**
    * ⚠ `new THREE.X ? a : b` IS NOT A FEATURE TEST — `new` binds tighter than `?:`, so it
@@ -5677,7 +5693,7 @@ async function sectionAN(content) {
   g.selectSlot('p1', (imagerSlot + 1) % SLOTS.length);
   g.selectSlot('p1', imagerSlot);
   g.toggleImager('p1');
-  g.setClaim(CLAIMS[0].id, 'supported');
+  g.setClaim(CLAIMS[0].id, 'believed');
   g.setClaim(CLAIMS[0].id, 'excluded');
   const card = { target: 'a', state: 'b', trigger: 'c', transfer: 'd', maintained: [], abort: 'e' };
   g.commitProcedure(card);
@@ -5770,7 +5786,7 @@ async function sectionAN(content) {
   const qSlot = SLOTS.findIndex((s) => q.slots.get(s.id) === 'thermal-imager');
   if (qSlot >= 0) { g3.selectSlot(joiner.id, (qSlot + 1) % SLOTS.length); g3.selectSlot(joiner.id, qSlot); }
   g3.toggleImager(joiner.id);
-  g3.setClaim(CLAIMS[0].id, 'supported');
+  g3.setClaim(CLAIMS[0].id, 'believed');
   g3.takeFromCache('floodlight-tripod', joiner.id);
   const qTri = SLOTS.findIndex((s) => q.slots.get(s.id) === 'floodlight-tripod');
   if (qTri >= 0) g3.selectSlot(joiner.id, qTri);

@@ -454,6 +454,12 @@ export class Game {
    * before the debrief (§7.3) and neither does anything listening to it.
    */
   setClaim(claimId, state, playerId = 'p1') {
+    /* ⚠ THE STATE IS A CLOSED SET AND NOTHING CHECKED IT. `Ledger.setClaim` validates the
+     * claim ID — it must already be on the board — and then stores whatever the second
+     * argument is. So the board could hold an object, and §7.4's whole design is that a
+     * claim carries a WORD rather than a number. Anything that is not one of the three
+     * reads as "no position taken", which is what an unrecognised third state means. */
+    if (state !== 'believed' && state !== 'excluded') state = null;
     const before = this.ledger.claimState.get(claimId) || null;
     if (!this.ledger.setClaim(claimId, state)) return false;
     if (before !== (state || null)) {
@@ -1463,7 +1469,28 @@ export class Game {
      * rather than another commit. It is one of the few numbers that says whether the
      * hypothesis loop is doing anything. */
     const revised = !!this.mission.procedure;
-    this.mission.procedure = { ...card, committedMs: this.clock.simTimeMs };
+    /**
+     * ⚠ THIS WAS `{ ...card }`, AND THE CARD IS AN OBJECT SOMEBODY ELSE BUILT.
+     *
+     * Not prototype pollution — object spread uses CreateDataProperty, so a `__proto__` key
+     * off `JSON.parse` becomes an own property and never reaches the prototype, and that
+     * reading was checked and is wrong. What it IS: an unbounded object of unknown shape,
+     * stored on the mission and printed on the tablet, where the five fields anybody reads
+     * are the five below.
+     *
+     * The net layer already rebuilds a remote card from this same whitelist. That left the
+     * asymmetry worth closing: the guard belonged where the card is STORED, not on one of
+     * the two paths that reach it, because the other path is a local UI that can be as
+     * wrong as any other caller.
+     */
+    const c = card && typeof card === 'object' && !Array.isArray(card) ? card : {};
+    const line = (v) => (typeof v === 'string' ? v.slice(0, 160) : '');
+    this.mission.procedure = {
+      target: line(c.target), state: line(c.state), trigger: line(c.trigger),
+      transfer: line(c.transfer), abort: line(c.abort),
+      maintained: (Array.isArray(c.maintained) ? c.maintained : []).slice(0, 12).map(line).filter(Boolean),
+      committedMs: this.clock.simTimeMs,
+    };
     this.mission.procedureCommittedMs = this.clock.simTimeMs;
     this.mission.setPhase(PHASE.PROCEDURE_COMMITTED, this.clock.simTimeMs);
     this.bus.emit(EVENTS.PHASE_CHANGED, { phase: this.mission.phase }, this.clock.simTimeMs);

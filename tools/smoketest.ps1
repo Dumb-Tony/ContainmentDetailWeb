@@ -52,6 +52,23 @@ $html = $html -replace '</body>', $inject
 # can silently run the wrong game's page and report its results as ours.
 $stamp = "CDTEST-" + [System.Guid]::NewGuid().ToString("N")
 $html = $html -replace '</head>', "<!--$stamp--></head>"
+
+# ⚠ THE SCRATCH PAGE DROPS THE CONTENT-SECURITY-POLICY, AND HERE IS WHY THAT IS NOT A HOLE.
+#
+# This harness works by copying index.html, which is the whole reason a suite runs against
+# the real page rather than a fixture. It also means every suite inherits the PRODUCTION
+# policy — and `tools/platform-tests.js` exercises `sw.js` by fetching it as text and
+# evaluating it with `new Function`, deliberately and at length in its own header, because
+# the real CacheStorage is unusable under virtual time. `script-src 'self'` forbids that, so
+# adding a CSP to the product took out six sections of a suite that tests something else.
+#
+# Loosening the policy to keep a test alive would be the wrong way round. So the harness page
+# is not the product page and does not pretend to be, and the policy is covered where the
+# PRODUCT is loaded instead: `tools/boot-tests.js` boots `/?incident=...` in real iframes —
+# the actual index.html, CSP and all, nine times — and m0's K11a–K11d assert the policy is
+# present and still strict. A suite that needed `unsafe-eval` cannot quietly grant it.
+$html = [regex]::Replace($html, '(?is)<meta\s+http-equiv\s*=\s*"Content-Security-Policy"[^>]*>',
+  '<!-- CSP removed for the harness page; see tools/smoketest.ps1 and tools/boot-tests.js -->')
 Set-Content -Path $scratch -Value $html -Encoding utf8
 
 . "$root\tools\_serve-mine.ps1"

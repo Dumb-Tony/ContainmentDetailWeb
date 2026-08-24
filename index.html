@@ -3,6 +3,40 @@
 <head>
   <meta name="cd-build" content="9ac1170 2026-08-23T15:25:41-04:00">
 <meta charset="utf-8">
+
+<!-- The second line of defence, behind every escape in src/ui.
+     ================================================================================
+     This game's threat model is one sentence: ANOTHER BROWSER SENDS YOU DATA AND YOU
+     RENDER IT. A hostile host reaches every client through the debrief, the phase row and
+     the objective line; a hostile client reaches the host through a callsign. All of those
+     are escaped now, and an escape is a thing a person has to remember at every site. This
+     is the thing that does not need remembering.
+
+     It is a meta tag because GitHub Pages serves static files and cannot set a header. That
+     costs `frame-ancestors`, which is header-only and is therefore deliberately absent
+     rather than written down and silently ignored — `tools/boot-tests.js` loads this page in
+     iframes on purpose, so it would be wrong here anyway.
+
+     Every directive was measured against the shipped tree before it went in:
+
+       script-src 'self'      no inline <script> in this file, no on* attribute anywhere in
+                              src/ui, and NEITHER VENDORED LIBRARY CONTAINS `eval(`,
+                              `new Function` OR `Function(` — counted, all three, both files,
+                              which is what makes omitting 'unsafe-eval' safe rather than
+                              hopeful
+       style-src 'unsafe-inline'  one <style> block below, and four UI modules build
+                              `style="..."` attributes. This is the directive the policy does
+                              NOT get to be strict about, and saying so is better than
+                              pretending otherwise
+       connect-src            the PeerJS broker, both schemes. ICE is not governed by
+                              connect-src in any current browser, so the STUN and TURN hosts
+                              are not listed — and multiplayer was re-verified on the live
+                              site after this landed rather than assumed
+       object-src 'none'      there are no plugins and there will not be
+       base-uri 'none'        nothing may retarget every relative URL on the page
+       form-action 'none'     there is no form in this build -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://0.peerjs.com wss://0.peerjs.com; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Containment Detail — cold storage, level 2</title>
 <meta name="description" content="A cooperative-design containment operation: learn the anomaly's rules, build a field procedure, establish custody. Browser build.">
