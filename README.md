@@ -388,7 +388,9 @@ compatible if the *primary* channel is the one that needs neither, so what exist
 ping-and-phrase wheel on `Z`: ten phrases the loop actually requires — *it is here*, *hold,
 ## The lobby, and what it is honest about
 
-Verified on the deployed build, 2026-08-23, in two browsers against the real broker: the
+Verified on the deployed build, 2026-08-23, in two browsers against the real broker — and
+verified again after the page grew a Content-Security-Policy, because a `connect-src` that
+gets the broker wrong breaks the session and nothing else: the
 host opens room **A88QJ** and reports *"room A88QJ — waiting"*; a second machine joins by
 code, is issued seat **p2**, and its typed callsign appears on the host's roster as
 *"Vasquez joined"*; the client then holds the host's authoritative positions for both
@@ -488,6 +490,25 @@ powershell -ExecutionPolicy Bypass -File tools/serve.ps1
 It scans ports 8401–8410 and prints the one it got. Read that line — several projects on
 this machine run the same server.
 
+## The policy, and what it is allowed to be strict about
+
+The page carries a Content-Security-Policy in a meta tag -- Pages serves static files and
+cannot set a header, which costs `frame-ancestors` and is why that directive is absent rather
+than written down and ignored. `script-src` is `self` alone: no CDN, no inline, and **no**
+`unsafe-eval`, which is safe rather than hopeful because neither vendored library contains
+`eval(`, `new Function` or `Function(` -- counted, all three patterns, both files. The one
+directive it does not get to be strict about is `style-src`, which needs `unsafe-inline` for
+one stylesheet and four UI modules that build `style="..."`; saying so beats pretending
+otherwise.
+
+It broke three things on the way in and all three were right to break. A suite that drives
+`sw.js` through `new Function` died, because the harness works by copying this page -- so the
+harness page drops the policy and `boot-tests.js` became the only place it is in force, which
+is the honest arrangement rather than loosening a product policy to keep a test alive. And
+two hygiene checks flagged `0.peerjs.com` appearing in `index.html`, correctly, until they
+were taught the distinction the policy turns on: **a host in a `connect-src` allow-list is a
+restriction, not a reach.** A check that fails on one teaches the reader to delete it.
+
 ## Offline, without ever serving a stale build
 
 The deployed page installs and plays with no network. That is normally in tension with
@@ -539,7 +560,7 @@ the next, a suite that hangs cannot take the others with it, and a suite that pr
 result block at all counts as a **failure** rather than as zero assertions and no problem.
 A crashed page reporting green is the failure mode the whole harness exists to avoid.
 
-**1,959 assertions across eleven suites, all headless.** The eleven are the milestone-0 suite
+**1,964 assertions across eleven suites, all headless.** The eleven are the milestone-0 suite
 (everything true of *every* package), the content suite (the numbers that make one incident
 the incident it is), the net suite, the tablet suite, and six that arrived with the
 milestones they check: licensing and rollback, localization, onboarding, telemetry,
