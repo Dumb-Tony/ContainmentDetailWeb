@@ -1000,7 +1000,18 @@
       "Enter": "Enter",
       "Backspace": "Backspace",
       "CapsLock": "Caps",
-      "numpad": "Num {key}"
+      "numpad": "Num {key}",
+      "pad": {
+        "_note": "⚠ THE IDS ARE ONE VENDOR'S SILKSCREEN AND THESE WORDS ARE NOT. `PadA` and `PadLB` are Xbox legends; a PlayStation pad has no A button and no LB, and a DualSense player told to press PadLB is being sent to a control that is not on the device in their hands. The ids stay — they are compared against and written into a save — and the labels come from the layout the indices actually belong to. The W3C Standard Gamepad names POSITIONS: index 0 is the bottom face button on every pad ever made, whether it says A, ✕ or B. So these say where the button IS, which is true everywhere, rather than what somebody printed on it.",
+        "PadA": "Face button, bottom", "PadB": "Face button, right",
+        "PadX": "Face button, left", "PadY": "Face button, top",
+        "PadLB": "Left bumper", "PadRB": "Right bumper",
+        "PadLT": "Left trigger", "PadRT": "Right trigger",
+        "PadBack": "Select", "PadStart": "Start",
+        "PadLS": "Left stick, pressed", "PadRS": "Right stick, pressed",
+        "PadUp": "D-pad up", "PadDown": "D-pad down",
+        "PadLeft": "D-pad left", "PadRight": "D-pad right"
+      }
     },
     "flash": {
       "groupReset": "{group} reset.",

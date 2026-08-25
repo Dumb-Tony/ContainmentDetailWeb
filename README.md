@@ -429,6 +429,24 @@ quadratic; **454 kbit/s of host uplink with a full squad** at twelve snapshots a
 the worst message is 11.6 seconds late. The limit on squad size is a household uplink, not a
 constant.
 
+Those come from a ten-second run, and a burst figure is a claim about a burst. So a full
+squad is now also held open for **four simulated minutes** — five seats, every one sending
+intent at 60 Hz and a discrete action every two seconds — and sampled every thirty seconds.
+The host's uplink reads 51.74 kB/s in the first window and 51.54 in the last, the squad's
+11.70 against 11.71, message rates 50/s down and 242/s up throughout. **423 kbit/s
+sustained, inside the same band the ten-second run asserts**, which is the only thing that
+makes the ten-second run worth quoting.
+
+Four structures were larger at the end than at the start, all of them things a four-minute
+mission is supposed to accumulate, and none past 512 entries. And the check nobody had run
+in the other direction: **four minutes of ordinary play by four operatives is rate-limited
+exactly zero times.** A limiter is normally tested by flooding it, which proves it stops an
+attacker and says nothing about whether it stops a player — and a defence that costs the
+people it defends is a bug wearing a security argument. One seat flooding drains its own
+bucket to 0.2 tokens while the other three sit at 28.4 of 30, because the bucket is keyed on
+the seat; three seconds of not flooding buys it back to 29.0, so a flood is a pause and not
+a ban.
+
 leave that alone*, *something to log here*, *set up here*, *bring kit here*, *I have this
 one*, *in position*, *on me*, *keep this in view*, *I am in trouble*. No greetings, no
 emotes. A squad with no microphones between them can run a whole operation on it, and a
@@ -560,11 +578,11 @@ the next, a suite that hangs cannot take the others with it, and a suite that pr
 result block at all counts as a **failure** rather than as zero assertions and no problem.
 A crashed page reporting green is the failure mode the whole harness exists to avoid.
 
-**1,964 assertions across eleven suites, all headless.** The eleven are the milestone-0 suite
+**1,983 assertions across twelve suites, all headless.** The twelve are the milestone-0 suite
 (everything true of *every* package), the content suite (the numbers that make one incident
 the incident it is), the net suite, the tablet suite, and six that arrived with the
 milestones they check: licensing and rollback, localization, onboarding, telemetry,
-platform, and security — plus one that does nothing but start the game.
+platform, security and load — plus one that does nothing but start the game.
 
 That last one exists because nothing else did. Ten suites and 1,946 assertions all built a
 world the same way — `loadContent()`, then `new Game(...)` — which is the right shape for

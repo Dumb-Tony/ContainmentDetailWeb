@@ -769,6 +769,26 @@ export function keyLabel(code) {
   if (!code) return msg('settings.key.none');
   if (KEY_GLYPHS[code]) return KEY_GLYPHS[code];
   if (NAMED_KEYS.includes(code)) return msg(`settings.key.${code}`);
+  /**
+   * ⚠ THE PAD CODES PRINTED THEMSELVES, AND THEY ARE ONE VENDOR'S SILKSCREEN.
+   *
+   * Sixteen of them — `PadA`, `PadLB`, `PadRT`, `PadBack` — fell through to `return code`
+   * along with `IntlBackslash`, and the argument for that fallback ("a player who rebound
+   * to IntlBackslash should see IntlBackslash, not a guess") does not carry here. A key
+   * code IS what is printed on the key. **A PlayStation pad has no A button and no LB**,
+   * and a DualSense player reading "Sprint · PadLB" is being told to press something that
+   * is not on the device in their hands.
+   *
+   * The ids stay as they are: they are compared against, they are written into a save, and
+   * they are the same id-and-label split the palette presets above make. What changes is
+   * the word — and the word comes from the layout these indices actually belong to. The
+   * W3C Standard Gamepad names POSITIONS, not letters: index 0 is the bottom face button on
+   * every pad ever made, whether that button says A, ✕ or B. So the labels say where the
+   * button is, which is true everywhere, instead of what one manufacturer wrote on it.
+   *
+   * `settings.key.pad.<code>` and not a table here, because these are WORDS.
+   */
+  if (code.startsWith('Pad')) return msg(`settings.key.pad.${code}`);
   if (code.startsWith('Key')) return code.slice(3);
   if (code.startsWith('Digit')) return code.slice(5);
   if (code.startsWith('Numpad')) return msg('settings.key.numpad', { key: code.slice(6) });

@@ -39,7 +39,7 @@ import {
   Progression, loadSite, UPGRADES, SIDEGRADE_AXES, migrateWithReport, defaultProfile,
   earningsFor, PROGRESSION_VERSION,
 } from '../src/sim/progression.js';
-import { Input } from '../src/core/input.js';
+import { Input, PAD_BUTTONS } from '../src/core/input.js';
 import { varyContent, WEATHER, TIMES } from '../src/sim/variation.js';
 
 /* Files whose user-facing strings have been extracted. A file joins this list when it is
@@ -1007,6 +1007,33 @@ async function sectionH() {
   const underDefault = CAPTIONS.CONTACT.text;
   ok('H2 and the same row answers differently after a locale change, so it is a live lookup',
     underPseudo !== underDefault && /[áéîöû]/.test(underPseudo), `${underPseudo} vs ${underDefault}`);
+
+  /**
+   * ⚠ THE SIXTEEN PAD CODES WERE THE LAST WORDS ON THE SCREEN THAT WERE NOT WORDS.
+   *
+   * `keyLabel` fell through to `return code` for them, alongside `IntlBackslash` — and the
+   * argument for that fallback does not carry here. A KEY code is what is printed on the
+   * key; a PAD code is `PadA`, which is printed on exactly one manufacturer's pad. The
+   * labels come from the W3C Standard Gamepad's positions instead, because index 0 is the
+   * bottom face button whether the button says A, ✕ or B.
+   *
+   * Asserted through the message table rather than against a list of English words: a
+   * label that reads back as its own code has lost its entry, and one that survives the
+   * pseudolocale unaccented never had one.
+   */
+  const padPlain = [];
+  for (const code of PAD_BUTTONS) if (keyLabel(code) === code) padPlain.push(code);
+  eq(`H2a every pad control has a word${padPlain.length ? ` — ${padPlain.join(', ')}` : ''}`, padPlain.length, 0);
+  ok('H2b and not one of them is a vendor legend — the layout names positions, and a DualSense has no A button',
+    !PAD_BUTTONS.some((c) => /\b(A|B|X|Y|LB|RB|LT|RT)\b/.test(keyLabel(c))),
+    PAD_BUTTONS.map(keyLabel).slice(0, 4).join(' · '));
+
+  await loadLocale('pseudo');
+  const padUnaccented = PAD_BUTTONS.filter((c) => !accented(keyLabel(c)));
+  await loadLocale(DEFAULT_LOCALE);
+  eq(`H2c and every one of them goes through the table${padUnaccented.length ? ` — ${padUnaccented.join(', ')}` : ''}`,
+    padUnaccented.length, 0);
+  note(`  the pad reads: ${PAD_BUTTONS.map(keyLabel).join(' · ')}`);
   emit();
 }
 
