@@ -182,6 +182,7 @@ const PRECACHE = [
   'src/ui/commswheel.js',
   'src/ui/hud.js',
   'src/ui/lobby.js',
+  'src/ui/touch.js',
   'src/ui/panels.js',
   'src/ui/settings.js',
 
@@ -203,6 +204,7 @@ const PRECACHE = [
   'content/incidents/ashlar-flat-lodger.json',
   'content/incidents/ashlar-gallery-draught.json',
   'content/incidents/blackthorn-caller.json',
+  'content/incidents/blackthorn-generator.json',
   'content/incidents/cold-storage-draught.json',
   'content/incidents/cold-storage-figure.json',
   'content/incidents/cold-storage-passenger.json',
