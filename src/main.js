@@ -529,15 +529,20 @@ async function boot() {
   if (joinCode && /^[A-Z0-9]{5}$/.test(joinCode)) {
     lobby.show(null, { joiner: true });
     lobby.autoJoin(joinCode);
-  } else if (lobby.resume) {
-    /* This tab dropped out of a live session - the blob is sessionStorage, so it only
-     * exists after a reload of THAT session. Open the lobby as a joiner: 'Rejoin as
-     * <callsign>' is the primary action; Forget dismisses it. */
-    lobby.show(null, { joiner: true });
   } else if (bootFlow === 'solo') {
     panels.showLoadout();
   } else if (bootFlow === 'squad') {
     lobby.show(currentOp || { id: scenario || incidentId, name: content.incident.displayName || incidentId, incident: incidentId });
+  } else if (lobby.resume) {
+    /* ⚠ AFTER the flow branches, not before them. flow= is EXPLICIT intent carried by the
+     * click that navigated here; the resume blob is PASSIVE state from an earlier session
+     * in this tab. A player who chose Deploy solo while holding a stale squad blob must get
+     * their solo loadout, not a hijack into the lobby. Passive state only claims the plain
+     * boot. */
+    /* This tab dropped out of a live session - the blob is sessionStorage, so it only
+     * exists after a reload of THAT session. Open the lobby as a joiner: 'Rejoin as
+     * <callsign>' is the primary action; Forget dismisses it. */
+    lobby.show(null, { joiner: true });
   } else {
     base.show();
   }
