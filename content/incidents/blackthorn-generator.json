@@ -1,0 +1,52 @@
+{
+  "id": "blackthorn-generator",
+  "contentRevision": "0.1.0-web",
+  "licensingRecordId": null,
+  "_licensingNote": "Original, not an SCP. The premise, prose, placements and variation here were authored for this build; the anomaly and map it binds carry their own records. licensingRecordId is null because there is no third-party material to record, and this note is what makes that null mean 'checked' rather than 'never asked'. See content/provenance.json.",
+
+  "displayName": "Blackthorn reserve, the generator",
+  "anomaly": "coldharbour-passenger",
+  "map": "blackthorn-reserve",
+  "difficulty": "field",
+
+  "_note": "THE SECOND OPERATION ON THE RESERVE, AND THE ONE THAT PUNISHES THE FIRST ONE'S LESSON. §15.2 says the building is the constant and the incident is the variable, and cold storage level 2 proves it five times over. This is the same argument on the outdoor floor — and it is aimed at a specific squad: the one that contained the caller here in July and left as policy the one sentence that operation taught. NO POWERED SOUND SOURCES ON THE RESERVE FLOOR. That order is pinned inside the hut, it is signed, it has been obeyed for months — and this incident cannot be finished without breaking it, because the passenger is dislodged by ATTENTION and rehoused by WARMTH, and the only portable warmth the squad owns is the loud kind. A heater is a beacon on the caller's floor and bait on this one. The squad that arrives having learned to switch everything off and stay quiet has arrived with the exact reflex this thing is arranged against.\n\nAND THE HOST IS THE SITE'S OWN HEART. On level 2 the passenger sat in a dead heater on a mothballed floor; nothing depended on its host. Here it sits in the generator that runs the mast and the compound lights, eleven years without a break — the hours book is the fiction's own statement of `it-does-not-travel`. The squad's decision with teeth is not where to put the case, it is WHEN TO ACCEPT DARKNESS: unhousing it from a running set means standing in a forest compound at night with the lights sagging, watching a thing you have just made homeless choose the warmest object left. Be sure the warmest object left is the one you brought.\n\nWhy the passenger transfers honestly: every one of its four rules is about attention, warmth, marks and holds — none is about aisles or chillers. The anomaly file carries a reserve evidence set for the same four rules (service-week-log through fuel-ledger), authored per the draught precedent: one anomaly, several floors, each incident placing the subset that is true of its ground.",
+
+  "anomalySpawn": [-11.6, -8.6],
+  "_spawnNote": "Mid compound-yard, on the generator skid the fiction puts it in. The spare set two metres away is the negative control the evidence reads.",
+
+  "variation": {
+    "origins": [[-12, -18], [20, -17], [20.6, 17], [-18.9, 5.4]],
+    "routes": ["door-culvert-gate", "door-station"],
+    "routesShutMax": 1,
+    "faults": ["circuit-ridge"],
+    "faultsMax": 1,
+    "droppable": ["spare-set-cold", "fuel-ledger", "wildlife-camera"],
+    "dropMax": 1,
+    "civilians": [{ "id": "rangers-habit", "positions": [[6.4, -17.4], [-9.6, -20.2]] }]
+  },
+  "_variationNote": "Same variation grammar as the caller's package — same doors, same faultable circuit — because §15.2 cuts both ways: a squad's knowledge of THIS COMPOUND (which gate jams, which circuit browns out) must transfer even while their knowledge of the thing does not. Dropping `spare-set-cold` leaves `it-does-not-travel` one path, which the completability rule accepts and the emptying rule would refuse.",
+
+  "briefing": {
+    "headline": "The reserve generator will not take a service",
+    "report": "Blackthorn reserve, closed since July. The compound generator has run continuously for eleven years feeding the mast and the yard lights. At winter service the contractor craned it out; by morning a frost ring had formed on the engine block of the SPARE standing in for it, and the old set — cold, drained, on the apron — was warm to the hand. The crew put it back, logged the swap as complete, and called the region. Fuel consumption has crept four per cent a month for a year. Nobody has watched the set run in a long time: reserve staff check it by ear from the hut door, and none of them can tell you when that habit started.",
+    "known": [
+      "The set runs rough when watched, and settles when not. A fence camera has recorded the two-second lag forty-one times.",
+      "One glove on the filler cap, palm burnt through, back untouched. Refuelling is the only job that puts a palm on the set.",
+      "The July containment's standing order is still pinned in the hut: no powered sound sources on the reserve floor. Nothing in that file concerns the generator."
+    ]
+  },
+
+  "evidenceSources": [
+    { "evidenceId": "rangers-habit", "at": [6.4, -17.4], "label": "The duty ranger, at the station office", "prompt": "Take a statement", "requiresEquipment": [] },
+    { "evidenceId": "caller-file", "at": [8.8, -14.2], "label": "The July file, pinned inside the hut", "prompt": "Read the standing order", "requiresEquipment": [] },
+    { "evidenceId": "hut-handlamp", "at": [12.6, -17.0], "label": "The retired handlamp, on its hook", "prompt": "Check the handlamp", "requiresEquipment": [] },
+    { "evidenceId": "service-week-log", "at": [-15.9, -11.0], "label": "The generator hours book, workshop apron", "prompt": "Read the hours book", "requiresEquipment": [] },
+    { "evidenceId": "skid-thaw-ring", "at": [-12.6, -7.0], "label": "A double ring in the needle litter", "prompt": "Examine the ring", "requiresEquipment": [] },
+    { "evidenceId": "spare-set-cold", "at": [-9.6, -6.2], "label": "The spare set, two metres off the runner", "prompt": "Take a thermal reading", "requiresEquipment": ["thermal-imager"] },
+    { "evidenceId": "block-heat-map", "at": [-10.4, -8.0], "label": "The running set, cowling side", "prompt": "Take a thermal reading", "requiresEquipment": ["thermal-imager"] },
+    { "evidenceId": "wildlife-camera", "at": [-4.6, -9.0], "label": "The wildlife camera on the yard fence", "prompt": "Pull the card", "requiresEquipment": [] },
+    { "evidenceId": "filler-glove", "at": [-18.3, -5.2], "label": "A glove on the filler cap, fuel bay", "prompt": "Examine the glove", "requiresEquipment": [] },
+    { "evidenceId": "fuel-ledger", "at": [-16.8, -4.6], "label": "The fuel ledger, fuel bay shelf", "prompt": "Reconcile the ledger", "requiresEquipment": [] }
+  ],
+  "_sourcesNote": "Ten placed. The station cluster (ranger, file, handlamp) starts the investigation before anybody crosses the meadow, the same shape as harrowbank's gate statements; the compound cluster is where the thing is, so the confirmed instrument reads cost a walk toward it; the fuel bay pair sits one room beyond, so the ledger that explains the drain is read standing next to the machine doing the draining. Every position swept for standability at the 0.34m operative radius against statics, crates and closed doors; the closest pair is 1.63m apart and every other pair is over 2.3m."
+}

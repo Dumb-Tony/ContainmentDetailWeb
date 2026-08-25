@@ -322,6 +322,130 @@
       "isFalseLead": true,
       "_note": "THE FALSE LEAD THAT GETS TAKEN FIRST, and it is aimed at a specific squad: one that has run this floor three times and knows the imager finds what is cold. It costs an imager, a walk and about four minutes, and every word of it is true."
     }
+,
+    {
+      "id": "service-week-log",
+      "type": "documentary",
+      "dimension": "constraint",
+      "displayName": "The generator hours book",
+      "rawObservation": "The hours book from the compound hut. The set has run continuously for eleven years less one week - the winter service, when it was craned out and a frost ring formed on the ENGINE BLOCK of the spare that stood in, gone by noon the day the old set went back. Whoever kept the book has underlined the entry twice and written nothing beside it.",
+      "reliability": "confirmed",
+      "revealsRule": "it-does-not-travel",
+      "requiredEquipment": [],
+      "channel": "document",
+      "isFalseLead": false
+    },
+    {
+      "id": "spare-set-cold",
+      "type": "instrumental",
+      "dimension": "constraint",
+      "displayName": "The spare set, two metres away",
+      "rawObservation": "Thermal sweep of the generator skid. The running set reads warm along its whole length. The spare set on the same rail, two metres away, reads air temperature exactly - no residual anywhere on it, bird fouling on the cowling undisturbed. Whatever favours the one has never once crossed the gap to the other.",
+      "reliability": "confirmed",
+      "revealsRule": "it-does-not-travel",
+      "requiredEquipment": [
+        "thermal-imager"
+      ],
+      "channel": "instrument",
+      "isFalseLead": false
+    },
+    {
+      "id": "wildlife-camera",
+      "type": "instrumental",
+      "dimension": "trigger",
+      "displayName": "The wildlife camera on the yard fence",
+      "rawObservation": "A fixed camera strapped to the compound fence, thermal-capable, nine nights on the card. In every frame that holds a person FACING the running set, the exhaust temperature falls within about two seconds, and it recovers the moment they turn away. Deer in frame change nothing. The camera has recorded the same two-second fact forty-one times.",
+      "reliability": "confirmed",
+      "revealsRule": "attention-dislodges",
+      "requiredEquipment": [],
+      "channel": "instrument",
+      "isFalseLead": false
+    },
+    {
+      "id": "rangers-habit",
+      "type": "testimonial",
+      "dimension": "trigger",
+      "displayName": "The duty ranger",
+      "rawObservation": "The duty ranger. She states the set runs rough if you stand and watch it, and has for years, and that the reserve staff long ago stopped watching it - you check it by ear from the hut door and you do not go and look unless the note changes. Asked when that habit started, she checks the hours book and cannot find a time before it.",
+      "reliability": "probable",
+      "revealsRule": "attention-dislodges",
+      "requiredEquipment": [],
+      "channel": "witness",
+      "isFalseLead": false
+    },
+    {
+      "id": "skid-thaw-ring",
+      "type": "environmental",
+      "dimension": "capability",
+      "displayName": "The ring round the skid",
+      "rawObservation": "A ring of thawed and refrozen needle litter around the generator skid, one ring inside another with a dry band between, the ripple in both set outward from the machine. The same double ring, in forest litter instead of bay concrete, that the level-2 file photographs around a dead heater forty miles from here.",
+      "reliability": "confirmed",
+      "revealsRule": "it-leaves-a-mark",
+      "requiredEquipment": [],
+      "channel": "visual",
+      "isFalseLead": false
+    },
+    {
+      "id": "filler-glove",
+      "type": "environmental",
+      "dimension": "capability",
+      "displayName": "A glove on the filler cap",
+      "rawObservation": "A fuelling glove left on the filler cap, right hand, palm burnt through and the back of it untouched. Refuelling is the one job on this compound that puts a bare palm flat on the set while it is warm, and the fuel log says the last fill was done fast and finished early.",
+      "reliability": "confirmed",
+      "revealsRule": "takes-hold",
+      "requiredEquipment": [],
+      "channel": "visual",
+      "isFalseLead": false
+    },
+    {
+      "id": "hut-handlamp",
+      "type": "instrumental",
+      "dimension": "capability",
+      "displayName": "The handlamp in the hut",
+      "rawObservation": "The compound handlamp, retired to a hook in the hut. Cells flat, lamp glass cracked from the inside, and the charge log taped to its stock: died in forty minutes on a fresh cell, the one night it was left standing lit on the generator skid. The log keeper has written cell fault, and then, later, in different ink, a question mark.",
+      "reliability": "confirmed",
+      "revealsRule": "takes-hold",
+      "requiredEquipment": [],
+      "channel": "instrument",
+      "isFalseLead": false
+    },
+    {
+      "id": "caller-file",
+      "type": "documentary",
+      "dimension": "anchor",
+      "displayName": "The July file, pinned inside the hut",
+      "rawObservation": "The closed file from the July containment on this ground, and under it the standing order that operation left behind, pinned at eye height: NO POWERED SOUND SOURCES ON THE RESERVE FLOOR. It is signed by the recovering ranger and it has been obeyed to the letter for months. Nothing in the file concerns the generator.",
+      "reliability": "confirmed",
+      "requiredEquipment": [],
+      "channel": "document",
+      "isFalseLead": false
+    },
+    {
+      "id": "fuel-ledger",
+      "type": "documentary",
+      "dimension": "behaviour",
+      "displayName": "The fuel ledger",
+      "rawObservation": "Twelve months of fuel consumption for one generator, creeping up a steady four per cent a month with no leak found, no load added, and no service fault recorded. The auditor has reconciled it three times and written meter? against the total. The meter has been changed once already. The creep is in the new meter too.",
+      "reliability": "confirmed",
+      "requiredEquipment": [],
+      "channel": "document",
+      "isFalseLead": false
+    }
+,
+    {
+      "id": "block-heat-map",
+      "type": "instrumental",
+      "dimension": "capability",
+      "displayName": "The warm patch on the cowling",
+      "rawObservation": "Thermal of the running set from three metres. The engine reads as an engine - manifold, exhaust, alternator, all where the manual puts them - and then one broad warm patch on the cowling sheet metal, a hand-span across, where there is nothing mechanical behind the panel at all. It has edges. Engine heat does not have edges.",
+      "reliability": "confirmed",
+      "revealsRule": "it-leaves-a-mark",
+      "requiredEquipment": [
+        "thermal-imager"
+      ],
+      "channel": "instrument",
+      "isFalseLead": false
+    }
   ],
 
   "_claimsNote": "The board for a thing that does not travel, is dislodged by being looked at, and has no signature in any band. The old shared board offered this floor the draught's opinions, which on this incident are four separate ways to get somebody burnt.\n\nFour required rules, four claims, each carrying its own pair. The fifth true claim is the clock, and it is the one the operation is actually lost to: the case is a cell within five metres of the thing, and the case is what runs out. Its own pair is two probables, so the claim also names the fault printer — the luminaire two metres over the heater tripped thermal at 06:19 and did not clear until 10:52, which is a powered fitting held in fault for four and a half hours.\n\nThe two false claims are the two things a squad three incidents into this building already believes. The heater failing is a date, not a cause. And the chiller return is three degrees under the room because it is a drained line in a cold building, which is exactly what a cold mass would look like to somebody sweeping for one.",
@@ -332,35 +456,35 @@
       "dimension": "trigger",
       "text": "It has never crossed a room on its own. It is on this floor because a man carried it here.",
       "truth": true,
-      "supportedBy": ["fault-printer", "the-contractor"]
+      "supportedBy": ["fault-printer", "the-contractor", "service-week-log", "spare-set-cold"]
     },
     {
       "id": "claim-attention-dislodges",
       "dimension": "constraint",
       "text": "Two seconds of anyone looking at it and it lets go of whatever it is resting on.",
       "truth": true,
-      "supportedBy": ["helmet-footage", "search-party"]
+      "supportedBy": ["helmet-footage", "search-party", "wildlife-camera", "rangers-habit"]
     },
     {
       "id": "claim-it-leaves-a-mark",
       "dimension": "capability",
       "text": "Nothing reads it. What it has been on holds heat for hours, and floor it has stood on has thawed and set again.",
       "truth": true,
-      "supportedBy": ["thaw-rings", "residual-heat"]
+      "supportedBy": ["thaw-rings", "residual-heat", "skid-thaw-ring", "block-heat-map"]
     },
     {
       "id": "claim-it-takes-what-comes-in",
       "dimension": "capability",
       "text": "It takes whatever warm thing comes inside a metre and a half. It does not follow and it does not choose.",
       "truth": true,
-      "supportedBy": ["scorched-glove", "work-light"]
+      "supportedBy": ["scorched-glove", "work-light", "filler-glove", "hut-handlamp"]
     },
     {
       "id": "claim-it-bleeds-charge",
       "dimension": "capability",
       "text": "Cells within five metres flatten about four times faster than rated while it is on nothing. The case is a cell.",
       "truth": true,
-      "supportedBy": ["work-light", "residual-heat", "fault-printer"]
+      "supportedBy": ["work-light", "residual-heat", "fault-printer", "fuel-ledger", "hut-handlamp"]
     },
     {
       "id": "claim-the-heater-anchor",

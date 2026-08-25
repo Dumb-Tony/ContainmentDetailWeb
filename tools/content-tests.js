@@ -890,7 +890,13 @@ async function sectionF() {
     const pack = await loadContent({ incident: id });
     if (!byAnomaly.has(pack.anomaly.id)) byAnomaly.set(pack.anomaly.id, pack.anomaly);
   }
-  eq('F1 nine incident packages over eight anomalies', `${INCIDENTS.length}/${byAnomaly.size}`, '9/8');
+  /* ⚠ COUNTED AGAINST THE FLOOR, NOT REMEMBERED. This asserted the literal '9/8' and failed
+   * the day the tenth package landed — the soak's `$incidentCount = 7` defect, in a test.
+   * What the assertion is FOR is the §15.2 ratio: more incidents than anomalies, meaning at
+   * least one thing has been given a second floor. So assert the shape, print the count. */
+  note(`  ${INCIDENTS.length} incident packages over ${byAnomaly.size} anomalies`);
+  ok(`F1 more packages than anomalies — §15.2 is structural, not an accident (${INCIDENTS.length}/${byAnomaly.size})`,
+    INCIDENTS.length > byAnomaly.size && byAnomaly.size >= 8);
 
   /* AC2's own arithmetic, reported per pair rather than as a single worst, so a new file
    * that is a reskin names itself. */
@@ -1091,6 +1097,111 @@ async function sectionD3() {
   eq('D46 and all three tell it differently, because settling out of a run is not settling out of a sit', tells.size, 3);
 }
 
+/* ------------------------------------------------------------------------------------- */
+async function sectionG() {
+  heading('G. the generator, solo, through the real verbs — §15.2 against the caller\'s own floor');
+  const content = await loadContent({ incident: 'blackthorn-generator' });
+  const g = new Game(content, { seed: 'generator-solo' });
+  const { walkTo, route, wait, workAt, hold, deployAt } = driver(g);
+  const A = g.anomaly;
+
+  eq('G1 the reserve\'s second package binds the passenger to the caller\'s ground',
+    `${A.def.id}@${g.site.id}`, 'coldharbour-passenger@blackthorn-reserve');
+  eq('G2 and it starts settled, in the thing the fiction says it lives in', A.state, 'settled');
+
+  /* The §15.2 hinge, asserted as data: the July operation's lesson is ON THIS FLOOR as
+   * evidence, and the tool this operation turns on is the one that lesson forbids. */
+  const placed = new Set(content.incident.evidenceSources.map((e) => e.evidenceId));
+  ok('G3 the caller\'s standing order is placed as evidence on the same ground', placed.has('caller-file'));
+  const rules = new Map();
+  for (const e of A.def.evidenceRules) {
+    if (!e.revealsRule || !placed.has(e.id)) continue;
+    rules.set(e.revealsRule, (rules.get(e.revealsRule) || 0) + 1);
+  }
+  note(`  placed paths per rule: ${[...rules.entries()].map(([k, v]) => `${k}=${v}`).join(', ')}`);
+  ok('G4 every rule keeps two placed paths on this floor — the Ashlar denominator lesson, applied at authoring time',
+    [...rules.values()].every((n) => n >= 2) && rules.size === 4, JSON.stringify([...rules]));
+
+  /* Kit, from the vehicle. The heater is the whole operation: bait on this floor, beacon
+   * on this floor's LAST operation. */
+  g.commitLoadout([
+    { itemId: 'portable-heater', qty: 1 }, { itemId: 'reinforced-transit-case', qty: 1 },
+    { itemId: 'thermal-imager', qty: 1 }, { itemId: 'trauma-kit', qty: 1 },
+  ]);
+  walkTo(g.site.cache.x, g.site.cache.z, 1.2);
+  /* Two general slots, and bait + box are both general: A SOLO OPERATIVE CANNOT ALSO CARRY
+   * THE IMAGER. That is 10.7's wager with teeth on this floor - the two instrument reads
+   * cost a second trip to the vehicle, or a second operative. Asserted, not worked around. */
+  const takeErrs = ['portable-heater', 'reinforced-transit-case', 'trauma-kit']
+    .map((id) => [id, g.takeFromCache(id)]).filter(([, e]) => e);
+  eq(`G5 the squad carries bait, box and kit - and the imager stays behind, because two general slots is the wager${takeErrs.length ? ' - ' + takeErrs.map(([i, e]) => i + ': ' + e).join('; ') : ''}`,
+    [...g.player.slots.values()].filter(Boolean).length >= 3, true);
+  eq('G5a and a third general item is refused in words, which is the wager stated at the vehicle',
+    g.takeFromCache('thermal-imager') ? true : false, true);
+
+  /* North across the meadow to the compound. */
+  /* The compound is FENCED - south gate closed, one 2.4m gap in the east run between two
+   * porous panels. The gap is the honest pedestrian entry; the gate is the vehicle one. */
+  route([[-6.0, -16.0], [-4.8, -10.0], [-7.15, -7.2], [-9.5, -7.6]], 1.0, 120000);
+  const dA = dist(g.player.x, g.player.z, A.x, A.z);
+  note(`  at the yard, ${dA.toFixed(1)}m from the set; it is ${A.state}`);
+  eq('G6 walking the compound does not move it — nothing here hunts', A.state, 'settled');
+
+  /* The bait and the box go down FIRST, while it is still housed: the case can wait beside
+   * a settled thing all day, and the seal trigger only reads it once the thing is lodged. */
+  hold('portable-heater');
+  eq('G7 the heater deploys inside its reach', deployAt(A.x + 1.1, A.z + 0.4, A.x + 2.4, A.z + 1.2), null);
+  hold('reinforced-transit-case');
+  eq('G8 and the case beside it', deployAt(A.x + 0.6, A.z - 1.1, A.x + 1.8, A.z - 2.2), null);
+  const heater = g.deployables.byItem('portable-heater')[0];
+  const box = g.deployables.byItem('reinforced-transit-case')[0];
+  note(`  heater ${dist(heater.x, heater.z, A.x, A.z).toFixed(2)}m and case ${dist(box.x, box.z, A.x, A.z).toFixed(2)}m from it`);
+
+  /* Now the counter-lesson: STAND BACK AND LOOK AT IT. Two seconds of attention unhouses
+   * it; a second and a half of warmth in reach rehouses it — into the warm thing the squad
+   * chose the position of. */
+  walkTo(A.x, A.z, 4.2, 30000);          // walks facing it, stops 4.2m out, still facing
+  let unhoused = null, lodged = null;
+  for (let ms = 0; ms < 12000 && !lodged; ms += 100) {
+    g.setCommand('p1', { axis: { x: 0, y: 0 }, sprint: false, crouch: false });
+    g.skipMs(100);
+    if (!unhoused && A.state === 'unhoused') unhoused = g.clock.simTimeMs;
+    if (A.state === 'lodged') lodged = g.clock.simTimeMs;
+  }
+  ok(`G9 two seconds of being looked at and it lets go (${unhoused === null ? 'never' : 'at ' + (unhoused / 1000).toFixed(1) + 's'})`,
+    unhoused !== null);
+  ok(`G10 and warmth in reach takes it — lodged ${lodged === null ? '(never)' : ((lodged - unhoused) / 1000).toFixed(1) + 's later'}`,
+    lodged !== null);
+
+  /* Seal while lodged. The approach is the dance the cold store teaches: get to the case
+   * without giving it two more seconds of attention. `walkTo(case)` faces the CASE. */
+  let sealed = false;
+  for (let attempt = 0; attempt < 5 && !sealed; attempt++) {
+    if (A.state === 'unhoused') {
+      /* It slipped loose — the heater is still the only warmth in reach; wait it back in. */
+      for (let ms = 0; ms < 5000 && A.state !== 'lodged'; ms += 100) { g.setCommand('p1', { axis: { x: 0, y: 0 }, sprint: false, crouch: false }); g.skipMs(100); }
+    }
+    if (A.state !== 'lodged') continue;
+    const act = workAt(box.x, box.z, 'seal', 15000);
+    if (act && act.kind === 'seal') { g.doInteract(); sealed = A.state === 'cased'; }
+  }
+  eq('G11 the seal lands while it is lodged in the squad\'s own bait', A.state, 'cased');
+  eq('G12 and custody is the game\'s word for it', g.custody, 'sealed');
+
+  /* The floor's two operations demand OPPOSITE kit disciplines, and that is checkable as
+   * data rather than as prose: the caller is provoked by the noise band every powered
+   * deployable emits; the passenger is captured with one. */
+  const caller = (await loadContent({ incident: 'blackthorn-caller' })).anomaly;
+  const noisy = (content.itemsById.get('portable-heater') || {}).noiseOutputDb || 0;
+  const callerHearsAt = (() => {
+    const t = caller.triggers.find((x) => x.when && (x.when.sense === 'noise-above' || x.when.sense === 'loudest-noise-within'));
+    return t && t.when.thresholdDb ? t.when.thresholdDb : null;
+  })();
+  note(`  the heater emits ${noisy} dB; the caller's own file wakes on ${callerHearsAt === null ? '(no dB threshold trigger)' : callerHearsAt + ' dB'}`);
+  ok('G13 the bait this operation requires is louder than silence — §15.2\'s collision is in the numbers, not the briefing',
+    noisy > 0);
+}
+
 suite('content', async () => {
   let ctx = null;
   await run('A', async () => { ctx = await sectionA(); });
@@ -1102,4 +1213,5 @@ suite('content', async () => {
   await run('E', () => sectionE());
   await run('E2', () => sectionE2());
   await run('F', () => sectionF());
+  await run('G', () => sectionG());
 });

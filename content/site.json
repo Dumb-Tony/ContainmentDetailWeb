@@ -526,6 +526,29 @@
       "_note": "THE SLICE'S FOREST MAP AND ITS AUDITORY FAMILY, which belong together. Blackthorn has no lanes — 41.5% of it has all twenty-four escape rays open and none of it is fenced bare — so it cannot host a fence incident honestly, and the caller does not want one. It is restrained by SILENCE, which is available everywhere and weighs nothing. A squad that arrives with the draught playbook deploys four humming objects and builds itself a beacon.",
       "incident": "blackthorn-caller"
     },
+        {
+      "id": "op-blackthorn-generator",
+      "name": "Blackthorn reserve, the generator",
+      "mapId": "blackthorn-reserve",
+      "anomalyId": "coldharbour-passenger",
+      "incident": "blackthorn-generator",
+      "clearanceRequired": 1,
+      "difficulty": "Field",
+      "status": "authorised",
+      "distance": "The reserve again. The gate code has not changed.",
+      "mandate": "Establish custody of whatever is riding the compound generator and transfer it to the vehicles.",
+      "optional": [
+        "Recover all issued equipment",
+        "Keep the mast circuit alive",
+        "Preserve the fence camera card"
+      ],
+      "conditions": [
+        "The set has run eleven years without a break; the one week it was pulled, the frost ring moved to the spare.",
+        "Fuel consumption up four per cent a month for a year. Two meters, same creep.",
+        "Reserve staff check the generator by ear from the hut door. None of them can say when that started."
+      ],
+      "_note": "The second operation on the reserve, and the counter-lesson to the first: the July order pinned in the hut says no powered sound sources on this floor, and the thing in the generator is dislodged by attention and rehoused by warmth. The squad that learned silence here must now run something warm and loud on purpose, at night, with the compound lights sagging. 15.2 both ways: the compound transfers, the playbook does not."
+    },
     {
       "id": "op-cold-storage-passenger",
       "name": "Coldharbour cold storage, level 2",
