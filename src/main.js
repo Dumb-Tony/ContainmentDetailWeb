@@ -16,7 +16,7 @@ import { NetSession, ROLE, ACT } from './net/net.js';
 import { Renderer } from './render/renderer.js';
 import { Hud } from './ui/hud.js';
 import { Panels } from './ui/panels.js';
-import { Audio, mixFor } from './audio/audio.js';
+import { Audio, mixFor, scoreFor, scoreInputs } from './audio/audio.js';
 import { Input } from './core/input.js';
 import { Settings, SettingsPanel } from './ui/settings.js';
 import { BaseScreen } from './ui/base.js';
@@ -434,6 +434,17 @@ async function boot() {
         pressureStage: game.mission.stage,
         activeEmitters: game.deployables.list.filter((d) => d.isEmitter && d.active).length,
       }), 0.12, game.clock.simTimeMs);
+
+      /* §17.5's score, on a slower clock than the mix and reading a different world: what
+       * the squad has worked out and what they have decided, never where the thing is.
+       * `callActive` is the duck — a caption on screen or a ping in the last two seconds
+       * means somebody is being spoken to, and the score gets out of the way. */
+      const spoken = audio.captions.active(game.clock.simTimeMs).length > 0
+        || game.comms.list.some((p) => game.clock.simTimeMs - p.atMs < 2000);
+      const owned = ((progression.profile || {}).siteUpgrades || []).length;
+      audio.applyScore(scoreFor(scoreInputs(game, {
+        inBase: base.isOpen, siteUpgrades: owned, callActive: spoken,
+      })));
     }
   }
 

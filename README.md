@@ -297,6 +297,45 @@ class can award one. So you can earn the whole certificate during ordinary play 
 opening a training screen — which is correct, not a loophole. And it gates nothing: §12.1
 grants options, never permission.
 
+## The score, which is not a distance function
+
+§17.5 is one paragraph and every clause in it is a constraint: *"Music is sparse during
+investigation. It responds to comprehension and procedural commitment rather than merely
+enemy proximity. Containment music supports rhythm without masking callouts. The base uses
+low, functional ambience and restrained motifs tied to site growth."*
+
+The `music` bus was built with the other five and had nothing on it, with a comment saying
+so. It has four layers now, and the interesting thing about them is what they are **not**
+allowed to know.
+
+Every horror score is a distance function. Writing one here would have been two lines — the
+mix layer computes `near` on its first line — and it would have sounded completely correct,
+which is exactly why nothing would ever have caught it. So `scoreFor` takes no position and
+no anomaly state; they are not in its argument, and the suite greps the function's code
+(comments stripped) to keep them out. What it reads instead is what the squad has **worked
+out** and what they have **decided to do about it**:
+
+- **bed** — always, and almost inaudible. Sparse is a floor, not a silence.
+- **reading** — comprehension: how much of the board they have taken a position on, times
+  how much of that position is carried by evidence they actually hold. **The product, not
+  the sum** — a board full of guesses is not comprehension, and neither is a satchel nobody
+  read. Both are silent, and the suite asserts both.
+- **intent** — absent until a procedure is committed, then present. A decision does not fade
+  in. A *revision* retunes the interval rather than raising it: the second plan is a second
+  idea, not more of the first.
+- **custody** — the rhythm layer, and the loudest thing in the score, because the climax of
+  this game is a box holding.
+
+At its loudest the whole score is 0.385 across four layers — under a third of the anomaly's
+own voice, because it is a score and not a cue. And "without masking callouts" is a rule
+rather than a mixing note: a live caption or a ping in the last two seconds ducks the entire
+bus to **35%**, fast in and slow out, so a call cuts through on the syllable and the score
+does not come back up under the second half of the sentence.
+
+Measured in a real `AudioContext` rather than only as a pure function: four oscillators on
+the `music` bus, ramping to 0.045 / 0.115 / 0.085 / 0.140, and every one of them at 35% of
+that a second after a call lands.
+
 ## Accessibility
 
 Full remapping with browser-reserved keys refused, hold-vs-toggle resolved at the source,
@@ -578,7 +617,7 @@ the next, a suite that hangs cannot take the others with it, and a suite that pr
 result block at all counts as a **failure** rather than as zero assertions and no problem.
 A crashed page reporting green is the failure mode the whole harness exists to avoid.
 
-**1,983 assertions across twelve suites, all headless.** The twelve are the milestone-0 suite
+**1,994 assertions across twelve suites, all headless.** The twelve are the milestone-0 suite
 (everything true of *every* package), the content suite (the numbers that make one incident
 the incident it is), the net suite, the tablet suite, and six that arrived with the
 milestones they check: licensing and rollback, localization, onboarding, telemetry,

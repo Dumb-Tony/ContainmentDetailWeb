@@ -104,6 +104,154 @@ export const VOICE_BUSES = Object.freeze({
   breath: 'voice',
 });
 
+/* ── §17.5, the score ─────────────────────────────────────────────────────────
+ *
+ * The `music` bus has existed with nothing on it since the graph was built, with a comment
+ * saying so. §17.5 is one paragraph and every clause in it is a constraint:
+ *
+ *   "Music is SPARSE DURING INVESTIGATION. It responds to COMPREHENSION AND PROCEDURAL
+ *    COMMITMENT rather than merely enemy proximity. Containment music SUPPORTS RHYTHM
+ *    WITHOUT MASKING CALLOUTS. The base uses low, functional ambience and restrained
+ *    motifs TIED TO SITE GROWTH."
+ *
+ * ⚠ "RATHER THAN MERELY ENEMY PROXIMITY" IS THE WHOLE DESIGN AND IT IS ALSO A TEST.
+ *
+ * Every horror game's score is a distance function, and writing one here would have been
+ * two lines — `mixFor` already computes `near` on the line above. It would also have been
+ * the exact thing the sentence forbids, and nothing would have caught it, because a score
+ * that swells as the thing approaches sounds *correct*.
+ *
+ * So `scoreFor` takes no position and no anomaly state. It cannot: they are not in its
+ * argument. What it reads is what the squad has WORKED OUT and what they have DECIDED to
+ * do about it — the board, and the committed procedure — which are the two things this
+ * game is actually about and the two things a proximity score would drown.
+ *
+ * The layers, and what each one is for:
+ *
+ *   bed        always, and almost inaudible. "Sparse during investigation" is a floor, not
+ *              a silence: a room with no bed at all reads as a bug rather than as restraint.
+ *   reading    COMPREHENSION. Rises with how much of the board the squad has taken a
+ *              position on AND how much of that position is carried by evidence they hold.
+ *              Both, multiplied — a board full of guesses is not comprehension, and a
+ *              satchel full of unread evidence is not either.
+ *   intent     PROCEDURAL COMMITMENT. Absent until a procedure is committed, and it does
+ *              not fade back in on a revision: a revised plan gets a DIFFERENT interval,
+ *              not a louder one, because the second plan is a second idea and not more of
+ *              the first.
+ *   custody    the containment rhythm, and the only layer with a pulse in it. Present only
+ *              while custody is actually being held.
+ *
+ * ⚠ AND IT DUCKS. "Without masking callouts" is not a mixing note, it is a rule: a ping,
+ * a caption or a squad call has to arrive over the top of whatever is playing. `duck` is
+ * returned rather than folded into the gains so that the graph applies it in one place and
+ * a test can assert the depth of it — a score that ducks by 5% is a score that says it
+ * ducks.
+ *
+ * No captions. §17.3 requires a visual alternative for every critical audio CUE, and this
+ * is deliberately not one: nothing here is a cue, nothing here carries information the
+ * player cannot get from the board it is reading, and a caption saying "music swells" would
+ * be noise in a channel reserved for the things that matter.
+ */
+export const SCORE_LAYERS = Object.freeze(['bed', 'reading', 'intent', 'custody']);
+
+/** Hz for each layer. Low, and spaced by intervals rather than by octaves so two layers
+ *  sounding together are a chord rather than a thicker version of one note. */
+export const SCORE_VOICES = Object.freeze({
+  bed: { type: 'sine', hz: 41 },
+  reading: { type: 'sine', hz: 61.5 },      // a fifth above the bed
+  intent: { type: 'triangle', hz: 82 },     // the octave; a revision retunes it, see below
+  custody: { type: 'sine', hz: 55 },
+});
+
+/** How far under a live callout the whole bus goes. §19.2 forbids a required rule depending
+ *  on hearing, so this is politeness rather than safety — but a squad call that arrives at
+ *  the same loudness as the score is a call somebody misses. */
+export const SCORE_DUCK = 0.35;
+
+/**
+ * Pure, and pointedly ignorant of where the anomaly is.
+ *
+ * @param {object} s {claimsTaken, claimsTotal, rulesSupported, rulesTotal, committed,
+ *                    revisions, custodyHeldMs, inBase, siteUpgrades, callActive}
+ * @returns {{bed:number, reading:number, intent:number, custody:number, duck:number,
+ *            intentHz:number}}
+ */
+export function scoreFor(s = {}) {
+  const frac = (a, b) => (b > 0 ? Math.max(0, Math.min(1, a / b)) : 0);
+
+  /* THE BASE IS A DIFFERENT PIECE. "Low, functional ambience and restrained motifs tied to
+   * site growth" — so between operations the only thing that moves is what the site has
+   * become, and it moves slowly: a site with everything built is not four times as loud as
+   * an empty one, it is a third louder. */
+  if (s.inBase) {
+    const grown = frac(s.siteUpgrades || 0, 8);
+    return {
+      bed: 0.05 + 0.017 * grown, reading: 0, intent: 0, custody: 0,
+      duck: s.callActive ? SCORE_DUCK : 1, intentHz: SCORE_VOICES.intent.hz,
+    };
+  }
+
+  const taken = frac(s.claimsTaken || 0, s.claimsTotal || 0);
+  const supported = frac(s.rulesSupported || 0, s.rulesTotal || 0);
+
+  return {
+    /* Audible enough to be a floor, quiet enough that a squad talking over it never has to
+     * raise their voice. */
+    bed: 0.045,
+
+    /* ⚠ THE PRODUCT, NOT THE SUM. A squad that has marked every claim on no evidence has
+     * comprehension of zero and should hear nothing for it; so should one holding every
+     * observation and committing to none. The score rewards the two together because the
+     * game does. */
+    reading: 0.115 * taken * supported,
+
+    /* Nothing until they commit. `committed` is a boolean and not a ramp on purpose: a
+     * procedure is a decision, and a decision does not fade in. */
+    intent: s.committed ? 0.085 : 0,
+
+    /* The rhythm layer, and the only one that gets anywhere near the others in level. It
+     * arrives when custody does and it is the loudest thing in the score, because the
+     * climax of this game is a box holding. */
+    custody: (s.custodyHeldMs || 0) > 0 ? 0.14 : 0,
+
+    duck: s.callActive ? SCORE_DUCK : 1,
+
+    /* A REVISION RETUNES RATHER THAN REPEATS. Each revision drops the interval a whole tone,
+     * bottoming out after four — so a squad on their third plan is listening to a different
+     * chord than the one they committed to first, without the score getting louder or
+     * telling them they were wrong. */
+    intentHz: SCORE_VOICES.intent.hz * (1 - 0.06 * Math.min(4, s.revisions || 0)),
+  };
+}
+
+/**
+ * Read the score's inputs off a live Game. Separated from `scoreFor` so the pure function
+ * stays drivable from a literal in the suite, which is the same split `mixFor` makes.
+ */
+export function scoreInputs(game, { inBase = false, siteUpgrades = 0, callActive = false } = {}) {
+  const led = game.ledger;
+  const claims = led ? led.claims : [];
+  const state = led ? led.claimState : new Map();
+  let taken = 0;
+  for (const c of claims) if (state.get(c.id)) taken++;
+  /* "Supported" is a rule with at least one observation logged against it — the squad's own
+   * satchel, not the anomaly file's list of what exists to be found. */
+  const found = new Set((led ? led.entries : []).map((e) => e.revealsRule || (led.rules.get(e.evidenceId) || {}).revealsRule).filter(Boolean));
+  const all = new Set([...(led ? led.rules.values() : [])].map((r) => r.revealsRule).filter(Boolean));
+  return {
+    claimsTaken: taken, claimsTotal: claims.length,
+    rulesSupported: found.size, rulesTotal: all.size,
+    committed: !!(game.mission && game.mission.procedure),
+    revisions: (game.mission && game.mission.procedureRevisions) || 0,
+    /* `game.custody` is the three-word state — none | sealed | verified — and the rhythm
+     * layer wants the two that mean a box is holding. Not a duration: the layer is on or
+     * off, because custody is on or off and a score that faded up through the thirty
+     * seconds would be counting down a clock the HUD already shows. */
+    custodyHeldMs: game.custody && game.custody !== 'none' ? 1 : 0,
+    inBase, siteUpgrades, callActive,
+  };
+}
+
 /** One-shot cues, as a data table keyed by simulation event. A new event is a new row; an
  *  event with no row is silent rather than fatal. */
 export const CUES = Object.freeze({
@@ -347,8 +495,47 @@ export class Audio {
       hum: voice('sawtooth', 110, 0, VOICE_BUSES.hum),
       breath: voice('sine', 180, 0, VOICE_BUSES.breath),
     };
+
+    /* §17.5's score, on the bus that was built for it and has been silent since. Four
+     * oscillators, all on `music`, all starting at zero — so a player who has learned
+     * nothing and committed to nothing hears the bed and no more. */
+    this.score = {};
+    for (const name of SCORE_LAYERS) {
+      const v = SCORE_VOICES[name];
+      this.score[name] = voice(v.type, v.hz, 0, 'music');
+    }
     this.ok = true;
     return true;
+  }
+
+  /**
+   * Apply a score. Separate from `apply` because it moves on a different timescale: a mix
+   * follows the world at 0.12 s and a score is allowed to take four seconds to notice
+   * something, which is most of what makes it a score rather than an alarm.
+   *
+   * ⚠ THE DUCK IS APPLIED HERE, ONCE, TO EVERY LAYER — not folded into `scoreFor`'s gains.
+   * A duck that lived in the pure function would be indistinguishable from a quiet score,
+   * and "supports rhythm without masking callouts" is a claim about what happens WHEN
+   * somebody speaks, which is a thing a test has to be able to see happening.
+   */
+  applyScore(sc, tSec = 4.0) {
+    if (!this.ok || !this.score) return;
+    const now = this.ctx.currentTime;
+    const duck = typeof sc.duck === 'number' ? sc.duck : 1;
+    for (const name of SCORE_LAYERS) {
+      const v = this.score[name];
+      if (!v) continue;
+      /* The duck is fast in and slow out: a call has to cut through on the syllable, and
+       * the score coming straight back up under the second half of a sentence is worse
+       * than it never having ducked. */
+      const target = Math.max(0, (sc[name] || 0)) * duck;
+      const ramp = duck < 1 ? 0.08 : tSec;
+      v.g.gain.cancelScheduledValues(now);
+      v.g.gain.setTargetAtTime(target, now, Math.max(0.02, ramp / 3));
+    }
+    if (typeof sc.intentHz === 'number' && this.score.intent) {
+      this.score.intent.o.frequency.setTargetAtTime(sc.intentHz, now, 1.2);
+    }
   }
 
   /**

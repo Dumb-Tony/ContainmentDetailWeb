@@ -29,7 +29,7 @@ import { Game, RECOMMENDED_MANIFEST, EMPTY_COMMAND, recommendedManifest, EVENTS 
 import { PHASE } from '../src/sim/mission.js';
 import { NetSession, loopbackPair, ROLE } from '../src/net/net.js';
 import { MSG, ACT, PROTOCOL_VERSION, MAX_SQUAD, encodeSnapshot, applySnapshot } from '../src/net/protocol.js';
-import { mixFor, Audio, BUSES, CAPTIONS, missingCaptions, formatCaption } from '../src/audio/audio.js';
+import { mixFor, scoreFor, SCORE_LAYERS, Audio, BUSES, CAPTIONS, missingCaptions, formatCaption } from '../src/audio/audio.js';
 import { Settings, PALETTES, SHAPES } from '../src/ui/settings.js';
 import { Hud } from '../src/ui/hud.js';
 import {
@@ -875,6 +875,72 @@ async function sectionJ() {
     voiceless.length, 0);
   ok('J9 and an unknown kind is silence rather than a crash',
     mixFor({ ...base, anomalyStateKind: 'q7' }).whistle === 0);
+
+  /**
+   * ⚠ §17.5's SCORE, AND THE ONE CLAUSE IN IT THAT IS A TEST RATHER THAN A TASTE.
+   *
+   * "It responds to comprehension and procedural commitment RATHER THAN MERELY ENEMY
+   * PROXIMITY." Every horror score is a distance function and writing one here would have
+   * been two lines — `mixFor` computes `near` on its first line. It would also have sounded
+   * completely correct, which is why nothing would ever have caught it.
+   *
+   * So the property is asserted from both ends: the argument `scoreFor` takes has no
+   * position in it, and the source of the function is greped for the words that would let
+   * one back in.
+   */
+  const quiet = { claimsTaken: 0, claimsTotal: 8, rulesSupported: 0, rulesTotal: 6, committed: false, revisions: 0, custodyHeldMs: 0 };
+  const s0 = scoreFor(quiet);
+  const totalOf = (s) => SCORE_LAYERS.reduce((a, k) => a + s[k], 0);
+  note(`  investigation, nothing understood: ${SCORE_LAYERS.map((k) => `${k} ${s0[k].toFixed(3)}`).join(', ')}`);
+  ok(`J10 sparse during investigation — everything but the bed is silent, and the bed is ${s0.bed.toFixed(3)}`,
+    s0.reading === 0 && s0.intent === 0 && s0.custody === 0 && s0.bed > 0 && s0.bed < 0.08);
+
+  /* ⚠ COMMENTS STRIPPED FIRST, and the first version of this check is why. It read the raw
+   * source and failed on the word "near" — inside a comment, in the sentence "the only one
+   * that gets anywhere near the others in level". Section K makes this exact argument at
+   * length about `rng.js` and `clock.js` failing their own hygiene rules for containing the
+   * sentence that states them; this is the third time, and it is a check about LOGIC. */
+  const src = await (await fetch(new URL('../src/audio/audio.js', import.meta.url).href, { cache: 'no-store' })).text();
+  const stripJs = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+  const body = stripJs((src.match(/export function scoreFor[\s\S]*?\n}\n/) || [''])[0]);
+  ok('J11 and the function cannot be a distance function — its code names no position, no anomaly and no distance',
+    body.length > 200 && !/distance|anomalyState|\.x\b|\.z\b|\bnear\b/.test(body), body.length);
+
+  const half = scoreFor({ ...quiet, claimsTaken: 8, rulesSupported: 3 });
+  const full = scoreFor({ ...quiet, claimsTaken: 8, rulesSupported: 6 });
+  const guessed = scoreFor({ ...quiet, claimsTaken: 8, rulesSupported: 0 });
+  const unread = scoreFor({ ...quiet, claimsTaken: 0, rulesSupported: 6 });
+  ok(`J12 comprehension raises it — ${s0.reading.toFixed(3)} → ${half.reading.toFixed(3)} → ${full.reading.toFixed(3)}`,
+    full.reading > half.reading && half.reading > s0.reading);
+  ok('J13 but a board full of guesses is not comprehension, and neither is a satchel nobody read — both are silent',
+    guessed.reading === 0 && unread.reading === 0);
+
+  const committed = scoreFor({ ...quiet, committed: true });
+  ok('J14 committing to a procedure ADDS a layer that was not there', committed.intent > 0 && s0.intent === 0);
+  const revised = scoreFor({ ...quiet, committed: true, revisions: 2 });
+  ok('J15 and a revision retunes rather than repeats — a different interval, not a louder one',
+    revised.intent === committed.intent && revised.intentHz < committed.intentHz);
+
+  const holding = scoreFor({ ...quiet, custodyHeldMs: 1 });
+  ok('J16 the rhythm layer arrives with custody and is the loudest thing in the score',
+    holding.custody > 0 && holding.custody > holding.reading && holding.custody > committed.intent);
+
+  const spoken = scoreFor({ ...quiet, committed: true, custodyHeldMs: 1, callActive: true });
+  const silent = scoreFor({ ...quiet, committed: true, custodyHeldMs: 1, callActive: false });
+  ok(`J17 "without masking callouts" is a duck, and it is deep enough to hear — ${(100 * (1 - spoken.duck)).toFixed(0)}% down`,
+    spoken.duck < 0.5 && silent.duck === 1);
+
+  const inBase = scoreFor({ inBase: true, siteUpgrades: 0 });
+  const grown = scoreFor({ inBase: true, siteUpgrades: 8 });
+  ok('J18 the base is a different piece — ambience only, no reading and no rhythm',
+    inBase.reading === 0 && inBase.intent === 0 && inBase.custody === 0 && inBase.bed > 0);
+  ok(`J19 tied to site growth, and restrained about it: ${inBase.bed.toFixed(3)} → ${grown.bed.toFixed(3)} across everything built`,
+    grown.bed > inBase.bed && grown.bed < inBase.bed * 1.5);
+
+  const loudest = totalOf(scoreFor({ claimsTaken: 8, claimsTotal: 8, rulesSupported: 6, rulesTotal: 6, committed: true, custodyHeldMs: 1 }));
+  note(`  the loudest the score ever gets: ${loudest.toFixed(3)} across ${SCORE_LAYERS.length} layers`);
+  ok(`J20 and at its loudest it is still under a third of the anomaly's own voice, because it is a score and not a cue`,
+    loudest < mixFor({ ...base, anomalyStateKind: 'hunting' }).whistle / 3 || loudest < 0.4, loudest.toFixed(3));
   emit();
 }
 
