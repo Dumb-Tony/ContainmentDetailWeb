@@ -235,10 +235,18 @@ export class BaseScreen {
     }
 
     const op = this._authorisedOperation();
+    /* ⚠ TWO BUTTONS, BECAUSE ONE WAS A TRAP. A single "Take the operation" sent every
+     * player — including a solo one — through the Session lobby, where the deploy button
+     * sits disabled behind a ready-gate until they report ready to their own empty room.
+     * The first real playtest (tools/playtest.js) measured the cost: four clicks, a full
+     * page reload back to this same board, and a dead end on a sheet that never closed.
+     * A solo player and a squad host want different next screens, so the board asks the
+     * one question that decides it. */
     const footer = this.tab === 'operations' && op
       ? `<span class="waiting">${this.site.condition === 'underfunded' ? msg('base.shell.underfunded') : ''}</span>
          <button class="ghost" data-close>${msg('base.shell.close')}</button>
-         <button class="go" data-deploy>${msg('base.shell.takeOperation')}</button>`
+         <button class="ghost" data-deploy-squad>${msg('base.shell.formSquad')}</button>
+         <button class="go" data-deploy>${msg('base.shell.deploySolo')}</button>`
       : `<button class="go" data-close>${msg('base.shell.close')}</button>`;
 
     this._shell(escapeHtml(this.site.displayName || msg('base.shell.fallbackName')),
@@ -925,7 +933,17 @@ export class BaseScreen {
         if (!op) return;
         this.open = null;
         this.node.style.display = 'none';
-        this.onDeploy(op);
+        this.onDeploy(op, 'solo');
+      };
+    }
+    const depSquad = q('[data-deploy-squad]');
+    if (depSquad) {
+      depSquad.onclick = () => {
+        const op = this._authorisedOperation();
+        if (!op) return;
+        this.open = null;
+        this.node.style.display = 'none';
+        this.onDeploy(op, 'squad');
       };
     }
 

@@ -28,7 +28,7 @@ import { dist } from './sim/geometry.js';
 import { CONFIG } from './config.js';
 import { installCrashBoundary, buildId } from './core/crash.js';
 import { sessionRecord, sessionRecordText } from './sim/telemetry.js';
-import { locale } from './core/i18n.js';
+import { locale, t as msg } from './core/i18n.js';
 
 const CONFIG_NET_HZ = CONFIG.net.snapshotHz;
 
@@ -228,7 +228,7 @@ async function boot() {
 
   const base = new BaseScreen(document.body, {
     progression, site, items: fitted.items,
-    onDeploy: (op) => {
+    onDeploy: (op, flow = 'solo') => {
       currentOp = op;
       /* Taking an operation for a DIFFERENT incident means loading different rules and a
        * different evidence set, so it navigates — same reasoning as the incident switcher
@@ -243,13 +243,18 @@ async function boot() {
         const u = new URL(location.href);
         u.searchParams.set('incident', op.incident);
         u.searchParams.set('scenario', nextScenario);
+        /* ⚠ THE CHOICE SURVIVES THE RELOAD, WHICH IS THE WHOLE FIX. The scenario always
+         * changes, so this branch always navigates — and before `flow` existed, the fresh
+         * page opened the operations board again and the same button had to be clicked a
+         * second time, into a lobby a solo player has no business in. The boot router
+         * below reads this parameter and lands the player on the screen they chose. */
+        u.searchParams.set('flow', flow);
         location.href = u.toString();
         return;
       }
-      /* The lobby, not the old squad panel: forming the squad is now a phase with its own
-       * state (who is in it, which seat, which operation, whether everybody is ready) and
-       * its own moderation controls, rather than a code to read aloud. GDD §11.4. */
-      lobby.show(op);
+      /* Same incident and scenario (a mid-session re-open): route directly. */
+      if (flow === 'squad') lobby.show(op);
+      else panels.showLoadout();
     },
     onClose: () => {},
   });
@@ -271,7 +276,7 @@ async function boot() {
 
   canvas.addEventListener('click', () => {
     audio.start();
-    if (!panels.isOpen && game.mission.phase !== PHASE.DEBRIEF) grabPointer();
+    if (!panels.isOpen && !lobby.open && !base.open && game.mission.phase !== PHASE.DEBRIEF) grabPointer();
   });
   document.addEventListener('pointerlockchange', () => {
     pointerLocked = document.pointerLockElement === canvas;
@@ -334,9 +339,25 @@ async function boot() {
     requestAnimationFrame(frame);
 
     /* Total pause by construction: the panel closes the clock, and every mutation in the
-     * game runs inside the clock's step callback, so no system needs to check a flag. */
-    const paused = panels.isOpen || settingsPanel.isOpen || !pointerLocked;
+     * game runs inside the clock's step callback, so no system needs to check a flag.
+     *
+     * ⚠ THE LOBBY AND THE BASE ARE ON THIS LINE NOW. They were not, and the first playtest
+     * caught the consequence: the mission clock RAN behind the Session lobby's sheet —
+     * prompts changing, pressure climbing, the operation aging — while the player stood on
+     * a screen with no world in it. A sheet that covers the game pauses the game. */
+    const paused = panels.isOpen || settingsPanel.isOpen || !!lobby.open || !!base.open || !pointerLocked;
     game.clock.setPaused(paused);
+
+    /* The free-mouse hint. The other finding from the same playtest: unlocked, the world
+     * sits frozen with a cursor on it and NOTHING SAYS WHY — no visible word "click"
+     * anywhere on the screen. The overlay names the one action that starts the game, and
+     * carries the controls so the first minute does not need a manual. */
+    const wantHint = !pointerLocked && !panels.isOpen && !settingsPanel.isOpen
+      && !lobby.open && !base.open && game.mission.phase !== PHASE.DEBRIEF;
+    if (wantHint !== freeHintShown) {
+      freeHintShown = wantHint;
+      freeHint.style.display = wantHint ? 'block' : 'none';
+    }
 
     /* The pad is POLLED, not evented — once a frame, before anything asks what is held.
      * `navigator.getGamepads` is passed in rather than reached for inside input.js so that
@@ -451,7 +472,49 @@ async function boot() {
   window.addEventListener('resize', () => renderer.resize());
   bootNode.remove();
   document.body.classList.add('free');
-  base.show();
+
+  /* The click-to-play overlay. Created once; the frame loop toggles it. On a device with
+   * no fine pointer it tells the truth instead: this build needs a keyboard and a mouse,
+   * and pretending otherwise would be a black screen that ignores every touch. */
+  const coarseOnly = window.matchMedia
+    && window.matchMedia('(pointer: coarse)').matches && !window.matchMedia('(pointer: fine)').matches;
+  const freeHint = document.createElement('div');
+  freeHint.className = 'cd-freehint';
+  freeHint.innerHTML = coarseOnly
+    ? `<b>${escapeHtml(msg('hud.needsKeyboard'))}</b>`
+    : `<b>${escapeHtml(msg('hud.clickToPlay'))}</b><span>${escapeHtml(msg('hud.controlsLine'))}</span>`;
+  freeHint.style.display = 'none';
+  document.getElementById('hud').appendChild(freeHint);
+  let freeHintShown = false;
+
+  /**
+   * ⚠ THE BOOT ROUTER, WHICH IS WHAT MAKES THE BOARD'S BUTTONS MEAN ANYTHING.
+   *
+   * Taking an operation navigates (the fresh scenario is load-bearing, §14.4), and before
+   * this existed the fresh page opened the operations board again — so "Take the
+   * operation" was a button that led to itself, and the measured cost of reaching the
+   * world was four clicks, one of them into a lobby with a disabled button. The choice
+   * made on the board rides the URL:
+   *
+   *   flow=solo    straight to the loadout. Commit is what moves Briefing → Arrival, so
+   *                this is the one screen a solo player actually needs.
+   *   flow=squad   the Session lobby, which is FOR forming a squad and nothing else now.
+   *   join=CODE    a friend clicked an invite link: the lobby, with the code already in
+   *                the field and the join already sent. One click from a chat message to
+   *                a seat in the room.
+   */
+  const bootFlow = params.get('flow');
+  const joinCode = (params.get('join') || '').trim().toUpperCase();
+  if (joinCode && /^[A-Z0-9]{5}$/.test(joinCode)) {
+    lobby.show(null, { joiner: true });
+    lobby.autoJoin(joinCode);
+  } else if (bootFlow === 'solo') {
+    panels.showLoadout();
+  } else if (bootFlow === 'squad') {
+    lobby.show(currentOp || { id: scenario || incidentId, name: content.incident.displayName || incidentId, incident: incidentId });
+  } else {
+    base.show();
+  }
   requestAnimationFrame(frame);
 
   /* The debug handle. The suite and any console probe drive the game through THIS, so

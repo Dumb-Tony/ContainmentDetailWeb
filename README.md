@@ -517,6 +517,27 @@ yours, your operative stands still rather than wandering off, and a resume token
 back in the same body. If you were carrying custody when your radio died, the case is set
 down where you stood rather than leaving the floor with you.
 
+## Playing it with friends
+
+Open the link, click **Deploy solo**, pick your kit, click **Deploy**, then click the screen
+to take control. That is the whole solo path: two buttons and a click.
+
+To play together: click **Form a squad** instead. Open the room, and next to the
+five-character code there is an **invite link with the code already in it** — the button
+copies it. Send it to a friend. When they click it, the page puts the code in for them and
+joins: they land on your roster having typed nothing. Everybody clicks **Report ready**, the
+host clicks **Take the operation**, picks the squad's kit, and deploys — every other seat's
+lobby closes itself the moment that happens.
+
+This flow is not assumed to work; it is *played*, headlessly, by `tools/playtest.js` — real
+clicks on the real buttons, real key events into the real input path, the canvas photographed
+at every step. It exists because 1,994 green assertions coexisted with an unplayable game:
+every suite drove the simulation through its seams, and nothing had ever clicked "Take the
+operation" to find that it led back to itself, through a page reload, into a lobby whose
+deploy button sat disabled behind a ready-gate a solo player could never want. The driver
+measured that wall (four clicks to a dead end), and now asserts its absence — 21 checks from
+"the board offers the real choice" to "the friend holds a two-operative world".
+
 ## Controls
 
 | | |

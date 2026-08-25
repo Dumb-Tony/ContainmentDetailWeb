@@ -314,6 +314,7 @@
       "reportsIncomplete": "Reports may be incomplete. They are not deliberately false.",
       "otherHead": "Other open operations",
       "otherBody": "The same floor, a different incident. Everything you learned about the building still applies; nothing you learned about the anomaly does.",
+      "roomPinsIncident": "The room is open, so the incident is pinned — switching floors would tear the session down.",
       "otherButton": "Deploy to {name} instead",
       "manifestHead": "Cargo manifest",
       "budget": "{used} of {budget} volume",
@@ -350,6 +351,8 @@
       "underfunded": "Everything you take is everything you have.",
       "close": "Close",
       "takeOperation": "Take the operation",
+      "deploySolo": "Deploy solo",
+      "formSquad": "Form a squad",
       "counter": "Counter"
     },
     "ledger": {
@@ -1149,6 +1152,9 @@
 
   "hud": {
     "_note": "The head-up display. Everything here is read at a glance while something is walking toward you, so it is short by design and the short forms are the ones that must survive translation.",
+    "clickToPlay": "Click to take control",
+    "controlsLine": "WASD move · mouse look · F interact · Q imager · TAB tablet · Z comms · Esc release",
+    "needsKeyboard": "This build needs a keyboard and a mouse — phone support is not in yet.",
     "pressure": "Incident pressure: {stage}",
     "clock": "{time} · {phase}",
     "primary": "Primary",

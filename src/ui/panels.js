@@ -358,10 +358,17 @@ export class Panels {
           <p>${msg('panels.card.mandatePrimary')}</p>
           <p>${msg('panels.card.mandateOptional')}</p>
           <p class="small">${msg('panels.card.reportsIncomplete')}</p>
-          ${others.length ? `<h2>${msg('panels.card.otherHead')}</h2>
+          ${/* ⚠ NOT WHILE A ROOM IS OPEN. These buttons NAVIGATE, and a squad host's page
+              * reload destroys their peer — the room, the roster, every seat. The playtest
+              * driver clicked one mid-form and measured the result: "friend status:
+              * disconnected". Switching incident is a pre-room decision; with a room open
+              * the card says so instead of offering the trapdoor. */
+  ''}${others.length && !(this.net && (this.net.code || this.net.peer)) ? `<h2>${msg('panels.card.otherHead')}</h2>
             <p class="small">${msg('panels.card.otherBody')}</p>
             ${others.map((id) => `<button class="wide" data-incident="${id}">${
   msg('panels.card.otherButton', { name: escapeHtml(id.replace(/^cold-storage-/, '')) })}</button>`).join('')}` : ''}
+          ${others.length && this.net && (this.net.code || this.net.peer)
+    ? `<p class="small">${msg('panels.card.roomPinsIncident')}</p>` : ''}
         </section>
         <section class="kit">
           <h2>${msg('panels.card.manifestHead')}</h2>

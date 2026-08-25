@@ -190,11 +190,15 @@ export class LobbyScreen {
   }
 
   /** @param op the operation card the base screen selected, or null */
-  show(op = null) {
+  show(op = null, opts = {}) {
     this.open = 'lobby';
     /* Becoming the host is what CREATES the lobby's first seat, and the screen must not be
-     * the thing that decides the role — it asks the session, which already knows. */
-    if (this.net.role === ROLE.SOLO) this.net.host();
+     * the thing that decides the role — it asks the session, which already knows.
+     *
+     * ⚠ UNLESS THEY ARRIVED ON AN INVITE LINK. A joiner who is made a host first opens an
+     * empty room of their own for the moment before the join lands, and the playtest saw
+     * the seam. A joiner is a joiner from the first frame. */
+    if (!opts.joiner && this.net.role === ROLE.SOLO) this.net.host();
     if (op) this.net.selectOperation({ id: op.id, label: op.name || op.id, incident: op.incident || '' });
     this.net.lobby.setCallsign(this.net.localPlayerId, this.callsign);
     this.render();
@@ -207,6 +211,30 @@ export class LobbyScreen {
     this.onClose();
   }
 
+  /**
+   * A friend arrived on an invite link (`?join=CODE` — see main.js's boot router). The
+   * code goes into the field the way typing would put it there, and the join is sent once.
+   * If the room is gone, the ordinary refusal path says so in the ordinary place — an
+   * auto-join must fail exactly like a typed one, or the link teaches the wrong lesson.
+   */
+  autoJoin(code) {
+    this.joinField = code;
+    this.render();
+    this._join(code);
+  }
+
+  /** The link that IS the invite: this build, this incident, this scenario, this room.
+   *  The incident and scenario ride along because the joiner's page builds its own world
+   *  from ITS url before the first snapshot arrives — a joiner on the wrong floor is a
+   *  version-skew bug wearing a convenience feature. */
+  _inviteUrl() {
+    const u = new URL(location.href);
+    const keep = new URL(u.origin + u.pathname);
+    for (const k of ['incident', 'scenario']) if (u.searchParams.get(k)) keep.searchParams.set(k, u.searchParams.get(k));
+    keep.searchParams.set('join', this.net.code || '');
+    return keep.toString();
+  }
+
   /** Re-render in place. Wired to `net.onLobby`, `net.onStatus` and `net.onRoster`. */
   refresh() { if (this.open) this.render(); }
 
@@ -215,6 +243,13 @@ export class LobbyScreen {
   render() {
     const net = this.net;
     const lobby = net.lobby;
+
+    /* ⚠ WHEN THE SQUAD DEPLOYS, THIS SCREEN IS OVER. The host's own deploy click closes
+     * their copy; every OTHER seat's copy closed on nothing, so a joiner sat on "Waiting
+     * for the host…" while the mission started behind the sheet. The lobby state already
+     * says deployed — the screen just has to believe it. */
+    if (this.open && lobby && lobby.phase === LOBBY_PHASE.DEPLOYED) { this.hide(); return; }
+
     const hosting = net.role === ROLE.HOST;
     const joined = net.role === ROLE.CLIENT;
     const ops = (this.site.operations || []).filter((o) => o.status !== 'locked');
@@ -305,6 +340,13 @@ export class LobbyScreen {
         ${escapeHtml(EXPOSURE_WORDS[this.visibility === VISIBILITY.PRIVATE ? 'none' : exposure])}</p>
       ${net.code ? `<div class="code">${escapeHtml(net.code)}</div>` : ''}
       ${net.roomName ? `<div class="code">${escapeHtml(net.roomName)}</div>` : ''}
+      ${net.code ? `
+      <div class="joiner invite">
+        <input data-invite readonly value="${escapeHtml(this._inviteUrl())}">
+        <button data-copy>${this.copied ? 'Copied' : 'Copy invite link'}</button>
+      </div>
+      <p class="small">Send that link to a friend. It opens this build, puts the code in for
+         them, and joins — one click from a chat message to a seat on this roster.</p>` : ''}
 
       ${this.visibility === VISIBILITY.LISTED ? `
         <p class="small caveat"><b>What the shared list actually is.</b> There is no server.
@@ -511,6 +553,20 @@ export class LobbyScreen {
 
     const roomField = q('[data-room]');
     if (roomField) roomField.oninput = () => { this.roomName = roomSlug(roomField.value); };
+
+    const copyBtn = q('[data-copy]');
+    if (copyBtn) {
+      copyBtn.onclick = () => {
+        const field = q('[data-invite]');
+        const done = () => { this.copied = true; this.render(); setTimeout(() => { this.copied = false; this.refresh(); }, 1800); };
+        /* Clipboard first; select-the-field when the browser refuses. A copy button that
+         * can fail silently is worse than no button, because the paste that follows is an
+         * old clipboard. */
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(field.value).then(done, () => { field.select(); });
+        } else { field.select(); }
+      };
+    }
 
     const openBtn = q('[data-open]');
     if (openBtn) {
