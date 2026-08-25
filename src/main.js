@@ -22,6 +22,7 @@ import { Settings, SettingsPanel } from './ui/settings.js';
 import { BaseScreen } from './ui/base.js';
 import { LobbyScreen } from './ui/lobby.js';
 import { CommsWheel, screenProjector } from './ui/commswheel.js';
+import { TouchControls } from './ui/touch.js';
 import { Progression, loadSite } from './sim/progression.js';
 import { escapeHtml } from './ui/hud.js';
 import { dist } from './sim/geometry.js';
@@ -313,6 +314,20 @@ async function boot() {
     if (commsWheel.isOpen) commsWheel.aim(e.movementX || 0, e.movementY || 0);
     else if (game.viewPlayer) game.viewPlayer.look(e.movementX || 0, e.movementY || 0);
   });
+  /* Touch (src/ui/touch.js): the phone build. Movement and every button arrive as a
+   * virtual standard-mapping pad through input.pollPads in the frame loop, so nothing here
+   * wires them. main.js supplies only the mouse's two jobs: look deltas into the same
+   * look()/aim() the mouse feeds, and the first-gesture audio unlock (the overlay sits
+   * over the canvas, so the canvas click that used to start audio never fires). */
+  const touch = new TouchControls(input, {
+    onActivate: () => audio.start(),
+    onLook: (dx, dy) => {
+      if (game.clock.paused || panels.isOpen) return;
+      if (commsWheel.isOpen) commsWheel.aim(dx, dy);
+      else if (game.viewPlayer) game.viewPlayer.look(dx, dy);
+    },
+  }).attach();
+
   input.onBlur = () => { game.clock.setPaused(true); };
 
   /* ── the loop ────────────────────────────────────────────────────────── */
@@ -345,14 +360,14 @@ async function boot() {
      * caught the consequence: the mission clock RAN behind the Session lobby's sheet —
      * prompts changing, pressure climbing, the operation aging — while the player stood on
      * a screen with no world in it. A sheet that covers the game pauses the game. */
-    const paused = panels.isOpen || settingsPanel.isOpen || !!lobby.open || !!base.open || !pointerLocked;
+    const paused = panels.isOpen || settingsPanel.isOpen || !!lobby.open || !!base.open || (!pointerLocked && !touch.active);
     game.clock.setPaused(paused);
 
     /* The free-mouse hint. The other finding from the same playtest: unlocked, the world
      * sits frozen with a cursor on it and NOTHING SAYS WHY — no visible word "click"
      * anywhere on the screen. The overlay names the one action that starts the game, and
      * carries the controls so the first minute does not need a manual. */
-    const wantHint = !pointerLocked && !panels.isOpen && !settingsPanel.isOpen
+    const wantHint = !pointerLocked && !touch.active && !panels.isOpen && !settingsPanel.isOpen
       && !lobby.open && !base.open && game.mission.phase !== PHASE.DEBRIEF;
     if (wantHint !== freeHintShown) {
       freeHintShown = wantHint;
@@ -480,9 +495,15 @@ async function boot() {
     && window.matchMedia('(pointer: coarse)').matches && !window.matchMedia('(pointer: fine)').matches;
   const freeHint = document.createElement('div');
   freeHint.className = 'cd-freehint';
-  freeHint.innerHTML = coarseOnly
-    ? `<b>${escapeHtml(msg('hud.needsKeyboard'))}</b>`
-    : `<b>${escapeHtml(msg('hud.clickToPlay'))}</b><span>${escapeHtml(msg('hud.controlsLine'))}</span>`;
+  /* Three sentences for three machines. `touch.enabled` retires `needsKeyboard` on the
+   * devices it used to apologise to: the overlay is real now, so the hint teaches thumbs
+   * instead of demanding a keyboard. The apology survives only for the odd device that is
+   * coarse-pointer with no touch surface the module could build on. */
+  freeHint.innerHTML = touch.enabled
+    ? `<b>${escapeHtml(msg('hud.touchToPlay'))}</b><span>${escapeHtml(msg('hud.touchControlsLine'))}</span>`
+    : coarseOnly
+      ? `<b>${escapeHtml(msg('hud.needsKeyboard'))}</b>`
+      : `<b>${escapeHtml(msg('hud.clickToPlay'))}</b><span>${escapeHtml(msg('hud.controlsLine'))}</span>`;
   freeHint.style.display = 'none';
   document.getElementById('hud').appendChild(freeHint);
   let freeHintShown = false;
@@ -508,6 +529,11 @@ async function boot() {
   if (joinCode && /^[A-Z0-9]{5}$/.test(joinCode)) {
     lobby.show(null, { joiner: true });
     lobby.autoJoin(joinCode);
+  } else if (lobby.resume) {
+    /* This tab dropped out of a live session - the blob is sessionStorage, so it only
+     * exists after a reload of THAT session. Open the lobby as a joiner: 'Rejoin as
+     * <callsign>' is the primary action; Forget dismisses it. */
+    lobby.show(null, { joiner: true });
   } else if (bootFlow === 'solo') {
     panels.showLoadout();
   } else if (bootFlow === 'squad') {

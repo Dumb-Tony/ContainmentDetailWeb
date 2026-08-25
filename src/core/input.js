@@ -203,6 +203,9 @@ export class Input {
      * `padConnected` is a straight answer rather than a guess. */
     this.pad = { connected: false, id: '', move: { x: 0, y: 0 }, look: { x: 0, y: 0 } };
     this._padDown = new Set();
+    /* Virtual pad sources — see addPadSource. Empty on every keyboard/mouse session, and
+     * when empty pollPads runs exactly the code it ran before this list existed. */
+    this._padSources = [];
     /** Look sensitivity for the stick, in radians per second at full deflection. It is
      *  separate from the mouse's per-pixel figure because they are different quantities —
      *  a mouse delta is distance, a stick is a rate, and one number cannot be both. */
@@ -435,8 +438,40 @@ export class Input {
    *   browser and the suite can drive a synthetic pad through the same path the real one
    *   uses. Testing the simulation is not testing the game, and neither is testing a mock.
    */
+  /**
+   * Register a VIRTUAL pad: a function returning a Gamepad-shaped object (standard
+   * mapping) or null. `src/ui/touch.js` is the customer — its on-screen stick and
+   * buttons enter the game through the very same selection, deadzone, response curve,
+   * binding table and hold/toggle logic a physical pad uses, which is what keeps the
+   * build at ONE input path instead of growing a touch-shaped second one.
+   *
+   * ⚠ Sources are consulted AFTER the browser's own list, so a real standard pad
+   * displaces a virtual one rather than the other way round. Wrong-buttons-vs-no-buttons
+   * reasoning again: the player who plugged a pad in has said which they want.
+   */
+  addPadSource(fn) {
+    if (typeof fn === 'function' && !this._padSources.includes(fn)) this._padSources.push(fn);
+    return this;
+  }
+
+  removePadSource(fn) {
+    const i = this._padSources.indexOf(fn);
+    if (i >= 0) this._padSources.splice(i, 1);
+    return this;
+  }
+
   pollPads(pads) {
-    const list = pads || [];
+    let list = pads || [];
+    if (this._padSources.length) {
+      const merged = [];
+      for (const p of list) merged.push(p);
+      for (const fn of this._padSources) {
+        let vp = null;
+        try { vp = fn(); } catch { vp = null; }
+        if (vp) merged.push(vp);
+      }
+      list = merged;
+    }
     let g = null;
     for (const p of list) {
       if (!p || !p.connected) continue;

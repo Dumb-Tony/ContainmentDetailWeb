@@ -37,7 +37,10 @@
        form-action 'none'     there is no form in this build -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://0.peerjs.com wss://0.peerjs.com; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- viewport-fit=cover: without it iOS letterboxes the page clear of the notch and
+     env(safe-area-inset-*) reads zero, so the touch layout below could not respect the
+     insets it is written against. Desktop ignores the token entirely. -->
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Containment Detail — cold storage, level 2</title>
 <meta name="description" content="A cooperative-design containment operation: learn the anomaly's rules, build a field procedure, establish custody. Browser build.">
 
@@ -509,6 +512,108 @@
   .cd-lobby ul.log li b{color:var(--amber);font-weight:600;min-width:110px}
   .cd-lobby ul.log li span{color:var(--dim)}
   /* ══ LOBBY BLOCK — END ════════════════════════════════════════════════════ */
+
+  /* ══ TOUCH BLOCK — BEGIN ══════════════════════════════════════════════════
+     src/ui/touch.js's overlay. Everything between these markers belongs to it and
+     NOTHING here renders on a desktop: the module refuses to build its DOM on any
+     fine-pointer device, so these rules select nothing there — the desktop page is
+     pixel-identical by absence, not by media query. (No @media gate on purpose: the
+     test harness force-builds the overlay on a desktop browser and measures these
+     boxes; a media gate would make it measure an unstyled ghost.)
+
+     Sizing discipline, measured by tools/touch-tests.js rather than promised:
+       · every tappable target ≥ 44 CSS px at --cd-ui-scale:1
+       · every dimension multiplies by --cd-ui-scale (GDD §19.1)
+       · every edge offset carries env(safe-area-inset-*) so a notch or home bar
+         cannot cover a control. */
+  .cd-touch{position:fixed;inset:0;z-index:6;pointer-events:none;font-family:var(--mono)}
+  .cd-touch.displaced{display:none}  /* a real pad owns the session while connected */
+  .cd-touch *{touch-action:none;-webkit-user-select:none;user-select:none;
+    -webkit-tap-highlight-color:transparent}
+
+  /* The two halves. Invisible: they are hit regions, not chrome. The stick zone stops
+     at 72% height so the top-left HUD stack stays out of thumb range; the look zone
+     runs full height because a stray look costs nothing. */
+  .cd-touch-stickzone{position:absolute;left:0;bottom:0;width:46%;height:72%;pointer-events:auto}
+  .cd-touch-lookzone{position:absolute;right:0;top:0;width:54%;height:100%;pointer-events:auto}
+
+  /* The floating stick: blooms where the thumb lands, so there is no wrong place to
+     put the thumb. The nub travels to the drawn rim, which is the same R the axes are
+     normalised against in touch.js — picture and maths share one number. */
+  .cd-touch-stick{position:absolute;display:none;width:calc(120px * var(--cd-ui-scale));
+    height:calc(120px * var(--cd-ui-scale));
+    margin:calc(-60px * var(--cd-ui-scale)) 0 0 calc(-60px * var(--cd-ui-scale));
+    border:1px solid rgba(140,160,180,.45);border-radius:50%;background:rgba(10,14,19,.30)}
+  .cd-touch-stick.on{display:block}
+  .cd-touch-nub{position:absolute;left:50%;top:50%;
+    width:calc(46px * var(--cd-ui-scale));height:calc(46px * var(--cd-ui-scale));
+    margin:calc(-23px * var(--cd-ui-scale)) 0 0 calc(-23px * var(--cd-ui-scale));
+    border-radius:50%;background:rgba(95,208,216,.35);border:1px solid var(--cyan)}
+
+  /* Buttons. 56 px base (64 for USE, the commonest verb) keeps 44 px at scale .8,
+     which is the bottom of the settings slider's range. */
+  .cd-touch-btn{position:absolute;pointer-events:auto;display:flex;align-items:center;
+    justify-content:center;width:calc(56px * var(--cd-ui-scale));height:calc(56px * var(--cd-ui-scale));
+    border:1px solid var(--line);border-radius:50%;background:rgba(10,14,19,.55);
+    color:var(--dim);font-size:calc(10px * var(--cd-ui-scale));letter-spacing:.05em;
+    text-shadow:0 1px 2px #000}
+  .cd-touch-btn.on{border-color:var(--amber);background:rgba(40,28,10,.72);color:var(--hot)}
+
+  /* Right-thumb cluster, bottom-right arc: USE largest and nearest the resting thumb,
+     IMAGER inboard, CROUCH and COMMS up the edge. Offsets are picked so no two boxes
+     overlap at scale 1 (the suite checks all pairs, because BedroomRacers' overlapped
+     pads silently answered as the wrong button). */
+  .cd-touch .b-use{width:calc(64px * var(--cd-ui-scale));height:calc(64px * var(--cd-ui-scale));
+    right:calc(14px + env(safe-area-inset-right,0px));bottom:calc(96px + env(safe-area-inset-bottom,0px));
+    color:var(--ink);border-color:#3c4a58}
+  .cd-touch .b-imager{right:calc(84px + env(safe-area-inset-right,0px));bottom:calc(38px + env(safe-area-inset-bottom,0px))}
+  .cd-touch .b-crouch{right:calc(92px + env(safe-area-inset-right,0px));bottom:calc(152px + env(safe-area-inset-bottom,0px))}
+  .cd-touch .b-comms{right:calc(10px + env(safe-area-inset-right,0px));bottom:calc(190px + env(safe-area-inset-bottom,0px));
+    border-color:#2e5a5e;color:var(--cyan)}
+
+  /* The column under the objective text: rare verbs, small (44 px) and out of the way.
+     ABORT sits lowest so a procedure panic-reach is the shortest one. */
+  .cd-touch .b-settings,.cd-touch .b-tablet,.cd-touch .b-abort{
+    width:calc(44px * var(--cd-ui-scale));height:calc(44px * var(--cd-ui-scale));
+    right:calc(12px + env(safe-area-inset-right,0px));font-size:calc(8.5px * var(--cd-ui-scale))}
+  .cd-touch .b-settings{top:calc(96px + env(safe-area-inset-top,0px))}
+  .cd-touch .b-tablet{top:calc(148px + env(safe-area-inset-top,0px))}
+  .cd-touch .b-abort{top:calc(200px + env(safe-area-inset-top,0px));border-color:#4a2a24;color:#e08a7f}
+
+  /* Slots 1–5, centred low — matching the on-screen slot readout's order. Shifted a
+     little right of centre so slot 1 clears the stick zone's usual thumb arc. */
+  .cd-touch .b-slot1,.cd-touch .b-slot2,.cd-touch .b-slot3,.cd-touch .b-slot4,.cd-touch .b-slot5{
+    width:calc(44px * var(--cd-ui-scale));height:calc(44px * var(--cd-ui-scale));
+    bottom:calc(8px + env(safe-area-inset-bottom,0px));border-radius:8px;
+    font-size:calc(12px * var(--cd-ui-scale))}
+  .cd-touch .b-slot1{left:calc(50% - 118px * var(--cd-ui-scale))}
+  .cd-touch .b-slot2{left:calc(50% - 66px * var(--cd-ui-scale))}
+  .cd-touch .b-slot3{left:calc(50% - 14px * var(--cd-ui-scale))}
+  .cd-touch .b-slot4{left:calc(50% + 38px * var(--cd-ui-scale))}
+  .cd-touch .b-slot5{left:calc(50% + 90px * var(--cd-ui-scale))}
+
+  /* Phone-width layout for the DOM sheets and HUD. Gated on width, not pointer, so a
+     narrow desktop window gets the same working layout — and 760px is under the 768
+     tablet breakpoint, so the desktop suite at 1280 never enters here (asserted). */
+  @media (max-width:760px){
+    .cd-panel{padding:8px}
+    .cd-panel .cols{grid-template-columns:1fr}
+    .cd-panel .cols>section+section{border-left:0;border-top:1px solid var(--line)}
+    .cd-panel header{padding:12px 14px 9px}
+    .cd-panel .pad,.cd-panel .cols>section{padding:12px 14px}
+    .cd-panel footer{padding:10px 14px}
+    .cd-panel .claim{grid-template-columns:1fr;gap:6px}
+    .cd-panel .claim .btns{justify-content:flex-start}
+    .cd-settings .setrow{grid-template-columns:1fr 1fr 52px;gap:8px}
+    .cd-topright{max-width:42vw}
+    .cd-notices{width:min(390px,52vw)}
+    .cd-commsfeed{width:min(420px,56vw)}
+    /* The comms wheel is authored at 556×scale px; on a 360-wide screen its wedges land
+       off-glass. Scaling the finished wheel keeps commswheel.js's own geometry intact —
+       aiming is by drag delta, not by direct touch, so smaller wedges cost nothing. */
+    .cd-wheel{transform:scale(.62)}
+  }
+  /* ══ TOUCH BLOCK — END ════════════════════════════════════════════════════ */
 </style>
 </head>
 <body>

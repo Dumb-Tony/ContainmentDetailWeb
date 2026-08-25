@@ -1153,6 +1153,8 @@
   "hud": {
     "_note": "The head-up display. Everything here is read at a glance while something is walking toward you, so it is short by design and the short forms are the ones that must survive translation.",
     "clickToPlay": "Click to take control",
+    "touchToPlay": "Touch the screen to play",
+    "touchControlsLine": "Left thumb moves — push to the rim to sprint. Right thumb looks; tap to interact.",
     "controlsLine": "WASD move · mouse look · F interact · Q imager · TAB tablet · Z comms · Esc release",
     "needsKeyboard": "This build needs a keyboard and a mouse — phone support is not in yet.",
     "pressure": "Incident pressure: {stage}",
@@ -1220,5 +1222,11 @@
       "procedure": "Execute the committed procedure.",
       "investigate": "Establish what it is and what stops it. Plan on the tablet (TAB)."
     }
+  },
+  "touch": {
+    "_note": "The overlay button labels. Four to six characters, uppercase by convention — they sit on 44px buttons on a phone and a word that wraps is a word that vanishes.",
+    "use": "USE", "imager": "IMAGER", "crouch": "CROUCH", "comms": "COMMS",
+    "abort": "ABORT", "tablet": "TABLET", "settings": "MENU"
   }
+
 }
