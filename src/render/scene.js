@@ -33,15 +33,28 @@ const COL = {
 
 export function buildScene(THREE, site, { thermalFloorTexture }) {
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x05070a);
-  /* Exponential fog does most of the work of "a big dark cold room": it hides the far
-   * wall without a hard clip plane, and it makes a headlamp feel like the only thing you
-   * own. Density is tuned so a 24m floor reads as unknowable from its own doorway. */
-  scene.fog = new THREE.FogExp2(0x05070a, 0.052);
 
   const b = site.bounds;
   const w = b.maxX - b.minX, d = b.maxZ - b.minZ;
   const h = site.ceilingHeight;
+
+  /* TWO MAP FAMILIES, ONE DISCRIMINANT THE MAPS ALREADY CARRY. The interiors author
+   * ceilings a person could touch (cold store 3.4m, Ashlar 2.45m); the outdoor sites
+   * author their airspace (the reserve 4.6m, the switchyard 5.2m) because `ceilingHeight`
+   * is also the collision lid. 4.0m splits the shipped four cleanly and errs the right
+   * way: a new tall INTERIOR drawn as night sky is moody, a forest drawn as a room with a
+   * grey roof at head height is a different building. No map file grows a `family` field
+   * for this — presentation infers, content stays untouched (GDD §21.5). */
+  const outdoor = h >= 4.0;
+
+  const bg = new THREE.Color(outdoor ? 0x020409 : 0x05070a);
+  scene.background = bg;
+  /* Exponential fog does most of the work of "a big dark cold room": it hides the far
+   * wall without a hard clip plane, and it makes a headlamp feel like the only thing you
+   * own. Density is tuned so a 24m floor reads as unknowable from its own doorway —
+   * thinner outdoors, where the sites are wider and open night air is not a store room's
+   * hanging chill. */
+  scene.fog = new THREE.FogExp2(bg.getHex(), outdoor ? 0.040 : 0.052);
 
   const mat = (color, extra = {}) => new THREE.MeshLambertMaterial({ color, ...extra });
 
@@ -79,7 +92,15 @@ export function buildScene(THREE, site, { thermalFloorTexture }) {
   thermalFloorMesh.layers.set(L_THERMAL);
   scene.add(thermalFloorMesh);
 
-  const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(w, d), mat(0x1b1e22));
+  /* Indoors this is the roof. Outdoors it is the night: an UNLIT star-less black, on a
+   * MeshBasicMaterial with fog off so no light and no fog can ever grey it into looking
+   * like a surface — the reserve must not read as a very large room (its `ceilingHeight`
+   * is a collision lid, not a ceiling). Same mesh either way, because the plane is also
+   * what stops the camera seeing "past the top of the world" on a high pitch. */
+  const ceiling = new THREE.Mesh(
+    new THREE.PlaneGeometry(w, d),
+    outdoor ? new THREE.MeshBasicMaterial({ color: 0x010205, fog: false }) : mat(0x1b1e22),
+  );
   ceiling.rotation.x = Math.PI / 2;
   ceiling.position.set((b.minX + b.maxX) / 2, h, (b.minZ + b.maxZ) / 2);
   scene.add(ceiling);
@@ -159,6 +180,29 @@ export function buildScene(THREE, site, { thermalFloorTexture }) {
   );
   stair.position.set(site.extraction.x, 0.02, site.extraction.z);
   scene.add(both(stair));
+
+  /* The way OUT is visible from across the floor: a stack of translucent green hoops over
+   * the extraction disc, in COL.extraction so the disc, the hoops and the HUD say the same
+   * colour. §14.3 wants landmarks a squad can say aloud, and "the green stack" is the one
+   * they will say most under pressure — a disc on the floor disappears behind one shelf
+   * unit, a 2.6m stack does not. Layer 0 ONLY, on purpose: it is drawn light, not heat,
+   * and an imager that showed a warm column at extraction would be inventing a reading
+   * (the §18.1 rule the thermal pass exists to keep). depthWrite off so the translucent
+   * hoops never punch holes in the fog-faded structure behind them. */
+  const beaconMat = new THREE.MeshBasicMaterial({
+    color: COL.extraction, transparent: true, opacity: 0.30, depthWrite: false, side: THREE.DoubleSide,
+  });
+  for (let k = 0; k < 3; k++) {
+    const hoop = new THREE.Mesh(new THREE.CylinderGeometry(0.55 - k * 0.13, 0.55 - k * 0.13, 0.06, 18, 1, true), beaconMat);
+    hoop.position.set(site.extraction.x, 0.9 + k * 0.75, site.extraction.z);
+    scene.add(hoop);
+  }
+  const mast = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.025, 0.025, 2.6, 8),
+    new THREE.MeshBasicMaterial({ color: COL.extraction, transparent: true, opacity: 0.5, depthWrite: false }),
+  );
+  mast.position.set(site.extraction.x, 1.3, site.extraction.z);
+  scene.add(mast);
   for (let k = 0; k < 5; k++) {
     const st = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.18, 0.34), mat(0x4b5158));
     st.position.set(site.extraction.x, 0.09 + k * 0.18, site.extraction.z - 0.9 + k * 0.34);
@@ -179,9 +223,11 @@ export function buildScene(THREE, site, { thermalFloorTexture }) {
     scene.add(g);
   }
 
-  /* Lights. Deliberately few: GDD §16.6 caps dynamic lights, and darkness is a mechanic. */
-  scene.add(new THREE.AmbientLight(0x35404a, 0.40));
-  scene.add(new THREE.HemisphereLight(0x2a3a4c, 0x0d1014, 0.48));
+  /* Lights. Deliberately few: GDD §16.6 caps dynamic lights, and darkness is a mechanic.
+   * Outdoor night is a shade cooler and dimmer than a store's ambient spill — there is no
+   * building to bounce it. */
+  scene.add(new THREE.AmbientLight(outdoor ? 0x2c3844 : 0x35404a, outdoor ? 0.34 : 0.40));
+  scene.add(new THREE.HemisphereLight(outdoor ? 0x1e2c3e : 0x2a3a4c, 0x0d1014, outdoor ? 0.40 : 0.48));
 
   const luminaireLights = site.luminaires.map((l) => {
     const light = new THREE.PointLight(l.emergency ? 0xff9a5a : 0xcfe4ff, 0, l.emergency ? 7 : 9, 1.6);
@@ -190,7 +236,22 @@ export function buildScene(THREE, site, { thermalFloorTexture }) {
     const fitting = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.08, 0.16), mat(l.emergency ? 0x5a3a2a : 0x50565e));
     fitting.position.set(l.x, h - 0.16, l.z);
     scene.add(both(fitting));
-    return { light, def: l };
+    /* The diffuser: the lit face UNDER the fitting, the thing your eye calls "a light
+     * that is on". A PointLight alone lights the floor and leaves its own fitting dark —
+     * you could stand under a live luminaire and not be able to say so, which is a §8.2
+     * failure for the one system the squad is sent to switch. Basic (a lit panel is not
+     * shaded), starts hidden, and `_syncLights` toggles it with the circuit. Mildly warm
+     * on the imager via both(): a running fitting is the one ceiling feature that IS
+     * warm, and the visible toggle keeps the imager honest about dead circuits for free. */
+    const glow = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.46, 0.14),
+      new THREE.MeshBasicMaterial({ color: l.emergency ? 0xffb37a : 0xdcecff, side: THREE.DoubleSide }),
+    );
+    glow.rotation.x = Math.PI / 2;
+    glow.position.set(l.x, h - 0.205, l.z);
+    glow.visible = false;
+    scene.add(both(glow, 0x6a4a30));
+    return { light, def: l, glow };
   });
 
   /* NOTE the name: `thermalFloorMesh`, not `thermalFloor`. The renderer spreads this

@@ -41,7 +41,10 @@ import {
   CommsWheel, WHEEL_ORDER, sectorAt, sectorPos, projectPoint, aimPoint, KIND_VARS,
 } from '../src/ui/commswheel.js';
 import { Progression, loadSite, DEPLOYMENT_COST, DEPARTMENT_IDS, migrate } from '../src/sim/progression.js';
-import { anomalyIsVisible, anomalyOnThermal, anomalyForm, ANOMALY_FORMS } from '../src/render/renderer.js';
+import {
+  anomalyIsVisible, anomalyOnThermal, anomalyForm, ANOMALY_FORMS,
+  DEPLOYABLE_FORMS, deployableForm, MATE_FORM, mateBand,
+} from '../src/render/renderer.js';
 import { Input, DEFAULT_BINDINGS, isReservedCode, PAD_BUTTONS, HOLD_MODE } from '../src/core/input.js';
 import { segmentHitsRect, moveWithWalls, dist, circleHitsRect } from '../src/sim/geometry.js';
 
@@ -965,6 +968,7 @@ async function sectionK() {
      * on anything absent, so the next module cannot be quietly exempt. */
     'src/sim/telemetry.js', 'src/sim/certification.js',
     'src/core/i18n.js', 'src/core/crash.js', 'src/ui/base.js', 'src/ui/lobby.js', 'src/net/lobby.js',
+    'src/ui/touch.js',
   ];
   /* ⚠ Strip comments FIRST. Every rule below is about what the code DOES, and a raw grep
    * tests what the file SAYS: rng.js explains at length that nothing may call
@@ -1160,6 +1164,12 @@ async function sectionK() {
       constructor(r, w, h, ps, pl, ts, tl) { this.kind = 'sphere'; this.r = r; this.thetaLength = tl; }
       scale(x, y, z) { this.sy = y; return this; }
     },
+    /* The deployable rigs speak four more primitives than the anomalies do. Same stub
+     * discipline: record what was asked for, construct nothing. */
+    BoxGeometry: class { constructor(w, h, d) { this.kind = 'box'; this.w = w; this.h = h; this.d = d; } },
+    PlaneGeometry: class { constructor(w, h) { this.kind = 'plane'; this.w = w; this.h = h; } },
+    ConeGeometry: class { constructor(r, h) { this.kind = 'cone'; this.r = r; this.h = h; } },
+    TorusGeometry: class { constructor(r, tube) { this.kind = 'torus'; this.r = r; this.tube = tube; } },
   };
 
   const shapes = [];
@@ -1251,6 +1261,85 @@ async function sectionK() {
     && anomalyOnThermal({ perception: { channels: ['thermal'] } }) === true
     && anomalyOnThermal({ perception: { channels: ['instrument-only'] } }) === true
     && anomalyOnThermal(null) === false);
+
+  /**
+   * ⚠ AND THE SQUAD'S OWN EQUIPMENT WAS EIGHT NEAR-IDENTICAL BOXES.
+   *
+   * K18–K24 gave the anomalies their shapes and left the squad's gear as one
+   * crate-with-a-stalk (the tripod and the case excepted) — so a motion sensor, a camera,
+   * a microphone, a pack, a heater and a flashlight could not be told apart across an
+   * aisle, in a game whose loop is calling equipment out across an aisle. The standard is
+   * PING_KINDS' own (§18.5): silhouettes differ in OUTLINE, not just colour. Driven
+   * through the same stub THREE, because a rig is a pure content question too — keyed on
+   * ITEM ids, which are the engine's own manifest vocabulary, never on anomaly ids.
+   */
+  const COLSTUB = { tripod: 1, case: 2, pack: 3, barrier: 4 };
+  const rigSig = (spec, dims) => {
+    const kinds = {};
+    for (const part of spec.parts(T, COLSTUB, dims)) kinds[part.geo.kind] = (kinds[part.geo.kind] || 0) + 1;
+    return Object.entries(kinds).sort().map(([k, n]) => `${k}x${n}`).join(' ');
+  };
+  const itemsDoc = (await loadContent({ incident: INCIDENTS[0] })).items;
+  const deployableIds = itemsDoc.items.filter((i) => i.deployable).map((i) => i.id);
+  const rigless = deployableIds.filter((id) => deployableForm(id) === DEPLOYABLE_FORMS.fallback);
+  eq(`K30 every deployable in the shipped manifest has a rig of its own — ${deployableIds.length} deployables${rigless.length ? `, rigless: ${rigless.join(', ')}` : ''}`,
+    rigless.length, 0);
+
+  const rigIds = Object.keys(DEPLOYABLE_FORMS);
+  const sigs = rigIds.map((id) => `${id.split('-').pop()}=${rigSig(DEPLOYABLE_FORMS[id])}`);
+  note(`rigs: ${sigs.join(', ')}`);
+  eq('K31 no two rigs share a primitive recipe — outline-distinct in the §18.5 sense, the fallback included',
+    new Set(rigIds.map((id) => rigSig(DEPLOYABLE_FORMS[id]))).size, rigIds.length);
+
+  ok('K32 an item this table has never heard of still puts a visible object on the floor — the documented fallback, never a throw and never nothing',
+    deployableForm('item-nobody-has-shipped') === DEPLOYABLE_FORMS.fallback
+    && DEPLOYABLE_FORMS.fallback.parts(T, COLSTUB).length >= 2);
+
+  /* The imager must be able to say a unit died: heat lives on parts the renderer can
+   * toggle (glow) or swap cold (thermalHot), and the cold silhouette is always declared. */
+  const heatItems = ['floodlight-tripod', 'portable-heater', 'reinforced-transit-case'];
+  const noGlow = heatItems.filter((id) => !DEPLOYABLE_FORMS[id].parts(T, COLSTUB).some((p) => p.glow));
+  eq(`K33 every heat emitter's rig carries a glow part the sync can hide when it dies${noGlow.length ? ` — missing: ${noGlow.join(', ')}` : ''}`,
+    noGlow.length, 0);
+  ok('K33a and every rig declares the cold silhouette its hot parts fall back to',
+    rigIds.every((id) => typeof DEPLOYABLE_FORMS[id].thermal === 'number'));
+
+  const floating = rigIds.filter((id) => DEPLOYABLE_FORMS[id].parts(T, COLSTUB).some((p) => p.at[1] < 0 || p.at[1] > 2));
+  eq(`K34 rigs stand on the floor and under head height — no buried parts, no hovering ones${floating.length ? ` — ${floating.join(', ')}` : ''}`,
+    floating.length, 0);
+
+  /* The barrier is the one rig sized by its INSTANCE: the drawn panel must be the sim's
+   * own collision rect, in either orientation, or the wall you see and the wall the
+   * draught cannot cross disagree. */
+  const wideX = DEPLOYABLE_FORMS['portable-barrier'].parts(T, COLSTUB, { w: 3.1, d: 0.2 });
+  const wideZ = DEPLOYABLE_FORMS['portable-barrier'].parts(T, COLSTUB, { w: 0.2, d: 3.1 });
+  ok('K35 the barrier panel is exactly its collision rect, whichever axis the sim snapped it to',
+    wideX.some((p) => p.geo.kind === 'box' && p.geo.w === 3.1)
+    && wideZ.some((p) => p.geo.kind === 'box' && p.geo.d === 3.1));
+
+  /**
+   * ⚠ A TEAMMATE MUST NEVER BE MISTAKABLE FOR THE STILLWATER-FIGURE. Both are lathed
+   * people; "which silhouette do I shoot a callout at" must not be a coin flip. The mate
+   * is shorter, wider-shouldered, helmeted, and — the channel the figure is DEFINED by
+   * lacking — carries its own light. The armband colour is §19.2-redundant: it says which
+   * mate, never that it is one.
+   */
+  const mateTall = Math.max(...MATE_FORM.profile.map(([, y]) => y));
+  const figTall = Math.max(...ANOMALY_FORMS.figure.build(T).points.map((p) => p.y));
+  const mateWide = Math.max(...MATE_FORM.profile.map(([x]) => x)) * 2;
+  note(`  a mate is ${mateTall.toFixed(2)}m to the figure's ${figTall.toFixed(2)}m, ${mateWide.toFixed(2)}m across the shoulders`);
+  ok(`K36 a mate's profile is not the figure's — ${(figTall - mateTall).toFixed(2)}m shorter, differently shouldered, and lit`,
+    Math.abs(figTall - mateTall) >= 0.05
+    && mateWide !== Math.max(...ANOMALY_FORMS.figure.build(T).points.map((p) => p.x)) * 2
+    && typeof MATE_FORM.lampColor === 'number');
+  ok('K36a and mates stand on the floor like the figure does',
+    Math.min(...MATE_FORM.profile.map(([, y]) => y)) === 0);
+  ok('K37 five seats, five armbands, no two alike — and a malformed seat id wears the first band rather than crashing the frame',
+    MATE_FORM.bands.length === 5
+    && new Set(MATE_FORM.bands).size === 5
+    && mateBand('p3') === MATE_FORM.bands[2]
+    && mateBand('p1') === MATE_FORM.bands[0]
+    && MATE_FORM.bands.includes(mateBand('not-a-seat')));
 
   /**
    * ⚠ AND `evidenceRules[].channel` WAS THE EIGHTEENTH DEAD CONTENT KEY.

@@ -258,6 +258,244 @@ export function anomalyForm(def) {
   return { key, spec, span };
 }
 
+/**
+ * What each piece of equipment looks like on the floor.
+ *
+ * ⚠ EVERY DEPLOYABLE WAS A NEAR-IDENTICAL SMALL BOX. The tripod and the case had rigs of
+ * their own; the other six shared one crate-with-a-stalk, so a motion sensor, a camera, a
+ * microphone, a power pack, a heater and a flashlight could not be told apart across an
+ * aisle — and this game's whole loop is a squad calling out equipment across an aisle. The
+ * standard is the one PING_KINDS (src/sim/comms.js) already holds itself to, §18.5:
+ * silhouettes differ in OUTLINE, not just colour — "a filled circle and a filled square are
+ * one bad monitor away from being the same mark", and a dark cold store at 20m through fog
+ * is a bad monitor. So no two rigs here share a primitive recipe: an A-frame is a tripod, a
+ * lidded box is the case, a post with a fan wedge is a sensor, a mast with a tilted wedge
+ * and a lens is a camera, a dish on a stand is the microphone, a squat box with a carry
+ * loop is the pack, a drum with a glowing band is the heater, a small lying cylinder is the
+ * flashlight, and a wide thin panel on feet is the barrier.
+ *
+ * KEYED BY ITEM ID, WHICH IS THE ALLOWED KIND OF NAME. Section K greps forbid the renderer
+ * knowing any ANOMALY by name, because anomalies are content and content is authoritative.
+ * Items are the other case: `content/equipment/items.json` is the engine's own manifest —
+ * game.js, deployables.js and the HUD all dispatch on these ids already — so a table keyed
+ * on them is presentation reading the engine's vocabulary, not the renderer inventing a
+ * rule about somebody's content. An item this table has never heard of falls back to the
+ * crate-with-a-stalk everything used to be (`fallback` below), so a new manifest row
+ * degrades to the old look rather than to nothing.
+ *
+ * Each entry's `parts(THREE, COL, dims)` runs ONCE per placed deployable and returns plain
+ * descriptors — geometry, position, colour, and three flags:
+ *
+ *   basic   MeshBasicMaterial instead of Lambert: the part is a light source or a glowing
+ *           face, and a glowing face shaded by a headlamp is a contradiction.
+ *   glow    only exists while the unit is powered. `_syncDeployables` toggles `visible` on
+ *           the state change — never rebuilds — which is the thermalSwap discipline:
+ *           geometry is built once, per-frame work is flags and material fields.
+ *   pulse   the eye-side opacity breathes while powered (the case's heater, the heater's
+ *           element). Opacity writes only; no allocation, no geometry.
+ *
+ * THE IMAGER TELLS THE TRUTH ABOUT DEAD UNITS. The old per-item thermal colour was
+ * constant, so a flat tripod still read white-hot on the instrument. Now `thermal` is the
+ * cold silhouette every part starts from, `thermalHot` (per part) is what a POWERED unit's
+ * hot parts read as, and the same state change that dims the eye-side materials swaps the
+ * thermal colour — so a fence post that died is cold on the screen that exists to say so,
+ * which is the failure signal `fence-power` authored ("tripods dim in sequence").
+ *
+ * The parameter is named THREE, deliberately: suite check K14 greps `THREE\.<Class>`
+ * against the vendored r128 bundle, and a table that called it `T` would put every
+ * geometry class here outside the check that exists because of CapsuleGeometry.
+ */
+const TRIPOD_TILT = 0.30;
+export const DEPLOYABLE_FORMS = Object.freeze({
+  /** Three splayed legs, a head, and the lit pane itself. Tall and empty in the middle —
+   *  nothing else on the floor is an A-frame. */
+  'floodlight-tripod': Object.freeze({
+    thermal: 0x243040,
+    parts: (THREE, COL) => {
+      /* Legs in a mid steel, not COL.tripod's near-black: photographed at 8m under one
+       * luminaire, near-black legs vanished and the A-frame — the outline that IS this
+       * rig — read as two floating antennas. The head keeps the dark housing colour. */
+      const legs = [0, 1, 2].map((k) => {
+        const a = (k / 3) * TAU;
+        return {
+          geo: new THREE.CylinderGeometry(0.028, 0.028, 1.62, 6),
+          at: [Math.sin(a) * 0.30, 0.76, Math.cos(a) * 0.30],
+          rot: [TRIPOD_TILT * Math.cos(a), 0, -TRIPOD_TILT * Math.sin(a)],
+          color: 0x555b64,
+        };
+      });
+      return [
+        ...legs,
+        /* The housing warms while the lamp runs — a 60C fitting, not a 20C one. */
+        { geo: new THREE.BoxGeometry(0.42, 0.26, 0.22), at: [0, 1.62, 0], color: 0x8b8f96, thermalHot: 0x9a6a38 },
+        { geo: new THREE.PlaneGeometry(0.34, 0.20), at: [0, 1.62, -0.115], rot: [-0.25, Math.PI, 0], color: 0xfff6da, basic: true, glow: true, thermalHot: 0xfff2c8 },
+      ];
+    },
+  }),
+
+  /** A lidded box with a proud rim, and the 39C heater strips that make it the bait. */
+  'reinforced-transit-case': Object.freeze({
+    thermal: 0x1c2833,
+    parts: (THREE, COL) => [
+      { geo: new THREE.BoxGeometry(0.90, 0.54, 0.64), at: [0, 0.27, 0], color: COL.case, thermalHot: 0xd8903a },
+      { geo: new THREE.BoxGeometry(0.94, 0.06, 0.68), at: [0, 0.52, 0], color: 0x1d2126 },
+      { geo: new THREE.BoxGeometry(0.98, 0.10, 0.72), at: [0, 0.585, 0], color: 0x9d7b34, thermalHot: 0xd8903a },
+      { geo: new THREE.PlaneGeometry(0.62, 0.09), at: [0, 0.30, -0.323], rot: [0, Math.PI, 0], color: 0xffb060, basic: true, glow: true, pulse: true, opacity: 0.95, thermalHot: 0xffc070 },
+      { geo: new THREE.PlaneGeometry(0.62, 0.10), at: [0, 0.637, 0], rot: [-Math.PI / 2, 0, 0], color: 0xffb060, basic: true, glow: true, pulse: true, opacity: 0.95, thermalHot: 0xffc070 },
+    ],
+  }),
+
+  /** A post and the fan wedge that watches the lane. The wedge's wide face points the way
+   *  the instrument does, so the rig SHOWS its coverage the way the camera below shows its
+   *  tilt. */
+  'motion-sensor': Object.freeze({
+    thermal: 0x1c2833,
+    parts: (THREE) => [
+      { geo: new THREE.CylinderGeometry(0.026, 0.026, 0.96, 6), at: [0, 0.48, 0], color: 0x777d85 },
+      { geo: new THREE.ConeGeometry(0.17, 0.34, 4, 1), at: [0, 1.02, -0.14], rot: [Math.PI / 2, 0, Math.PI / 4], color: 0x59606a },
+    ],
+  }),
+
+  /** A mast with a tilted wedge and a lens barrel: it looks DOWN its approach lane. */
+  'remote-camera': Object.freeze({
+    thermal: 0x1c2833,
+    parts: (THREE) => [
+      { geo: new THREE.CylinderGeometry(0.02, 0.02, 1.12, 6), at: [0, 0.56, 0], color: 0x777d85 },
+      { geo: new THREE.BoxGeometry(0.20, 0.13, 0.26), at: [0, 1.16, -0.02], rot: [-0.42, 0, 0], color: 0x4c545e },
+      { geo: new THREE.CylinderGeometry(0.045, 0.045, 0.14, 8), at: [0, 1.10, -0.16], rot: [-(Math.PI / 2) - 0.42, 0, 0], color: 0x394049 },
+    ],
+  }),
+
+  /** A dish on a stand, with the receiver stick at its focus. DoubleSide because the
+   *  whole point of a dish is its concave face — and the stick is there because a lit
+   *  bowl photographs as a ball from most angles (measured, docs/m7-gear.png's first
+   *  take): the element poking out of the middle is what says "dish" from ANY angle,
+   *  the way the fan wedge says "sensor". Tilted a few degrees up so the rim reads as
+   *  an ellipse rather than an outline circle. */
+  'directional-microphone': Object.freeze({
+    thermal: 0x1c2833,
+    parts: (THREE) => [
+      { geo: new THREE.CylinderGeometry(0.022, 0.022, 0.88, 6), at: [0, 0.44, 0], color: 0x777d85 },
+      { geo: new THREE.SphereGeometry(0.20, 12, 6, 0, TAU, 0, 0.85), at: [0, 0.92, 0.06], rot: [Math.PI / 2 - 0.10, 0, 0], color: 0x8a8f96, double: true },
+      { geo: new THREE.CylinderGeometry(0.013, 0.013, 0.24, 5), at: [0, 0.93, -0.10], rot: [Math.PI / 2 - 0.10, 0, 0], color: 0x30363d },
+    ],
+  }),
+
+  /** A squat box with a carry loop. Mildly warm on the imager while it feeds — its cells
+   *  and fan are working — and cold the moment it is not. */
+  'power-pack': Object.freeze({
+    thermal: 0x1c2833,
+    parts: (THREE, COL) => [
+      { geo: new THREE.BoxGeometry(0.52, 0.34, 0.42), at: [0, 0.17, 0], color: COL.pack, thermalHot: 0x50361f },
+      /* The loop stands across the box (plane facing ±z), in a mid grey: edge-on and
+       * near-black it disappeared, and the loop is the rig's whole outline claim. */
+      { geo: new THREE.TorusGeometry(0.15, 0.034, 6, 12), at: [0, 0.40, 0], color: 0x3f474f },
+    ],
+  }),
+
+  /** A drum with a glowing element band and a cap. The band is the 78C the item file
+   *  states, so it is the one deployable whose glow is the melody rather than a lamp. */
+  'portable-heater': Object.freeze({
+    thermal: 0x1c2833,
+    parts: (THREE) => [
+      { geo: new THREE.CylinderGeometry(0.21, 0.21, 0.56, 12), at: [0, 0.28, 0], color: 0x714b33, thermalHot: 0xffb066 },
+      { geo: new THREE.CylinderGeometry(0.215, 0.215, 0.14, 12, 1, true), at: [0, 0.30, 0], color: 0xff6a2e, basic: true, glow: true, pulse: true, opacity: 0.9, double: true, thermalHot: 0xffd08a },
+      { geo: new THREE.ConeGeometry(0.17, 0.14, 10), at: [0, 0.70, 0], color: 0x3a3f45 },
+    ],
+  }),
+
+  /** A hand torch, lying where it was set down. The lens face lights when it is on and its
+   *  thermal stays COLD either way — an LED torch is the one emitter here whose light is
+   *  not heat, which is the contrast the item file says the floor teaches. */
+  flashlight: Object.freeze({
+    thermal: 0x1c2833,
+    parts: (THREE) => [
+      { geo: new THREE.CylinderGeometry(0.035, 0.035, 0.22, 8), at: [0, 0.045, 0], rot: [0, 0, Math.PI / 2], color: 0x30353b },
+      { geo: new THREE.CylinderGeometry(0.05, 0.042, 0.07, 8), at: [0.135, 0.05, 0], rot: [0, 0, Math.PI / 2], color: 0x3c424a },
+      { geo: new THREE.PlaneGeometry(0.075, 0.075), at: [0.175, 0.05, 0], rot: [0, Math.PI / 2, 0], color: 0xfff6d8, basic: true, glow: true },
+    ],
+  }),
+
+  /** The one rig sized by its INSTANCE rather than by its item: the sim's barrierRect is
+   *  the collision truth, and a panel drawn any other width would disagree with the wall
+   *  the draught actually cannot cross (the scene.js header's founding rule). Feet sit on
+   *  the long axis, whichever axis that is. */
+  'portable-barrier': Object.freeze({
+    thermal: 0x22303e,
+    parts: (THREE, COL, dims) => {
+      const w = (dims && dims.w) || 2.4, d = (dims && dims.d) || 0.2;
+      const feet = w >= d
+        ? [{ geo: new THREE.BoxGeometry(0.26, 0.10, d + 0.36), at: [w / 2 - 0.2, 0.05, 0], color: 0x565845 },
+          { geo: new THREE.BoxGeometry(0.26, 0.10, d + 0.36), at: [-(w / 2 - 0.2), 0.05, 0], color: 0x565845 }]
+        : [{ geo: new THREE.BoxGeometry(w + 0.36, 0.10, 0.26), at: [0, 0.05, d / 2 - 0.2], color: 0x565845 },
+          { geo: new THREE.BoxGeometry(w + 0.36, 0.10, 0.26), at: [0, 0.05, -(d / 2 - 0.2)], color: 0x565845 }];
+      return [
+        { geo: new THREE.BoxGeometry(w, 1.86, d), at: [0, 0.93, 0], color: COL.barrier },
+        { geo: new THREE.BoxGeometry(w + 0.06, 0.07, d + 0.06), at: [0, 1.93, 0], color: 0x8d8f7a },
+        ...feet,
+      ];
+    },
+  }),
+
+  /** The crate-with-a-stalk every deployable used to be, kept as the DOCUMENTED FALLBACK:
+   *  an item id this table has never heard of still puts a visible, walk-uppable object on
+   *  the floor, and its very genericness is the bug report. */
+  fallback: Object.freeze({
+    thermal: 0x1c2833,
+    parts: (THREE) => [
+      { geo: new THREE.BoxGeometry(0.36, 0.4, 0.3), at: [0, 0.2, 0], color: 0x59606a },
+      { geo: new THREE.CylinderGeometry(0.02, 0.02, 0.5, 5), at: [0, 0.62, 0], color: 0x777d85 },
+    ],
+  }),
+});
+
+/** The rig for an item id, through the documented fallback. Exported pure, like
+ *  `anomalyForm`: the suite drives it with a stub THREE and no WebGL context. */
+export function deployableForm(itemId) {
+  return Object.prototype.hasOwnProperty.call(DEPLOYABLE_FORMS, itemId)
+    ? DEPLOYABLE_FORMS[itemId] : DEPLOYABLE_FORMS.fallback;
+}
+
+/**
+ * A squadmate's body, and how it differs from the thing the squad is watching.
+ *
+ * The stillwater-figure is ANOMALY_FORMS.figure: 1.78m, unlit, facing away, still. A
+ * teammate lathed from the SAME profile would be the §18.1 failure with the highest stakes
+ * in the build — "which silhouette do I shoot a callout at" must never be a coin flip — so
+ * every field here is a deliberate distance from that profile, asserted by the suite:
+ *
+ *   · 1.70m with a helmet bump and wider shoulders — different height, different posture;
+ *   · a HEADLAMP: a lit face on the helmet and a visible beam cone. The figure is defined
+ *     by being at the limit of the light; a mate is defined by bringing their own;
+ *   · an armband in their seat's colour, on a MeshBasicMaterial so it reads in the dark.
+ *     §19.2: the colour is the redundant channel (which mate), never the required one
+ *     (that it IS a mate — the lamp and the profile carry that), and the HUD roster says
+ *     the same thing in text.
+ *
+ * Five band colours for five seats (net/protocol.js MAX_SQUAD), chosen far apart in hue
+ * AND in lightness so the common colour-vision confusions (§19.2 again) still get a
+ * light/dark difference to hold on to.
+ */
+export const MATE_FORM = Object.freeze({
+  /* Lathe profile, feet at y=0: boot, hip, chest, shoulder shelf, neck, helmet. */
+  profile: Object.freeze([
+    [0.001, 1.70], [0.10, 1.665], [0.115, 1.575], [0.105, 1.52], [0.065, 1.475],
+    [0.24, 1.38], [0.22, 1.02], [0.19, 0.88], [0.21, 0.78], [0.15, 0.40],
+    [0.13, 0.05], [0.001, 0.00],
+  ]),
+  bands: Object.freeze([0x9aa5b1, 0x3f8fd4, 0xd4a13f, 0x3fd4a5, 0xc65fd4]),
+  lampColor: 0xffeedd,
+});
+
+/** Which band a seat wears. Seat ids are `p1`..`p5` (game.js `addPlayer`); anything else
+ *  (a malformed snapshot, a future seat scheme) wears the first band rather than crashing
+ *  a frame. */
+export function mateBand(playerId) {
+  const n = parseInt(String(playerId).slice(1), 10);
+  const b = MATE_FORM.bands;
+  return b[Number.isFinite(n) && n >= 1 ? (n - 1) % b.length : 0];
+}
+
 export class Renderer {
   constructor(THREE, canvas, game) {
     this.THREE = THREE;
@@ -333,9 +571,9 @@ export class Renderer {
      * thing you actually track is somebody else's light — and on the imager they are the
      * second-warmest thing on the floor, which is exactly what makes standing next to the
      * bait a bad idea. */
-    this._mateMeshes = new Map();  // playerId -> {group, lamp}
+    this._mateMeshes = new Map();  // playerId -> {group, lamp, beam}
 
-    this._depMeshes = new Map();   // uid -> {group, light}
+    this._depMeshes = new Map();   // uid -> {group, light, lit, glows, pulses}
     this._iceMeshes = [];
     this._iceGeo = new THREE.CircleGeometry(1, 18);
     this._iceMat = new THREE.MeshBasicMaterial({ color: 0xbcd7e6, transparent: true, opacity: 0.4 });
@@ -547,7 +785,13 @@ export class Renderer {
     return anomalyIsVisible(this.game && this.game.anomaly && this.game.anomaly.def);
   }
 
-  _syncDeployables() {
+  /**
+   * @param {number} t sim time, for the powered-glow pulse. Everything here follows the
+   * build-once rule at the head of DEPLOYABLE_FORMS: a rig is constructed on the frame its
+   * deployable first exists and after that this loop only writes positions, intensities,
+   * `visible` flags, opacities and material colours.
+   */
+  _syncDeployables(t) {
     const THREE = this.THREE;
     const seen = new Set();
     for (const d of this.game.deployables.list) {
@@ -555,52 +799,46 @@ export class Renderer {
       let rec = this._depMeshes.get(d.uid);
       if (!rec) {
         const g = new THREE.Group();
-        const col = d.itemId === 'floodlight-tripod' ? this.COL.tripod
-          : d.itemId === 'reinforced-transit-case' ? this.COL.case
-            : d.isBarrier ? this.COL.barrier
-              : d.isPack ? this.COL.pack : 0x59606a;
-
+        const spec = deployableForm(d.itemId);
+        /* Only the barrier reads its instance: the panel must be exactly the wall the sim
+         * collides the draught against, never the item's nominal width. */
+        let dims = null;
         if (d.isBarrier) {
           const r = d.barrierRect();
-          const panel = new THREE.Mesh(
-            new THREE.BoxGeometry(Math.max(0.18, r[2] - r[0]), 1.9, Math.max(0.18, r[3] - r[1])),
-            new THREE.MeshLambertMaterial({ color: col }),
-          );
-          panel.position.y = 0.95;
-          g.add(panel);
-        } else if (d.itemId === 'floodlight-tripod') {
-          const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.5, 6), new THREE.MeshLambertMaterial({ color: col }));
-          leg.position.y = 0.75; g.add(leg);
-          const head = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.24, 0.2), new THREE.MeshLambertMaterial({ color: 0x8b8f96 }));
-          head.position.y = 1.6; g.add(head);
-        } else if (d.itemId === 'reinforced-transit-case') {
-          const box = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.62, 0.66), new THREE.MeshLambertMaterial({ color: col }));
-          box.position.y = 0.31; g.add(box);
-          const band = new THREE.Mesh(new THREE.BoxGeometry(0.94, 0.07, 0.7), new THREE.MeshLambertMaterial({ color: 0x1d2126 }));
-          band.position.y = 0.44; g.add(band);
-        } else {
-          const box = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.4, 0.3), new THREE.MeshLambertMaterial({ color: col }));
-          box.position.y = 0.2; g.add(box);
-          const stalk = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.5, 5), new THREE.MeshLambertMaterial({ color: 0x777d85 }));
-          stalk.position.y = 0.62; g.add(stalk);
+          dims = { w: Math.max(0.18, r[2] - r[0]), d: Math.max(0.18, r[3] - r[1]) };
         }
-        /* On the imager a fence post is the brightest thing on the floor and the bait is
-         * a warm smudge — which is the entire read the operator needs, and it comes from
-         * the same table that decides the item's shape. */
-        const thermal = {
-          'floodlight-tripod': 0xfff2c8,
-          'portable-heater': 0xffd08a,
-          'reinforced-transit-case': 0xd8903a,
-          'portable-barrier': 0x22303e,
-        }[d.itemId] || 0x1c2833;
-        g.traverse((o) => {
-          o.layers.enable(1);
-          if (!o.isMesh) return;
-          o.userData.thermalMat = new THREE.MeshBasicMaterial({ color: thermal });
-          this.thermalSwap.push(o);
-        });
+        const glows = [], pulses = [];
+        for (const part of spec.parts(THREE, this.COL, dims)) {
+          const opts = { color: part.color };
+          if (part.opacity !== undefined) { opts.transparent = true; opts.opacity = part.opacity; }
+          if (part.double || part.glow) opts.side = THREE.DoubleSide;
+          const mesh = new THREE.Mesh(part.geo,
+            part.basic ? new THREE.MeshBasicMaterial(opts) : new THREE.MeshLambertMaterial(opts));
+          mesh.position.set(part.at[0], part.at[1], part.at[2]);
+          if (part.rot) mesh.rotation.set(part.rot[0], part.rot[1], part.rot[2]);
+          /* The thermal layer, part by part. `thermal` is the cold silhouette; a part with
+           * a `thermalHot` swaps to it while the unit is powered (below), so the imager
+           * never shows a dead unit warm. Built here rather than by a traverse because the
+           * hot/cold pair is per-part information a traverse would have to rediscover. */
+          mesh.layers.enable(1);
+          mesh.userData.thermalMat = new THREE.MeshBasicMaterial({ color: part.thermalHot !== undefined ? part.thermalHot : spec.thermal });
+          if (part.thermalHot !== undefined) {
+            mesh.userData.thermalHot = part.thermalHot;
+            mesh.userData.thermalCold = spec.thermal;
+          }
+          this.thermalSwap.push(mesh);
+          if (part.glow) glows.push(mesh);
+          if (part.pulse) pulses.push({ material: mesh.material, base: part.opacity !== undefined ? part.opacity : 1 });
+          g.add(mesh);
+        }
         g.position.set(d.x, 0, d.z);
-        g.rotation.y = d.yaw;
+        /* ⚠ NOT the barrier. `barrierRect()` is already a WORLD-axis-aligned answer (the
+         * sim quarter-snaps the yaw and bakes it into the AABB), so the rig built from
+         * those dims is already oriented — rotating the group by yaw on top of that drew
+         * the panel CROSSWISE to its own collider at the ±90° snaps: a wall you walked
+         * through beside a gap you could not. The visible surface and the collider come
+         * from the same rect or they disagree (the scene.js founding rule). */
+        g.rotation.y = d.isBarrier ? 0 : d.yaw;
         this.scene.add(g);
 
         let light = null;
@@ -618,19 +856,31 @@ export class Renderer {
         }
         /* `lit` starts true to match the materials as authored, so the first sync is a
          * no-op rather than a brighten. */
-        rec = { group: g, light, lit: true };
+        rec = { group: g, light, lit: true, glows, pulses };
         this._depMeshes.set(d.uid, rec);
       }
       rec.group.position.set(d.x, 0, d.z);
-      /* A dead unit goes dark and its head greys — the failure signal the content authored
-       * for `fence-power` ("floodlight tripods dim in sequence as the pack sheds load").
-       * Both channels, because the light going out is only visible if you were looking. */
+      /* A dead unit goes dark and greys, its glow faces vanish, and its hot parts go cold
+       * on the imager — the failure signal the content authored for `fence-power`
+       * ("floodlight tripods dim in sequence as the pack sheds load"), on every channel at
+       * once, because the light going out is only visible if you were looking. */
       if (rec.light) rec.light.intensity = d.active ? 1.5 : 0;
       if (rec.lit !== d.active) {
         rec.lit = d.active;
+        for (const m of rec.glows) m.visible = d.active;
         rec.group.traverse((o) => {
-          if (o.material && o.material.color) o.material.color.multiplyScalar(d.active ? 1 / 0.55 : 0.55);
+          if (!o.isMesh) return;
+          if (o.userData.thermalHot !== undefined) {
+            o.userData.thermalMat.color.setHex(d.active ? o.userData.thermalHot : o.userData.thermalCold);
+          }
+          if (o.material.color && !rec.glows.includes(o)) o.material.color.multiplyScalar(d.active ? 1 / 0.55 : 0.55);
         });
+      }
+      /* The powered breath — the case's §so-named "subtle emissive pulse", shared by the
+       * heater element. Sub-Hz and shallow: a beacon strobe would out-shout the anomaly. */
+      if (d.active && rec.pulses.length) {
+        const k = 0.72 + 0.28 * Math.sin(t / 520);
+        for (const p of rec.pulses) p.material.opacity = p.base * k;
       }
     }
     for (const [uid, rec] of this._depMeshes) {
@@ -658,50 +908,75 @@ export class Renderer {
       if (!rec) {
         const g = new THREE.Group();
         /**
-         * ⚠ `new THREE.CapsuleGeometry ? a : b` IS NOT A FEATURE TEST, and this one made
-         * multiplayer unrenderable.
-         *
-         * `new` binds tighter than `?:`, so it CONSTRUCTS first and only then asks whether
-         * the result was truthy — which means the fallback the guard exists to provide is
-         * unreachable, and the throw it exists to prevent happens on the way to the test.
-         * `CapsuleGeometry` arrived in three r142 and this build vendors r128, so the first
-         * frame with a second operative in it threw `THREE.CapsuleGeometry is not a
-         * constructor`, inside the rAF loop, and then every frame after it.
-         *
-         * Solo play never reaches this line, which is why 805 assertions stayed green over
-         * a defect that broke the entire co-op mode. Section K greps for the shape now.
+         * A person, lathed like ANOMALY_FORMS.figure and deliberately NOT it — the whole
+         * argument is on MATE_FORM. (The rig this replaced was a capsule-or-cylinder whose
+         * feature test was `new THREE.CapsuleGeometry ? a : b`, which CONSTRUCTS before it
+         * tests — `new` binds tighter than `?:` — and threw in the rAF loop on every frame
+         * with a second operative in it, r128 having no CapsuleGeometry. Solo play never
+         * reaches this line, so 805 assertions stayed green over a defect that broke the
+         * whole of co-op rendering. Section K greps for the shape now, and the lathe needs
+         * no feature test at all.)
          */
-        const body = new THREE.Mesh(THREE.CapsuleGeometry
-          ? new THREE.CapsuleGeometry(0.28, 1.0, 4, 8)
-          : new THREE.CylinderGeometry(0.28, 0.28, 1.5, 8),
-        new THREE.MeshLambertMaterial({ color: 0x3f4d5a }));
-        body.position.y = 0.85;
+        const body = new THREE.Mesh(
+          new THREE.LatheGeometry(MATE_FORM.profile.map(([x, y]) => new THREE.Vector2(x, y)), 14),
+          new THREE.MeshLambertMaterial({ color: 0x3f4d5a }),
+        );
         g.add(body);
-        const head = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.26, 0.26), new THREE.MeshLambertMaterial({ color: 0x6d7a86 }));
-        head.position.y = 1.6;
-        g.add(head);
-        const vest = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.16, 0.34), new THREE.MeshLambertMaterial({ color: 0xd8a13a }));
-        vest.position.y = 1.15;
-        g.add(vest);
-        /* Warm on the imager — an operative is 37C and the second-brightest thing here. */
+        /* The armband. Basic, because its job is to say WHICH mate from across a dark
+         * floor, and a Lambert band is black anywhere the viewer's own lamp is not. */
+        const band = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.247, 0.247, 0.09, 12, 1, true),
+          new THREE.MeshBasicMaterial({ color: mateBand(p.id), side: THREE.DoubleSide }),
+        );
+        band.position.y = 1.30;
+        g.add(band);
+        /* The headlamp's lit face, on the helmet, on the side the lamp light comes from. */
+        const lampFace = new THREE.Mesh(
+          new THREE.BoxGeometry(0.09, 0.05, 0.05),
+          new THREE.MeshBasicMaterial({ color: MATE_FORM.lampColor }),
+        );
+        lampFace.position.set(0, 1.60, -0.10);
+        g.add(lampFace);
+        /* Warm on the imager — an operative is 37C and the second-brightest thing here.
+         * Everything so far is body; the beam cone is added AFTER this traverse, because
+         * a cone of lamplight must not exist on the thermal layer (light is not heat, the
+         * flashlight rule again). */
         g.traverse((o) => {
           o.layers.enable(1);
           if (!o.isMesh) return;
           o.userData.thermalMat = new THREE.MeshBasicMaterial({ color: 0xc2703a });
           this.thermalSwap.push(o);
         });
+        /* The beam: an open additive cone from the helmet down the facing, the thing you
+         * actually track across a dark cold store. Layer 0 only, not in thermalSwap. */
+        const beam = new THREE.Mesh(
+          new THREE.ConeGeometry(0.34, 1.7, 12, 1, true),
+          new THREE.MeshBasicMaterial({
+            color: 0xffe8c2, transparent: true, opacity: 0.07,
+            blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
+          }),
+        );
+        beam.position.set(0, 1.50, -0.80);
+        beam.rotation.x = Math.PI / 2;
+        g.add(beam);
         this.scene.add(g);
         const lamp = new THREE.PointLight(0xffeedd, 0.9, 7, 1.6);
         this.scene.add(lamp);
-        rec = { group: g, lamp };
+        rec = { group: g, lamp, beam };
         this._mateMeshes.set(p.id, rec);
       }
-      const y = p.downed ? -0.55 : 0;
+      /* Downed: pivoted at the feet onto their back, sunk a hand's width so the lathe's
+       * shoulders read as lying on the concrete rather than balancing on it. */
+      const y = p.downed ? -0.12 : 0;
       rec.group.position.set(p.x, y, p.z);
       rec.group.rotation.y = p.yaw;
       rec.group.rotation.x = p.downed ? Math.PI / 2.2 : 0;
       rec.lamp.position.set(p.x - Math.sin(p.yaw) * 0.4, p.downed ? 0.4 : 1.6, p.z - Math.cos(p.yaw) * 0.4);
-      rec.lamp.intensity = p.alive && p.connected ? 0.9 : 0.15;
+      const lampOn = p.alive && p.connected;
+      rec.lamp.intensity = lampOn ? 0.9 : 0.15;
+      /* The beam follows the lamp's own state: a disconnected seat's operative stands
+       * dark, which is also the honest render of "nobody is holding that torch". */
+      rec.beam.visible = lampOn;
       rec.group.visible = p.alive;
     }
     for (const [id, rec] of this._mateMeshes) {
@@ -733,9 +1008,15 @@ export class Renderer {
   }
 
   _syncLights() {
-    for (const { light, def } of this.luminaireLights) {
+    for (const rec of this.luminaireLights) {
+      const { light, def } = rec;
       const on = def.emergency || (def.circuitId && this.game.site.circuitOn(def.circuitId));
       light.intensity = on ? (def.emergency ? 0.55 : 1.15) : 0;
+      /* The fitting's lit diffuser (scene.js builds it dark). Without this, a live circuit
+       * was only visible by what it did to the floor — you could stand under a working
+       * luminaire and not be able to SAY it was working, which fails §8.2 for the one
+       * system whose whole job is being pointed at ("get that circuit back up"). */
+      if (rec.glow) rec.glow.visible = !!on;
     }
     for (const dr of this.game.site.doors) {
       const rec = this.doorMeshes.get(dr.id);
@@ -962,7 +1243,7 @@ export class Renderer {
     const fz = -Math.cos(p.yaw) * Math.cos(p.pitch);
     this.lampTarget.position.set(p.x + fx * 6, p.eyeHeight() + fy * 6, p.z + fz * 6);
 
-    this._syncDeployables();
+    this._syncDeployables(t);
     this._syncInstances();
     this._syncLights();
     this._syncIce();

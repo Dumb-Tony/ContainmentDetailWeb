@@ -456,10 +456,7 @@
       "dimension": "anchor",
       "text": "This is the July thing again, back on its own ground. Contain it the July way: everything off, everybody quiet, and wait it out.",
       "truth": false,
-      "supportedBy": [
-        "caller-file",
-        "rangers-habit"
-      ]
+      "supportedBy": ["caller-file"]
     },
     {
       "id": "claim-it-does-not-travel",

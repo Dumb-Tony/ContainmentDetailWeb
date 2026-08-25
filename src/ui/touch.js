@@ -421,7 +421,11 @@ export class TouchControls {
       this._capture(zone, e);
       this._lookId = e.pointerId;
       this._lastX = e.clientX; this._lastY = e.clientY;
-      this._tapT0 = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+      /* ⚠ e.timeStamp, NEVER performance.now(). K5 forbids wall-clock reads outside the
+       * boot loop, and the pointer stream already carries its own DOMHighResTimeStamp -
+       * the tap-vs-drag question is a property of the GESTURE, so the gesture's clock is
+       * the honest one. */
+      this._tapT0 = e.timeStamp;
       this._tapTravel = 0;
       e.preventDefault();
     });
@@ -440,7 +444,7 @@ export class TouchControls {
     const up = (e, cancelled) => {
       if (e.pointerId !== this._lookId) return;
       this._lookId = null;
-      const dt = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - this._tapT0;
+      const dt = e.timeStamp - this._tapT0;
       /* Short and still: the context verb. Travelled or lingered: it was a look, and a
        * look must never ALSO interact — marking a fixture because you glanced past it
        * is the touch equivalent of the mis-click. */

@@ -224,6 +224,10 @@ what makes them accounted for rather than merely assumed.
 | `docs/m3-settings.png` | screenshot: the settings screen | `tools/shot.ps1 -Setup tools/_shot-settings.js` | project-original | no |
 | `docs/m6-figure.png` | screenshot: the figure in aisle B | `tools/shot.ps1 -Setup tools/_shot-figure.js -Query "incident=cold-storage-figure"` | project-original | no |
 | `docs/m3-site.png` | screenshot: the base | `tools/shot.ps1 -Setup tools/_shot-base.js` | project-original | no |
+| `docs/m7-gear.png` | screenshot: all nine deployable rigs in one lit aisle | `tools/shot.ps1 -Setup tools/_shot-gear.js -Out docs/m7-gear.png -Port 8963 -Query "incident=cold-storage-draught"` | project-original | no |
+| `docs/m7-squad.png` | screenshot: three squadmates, headlamps and armbands, one downed | `tools/shot.ps1 -Setup tools/_shot-squad.js -Out docs/m7-squad.png -Port 8965 -Query "incident=cold-storage-draught"` | project-original | no |
+| `docs/m7-reserve.png` | screenshot: Blackthorn Reserve at night, extraction beacon | `tools/shot.ps1 -Setup tools/_shot-reserve.js -Out docs/m7-reserve.png -Port 8966 -Query "incident=blackthorn-caller"` | project-original | no |
+| `docs/m7-thermal.png` | screenshot: the imager over a live and a dead tripod | `tools/shot.ps1 -Setup tools/_shot-thermal.js -Out docs/m7-thermal.png -Port 8967 -Query "incident=cold-storage-draught"` | project-original | no |
 | `assets/icons/icon-512.png` | install icon, 512px | rendered by `tools/make-icons.ps1` | project-original | no |
 | `assets/icons/icon-maskable-512.png` | install icon, maskable variant | rendered by `tools/make-icons.ps1` | project-original | no |
 | `assets/icons/icon-192.png` | install icon, 192px | `tools/make-icons.ps1`, bicubic resample of `icon-512.png` | project-original | resampled from the 512 |
