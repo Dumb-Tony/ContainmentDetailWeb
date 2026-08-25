@@ -40,6 +40,7 @@ import {
   roomSlug, nameExposure,
 } from '../net/lobby.js';
 import { ROLE, MAX_SQUAD } from '../net/net.js';
+import { CONFIG } from '../config.js';
 
 const el = (tag, cls, parent) => {
   const n = document.createElement(tag);
@@ -51,6 +52,13 @@ const el = (tag, cls, parent) => {
 /** Where the joiner's own memory of rooms lives. Their machine, their rooms. */
 const RECENT_KEY = 'cd.lobby.recent';
 const CALLSIGN_KEY = 'cd.lobby.callsign';
+/** The one seat this tab may walk back into. sessionStorage, never localStorage — see
+ *  `loadResume`. Exported so the suite can grep the blob it writes. */
+export const RESUME_KEY = 'cd.session.resume';
+/** How long a join is allowed to sit at "asking" before the screen calls it dead. The
+ *  broker reports an unclaimed id quickly; the case this covers is the one it never
+ *  reports — a registered tab that will not answer. */
+export const JOIN_TIMEOUT_MS = 12000;
 const RECENT_MAX = 8;
 /** Control characters, stripped from anything read off disk and put on the screen. Built
  *  from a string rather than written as a literal, so the source file stays text. */
@@ -125,6 +133,68 @@ export function rememberRoom(store, entry, atMs) {
   return next;
 }
 
+/* ── the seat this tab can walk back into ─────────────────────────────────── */
+
+/**
+ * The one thing this machine remembers about a live session: ITS OWN seat. The token the
+ * host issued, which room it belongs to, and the player's OWN callsign for the button
+ * label — never anybody else's anything. §21.2 ends "do not record … unnecessary personal
+ * data", and a roster or token cache that grew a "who else was there" field would be
+ * exactly that; the suite greps the written blob for other seats' callsigns.
+ *
+ * sessionStorage, not localStorage, and that is load-bearing twice over:
+ *   · a resume token is a key back into a RUNNING mission. It has no business outliving
+ *     the browsing session it was issued in — the host's seat map dies with the host's
+ *     tab, so a token on disk overnight is a stale promise at best.
+ *   · sessionStorage is per-tab, which is what keeps two of the same player's tabs from
+ *     believing they are the same operative. (A DUPLICATED tab copies it; the host hangs
+ *     up the older link when the copy resumes, so even that case converges to one seat.)
+ *
+ * Rebuilt from a whitelist on the way out, exactly like `loadRecent` above it: the origin
+ * is shared with every other project on the same `<user>.github.io`, so "off disk" is not
+ * the same as "written by this game".
+ */
+export function loadResume(store) {
+  try {
+    const raw = store && store.getItem(RESUME_KEY);
+    if (typeof raw !== 'string' || !raw) return null;
+    const r = JSON.parse(raw);
+    if (!r || typeof r !== 'object' || Array.isArray(r)) return null;
+    const token = typeof r.token === 'string' ? r.token.replace(CONTROL_CHARS, '').slice(0, 64) : '';
+    const code = String(r.code == null ? '' : r.code).trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16);
+    const room = roomSlug(r.room);
+    if (!token || (!code && !room)) return null;
+    return {
+      token,
+      code,
+      room,
+      callsign: (typeof r.callsign === 'string' ? r.callsign.replace(CONTROL_CHARS, ' ').trim().slice(0, 14) : '') || 'Operative',
+      atMs: typeof r.atMs === 'number' && Number.isFinite(r.atMs) ? r.atMs : 0,
+    };
+  } catch { return null; }
+}
+
+/** Write the seat. `callsign` is the LOCAL player's — the call sites only ever hand this
+ *  the name this machine typed, and `loadResume` clamps whatever comes back. */
+export function saveResume(store, entry, atMs) {
+  const row = {
+    token: String(entry.token || '').slice(0, 64),
+    code: String(entry.code || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16),
+    room: roomSlug(entry.room || ''),
+    callsign: String(entry.callsign || '').trim().slice(0, 14) || 'Operative',
+    atMs,
+  };
+  try { if (store) store.setItem(RESUME_KEY, JSON.stringify(row)); } catch { /* no storage, no resume */ }
+  return row;
+}
+
+export function clearResume(store) {
+  try {
+    if (store && store.removeItem) store.removeItem(RESUME_KEY);
+    else if (store) store.setItem(RESUME_KEY, '');
+  } catch { /* fine */ }
+}
+
 /* ── the screen ───────────────────────────────────────────────────────────── */
 
 export class LobbyScreen {
@@ -137,12 +207,21 @@ export class LobbyScreen {
    * @param opts.storage localStorage-alike, injected for the same reason
    * @param opts.onDeploy called when the squad takes the card
    */
-  constructor(root, { net, site = null, progression = null, now = null, storage = null, onDeploy, onClose } = {}) {
+  constructor(root, { net, site = null, progression = null, now = null, storage = null, session = null, onDeploy, onClose } = {}) {
     this.net = net;
     this.site = site || { operations: [] };
     this.progression = progression;
     this.now = now || (() => 0);
     this.storage = storage !== null ? storage : (typeof localStorage !== 'undefined' ? localStorage : null);
+    /* The SESSION store, distinct from `storage` because the two hold different promises:
+     * localStorage is "this machine remembers", sessionStorage is "this tab, this
+     * sitting". The resume token lives in the second — see `loadResume` — and the getter
+     * is guarded because a profile that blocks storage throws on the ACCESS, not on the
+     * use. */
+    this.session = session;
+    if (this.session === null) {
+      try { this.session = typeof sessionStorage !== 'undefined' ? sessionStorage : null; } catch { this.session = null; }
+    }
     this.onDeploy = onDeploy || (() => {});
     this.onClose = onClose || (() => {});
 
@@ -166,6 +245,17 @@ export class LobbyScreen {
     this.notice = null;
     this.reason = DEFAULT_REASON;
     this.showLog = false;
+
+    /** The seat this tab dropped out of, if any — the "Rejoin as …" offer. */
+    this.resume = loadResume(this.session);
+    /** True while the once-only callsign prompt is up. Set by `autoJoin` for a joiner who
+     *  has never saved a name; cleared the moment any name is saved. */
+    this.askName = false;
+    /* Wired HERE, not in main.js: a WELCOME is the moment the host hands back a seat and
+     * a token, and this screen is the one place with a storage to keep them. A dedicated
+     * hook, because main.js reassigns onStatus/onRoster/onLobby after this constructor
+     * runs and a piggyback on any of those would be silently clobbered. */
+    this.net.onWelcome = () => this._storeResume();
   }
 
   get isOpen() { return this.open !== null; }
@@ -184,9 +274,56 @@ export class LobbyScreen {
   _saveCallsign(name) {
     this.callsign = String(name || '').trim().slice(0, 14) || 'Operative';
     try { if (this.storage) this.storage.setItem(CALLSIGN_KEY, this.callsign); } catch { /* fine */ }
+    /* Saving a name — ANY name, including keeping the default — answers the once-only
+     * question for good: `_hasSavedCallsign` reads the same key. */
+    this.askName = false;
+    /* Keep the rejoin label honest: a rename while seated updates the stored blob, still
+     * with only THIS player's name in it. */
+    if (this.resume && this.net.role === ROLE.CLIENT && this.net.token) this._storeResume();
     /* One call whichever role this machine is in — `NetSession.setCallsign` knows that a
      * client asks and a host decides, and the screen has no business knowing which. */
     this.net.setCallsign(this.callsign);
+  }
+
+  /** Has this machine EVER saved a callsign? The once-only prompt turns on this, so a
+   *  player who chose to stay "Operative" is never asked twice. */
+  _hasSavedCallsign() {
+    try {
+      const v = this.storage && this.storage.getItem(CALLSIGN_KEY);
+      return typeof v === 'string' && v.trim().length > 0;
+    } catch { return false; }
+  }
+
+  /** Write the seat this tab holds — token, room, OWN callsign — to sessionStorage. */
+  _storeResume() {
+    const net = this.net;
+    if (net.role !== ROLE.CLIENT || !net.token || (!net.code && !net.roomName)) return;
+    this.resume = saveResume(this.session, {
+      token: net.token, code: net.code, room: net.roomName, callsign: this.callsign,
+    }, this.now());
+  }
+
+  /**
+   * Forget a resume the host has pronounced dead. Three verdicts count:
+   *   · a KICK — the seat was taken away, and the block outlives the token;
+   *   · a REFUSE on a hello that offered the token — blocked, or a session that no longer
+   *     recognises it;
+   *   · the broker reporting NOBODY holds the room id — the host's tab is gone, and the
+   *     seat map (and every token in it) went with it.
+   * A transient failure ("could not reach", a network error) is none of these and leaves
+   * the blob alone: the seat may still be there when the wire comes back.
+   */
+  _sweepDeadResume() {
+    if (!this.resume) return;
+    const net = this.net;
+    const jf = net.joinFailed;
+    const dead = net.removedWhy || net.tokenRefused
+      || (jf && /nobody is holding/i.test(jf.why || '')
+        && (jf.target === this.resume.code || (this.resume.room && jf.target === this.resume.room)));
+    if (dead) {
+      clearResume(this.session);
+      this.resume = null;
+    }
   }
 
   /** @param op the operation card the base screen selected, or null */
@@ -216,11 +353,27 @@ export class LobbyScreen {
    * code goes into the field the way typing would put it there, and the join is sent once.
    * If the room is gone, the ordinary refusal path says so in the ordinary place — an
    * auto-join must fail exactly like a typed one, or the link teaches the wrong lesson.
+   *
+   * Two things ride along:
+   *   · A RELOAD IS A RESUME. If this tab holds a token for the SAME room, it is offered
+   *     with the hello and the host gives back the exact seat — kit, position, callsign.
+   *     The invite link in the address bar is what makes this automatic: the reloaded URL
+   *     still says `?join=CODE`, and the token in sessionStorage says which seat.
+   *   · A FIRST-TIMER IS ASKED FOR A NAME, ONCE. A machine that has never saved a callsign
+   *     is about to land on the roster as "Operative". The join is NOT stalled on the
+   *     answer — they join with the default and the rename rides the host's existing
+   *     validated LACT path the moment they type one. Asked once ever: any saved answer,
+   *     including "stay Operative", is remembered.
    */
   autoJoin(code) {
-    this.joinField = code;
+    const typed = String(code || '').trim();
+    this.joinField = typed;
+    const r = this.resume;
+    const resuming = !!(r && ((r.code && r.code === typed.toUpperCase())
+      || (r.room && r.room === roomSlug(typed))));
+    this.askName = !resuming && !this._hasSavedCallsign();
     this.render();
-    this._join(code);
+    this._join(typed, resuming ? { token: r.token } : {});
   }
 
   /** The link that IS the invite: this build, this incident, this scenario, this room.
@@ -236,7 +389,13 @@ export class LobbyScreen {
   }
 
   /** Re-render in place. Wired to `net.onLobby`, `net.onStatus` and `net.onRoster`. */
-  refresh() { if (this.open) this.render(); }
+  refresh() {
+    /* Ungated on `open`: a KICK or a refused resume can land with the sheet closed, and a
+     * dead token must be forgotten THEN — offering that seat again next boot would be the
+     * screen promising what the host already refused. */
+    this._sweepDeadResume();
+    if (this.open) this.render();
+  }
 
   /* ── rendering ─────────────────────────────────────────────────────────── */
 
@@ -264,8 +423,16 @@ export class LobbyScreen {
      * belongs on whether a room has actually been OPENED — until then a player has not
      * said which of the two they are doing, and the screen must not decide for them.
      */
+    /* A dead token must not be offered even when the render was reached directly. */
+    this._sweepDeadResume();
+
+    /* ⚠ A JOIN IN FLIGHT IS STILL THE JOINER'S SCREEN. `committed` reads `net.code`, and
+     * `joinPeer` sets that optimistically — so the moment somebody clicked Join, the join
+     * column vanished and the HOST panel appeared with the typed code rendered as if it
+     * were their own room. On a dead room that state was permanent. The attempt now keeps
+     * the join column up, and a failed attempt cleans `code` back off (see `joinPeer`). */
     const committed = !!(net.peer || net.code || net.roomName);
-    const left = joined ? this._joinBlock()
+    const left = joined || net.joinAttempt ? this._joinBlock()
       : committed ? this._hostBlock(ops)
         : `${this._hostBlock(ops)}<h2 class="orjoin">or join somebody else's</h2>${this._joinBlock()}`;
 
@@ -359,12 +526,46 @@ export class LobbyScreen {
   /* ── the joiner's half ─────────────────────────────────────────────────── */
 
   _joinBlock() {
+    const net = this.net;
+    const attempt = net.joinAttempt;
+    const jf = net.joinFailed;
+
+    /* The seat this tab dropped out of, offered FIRST — a reconnect is the most likely
+     * reason anybody is back on this screen mid-evening, and hunting for the code they
+     * already had is what ends playtests. */
+    const r = this.resume;
+    const rejoin = r && net.role !== ROLE.CLIENT && !attempt ? `
+      <h2>Your held seat</h2>
+      <div class="joiner">
+        <button class="go" data-rejoin>Rejoin as ${escapeHtml(r.callsign)} — room ${escapeHtml(r.code || r.room)}</button>
+        <button data-forget>Forget</button>
+      </div>
+      <p class="small">${this.now() - (r.atMs || 0) > CONFIG.net.seatHoldMs
+    ? 'A dropped seat is held, but it has been a while — if the squad refilled it, you will come back to a fresh one.'
+    : 'A radio that goes out keeps its seat. Rejoining puts you back where you dropped, kit and all.'}</p>` : '';
+
+    /* ⚠ THE FAILURE, IN WORDS, WITH THE WAY OUT ON THE SAME SCREEN. Before this, a dead
+     * room was a grey status line and a lobby with its join controls gone. */
+    const failed = jf ? `
+      <div class="deadroom">
+        <p class="small warn"><b>Nobody is answering on ${escapeHtml(jf.target)}</b> — the
+           room may be over. A room lives in its host's browser tab and ends with it.</p>
+        <p class="small">Ask them for a fresh invite — or open a room of your own and send
+           the invite the other way. Hosting controls are on this page${this.net.role === ROLE.CLIENT ? '' : ' above'},
+           or use the shortcut:</p>
+        <button data-hostnow>Open a room of your own</button>
+      </div>` : '';
+
     return `
+      ${rejoin}
       <h2>Join an operation</h2>
       <div class="joiner">
         <input data-join placeholder="code or room name" maxlength="24" value="${escapeHtml(this.joinField)}">
-        <button data-dojoin>Join</button>
+        <button data-dojoin ${attempt ? 'disabled' : ''}>${attempt ? 'Asking…' : 'Join'}</button>
       </div>
+      ${attempt ? `<p class="small">Asking ${escapeHtml(attempt.target)} whether anybody is
+         there. A room that never answers is called dead after ${Math.round(JOIN_TIMEOUT_MS / 1000)} seconds.</p>` : ''}
+      ${failed}
       <p class="small">A five-character code is tried as a code. Anything else is tried as a
          room name.</p>
 
@@ -430,7 +631,24 @@ export class LobbyScreen {
 
     const removals = hosting ? lobby.removals() : [];
 
+    /* The once-only name prompt, INLINE and never a modal: the auto-join is already on
+     * its way and nothing here stalls it. Answering renames the seat in place through the
+     * host's validated LACT path; declining saves the default so the question is never
+     * asked again. */
+    const namePrompt = this.askName ? `
+      <div class="namep">
+        <h2>What do you go by on the radio?</h2>
+        <div class="joiner">
+          <input data-firstname maxlength="14" placeholder="callsign">
+          <button class="go" data-firstnamego>Use it</button>
+          <button data-firstnameskip>Stay ${escapeHtml(this.callsign)}</button>
+        </div>
+        <p class="small">You are on the roster as ${escapeHtml(this.callsign)} until you
+           pick one. Asked once; the answer is remembered on this machine only.</p>
+      </div>` : '';
+
     return `
+      ${namePrompt}
       <h2>Your callsign</h2>
       <p class="small">Called <input data-name value="${escapeHtml(this.callsign)}" maxlength="14" class="inline">
          on the radio. It is remembered on this machine and travels no further than the squad.</p>
@@ -586,6 +804,51 @@ export class LobbyScreen {
     const joinBtn = q('[data-dojoin]');
     if (joinBtn) joinBtn.onclick = () => this._join(this.joinField);
 
+    /* The held seat. Rejoining offers the stored token down the ordinary join path, so it
+     * fails (and succeeds) exactly like a typed join. */
+    const rejoinBtn = q('[data-rejoin]');
+    if (rejoinBtn) {
+      rejoinBtn.onclick = () => {
+        const r = this.resume;
+        if (r) this._join(r.code || r.room, { token: r.token });
+      };
+    }
+    const forgetBtn = q('[data-forget]');
+    if (forgetBtn) {
+      forgetBtn.onclick = () => {
+        clearResume(this.session);
+        this.resume = null;
+        this.render();
+      };
+    }
+
+    /* The way out of a dead room: one click into hosting a fresh private one. */
+    const hostNow = q('[data-hostnow]');
+    if (hostNow) {
+      hostNow.onclick = () => {
+        this.net.joinFailed = null;
+        this.net.hostPeer({});
+        this.render();
+      };
+    }
+
+    /* The once-only name prompt. Every exit saves, and saving is what stops the asking. */
+    const firstName = q('[data-firstname]');
+    const takeFirstName = () => {
+      this._saveCallsign(firstName && firstName.value ? firstName.value : this.callsign);
+      this.render();
+    };
+    const firstGo = q('[data-firstnamego]');
+    if (firstGo) firstGo.onclick = takeFirstName;
+    if (firstName) firstName.onkeydown = (e) => { if (e.key === 'Enter') takeFirstName(); };
+    const firstSkip = q('[data-firstnameskip]');
+    if (firstSkip) {
+      firstSkip.onclick = () => {
+        this._saveCallsign(this.callsign);
+        this.render();
+      };
+    }
+
     all('[data-goto]').forEach((b) => { b.onclick = () => this._join(b.dataset.goto); });
     all('[data-check]').forEach((b) => { b.onclick = () => this._check(b.dataset.check); });
 
@@ -650,11 +913,22 @@ export class LobbyScreen {
     }
   }
 
-  _join(text) {
+  _join(text, opts = {}) {
     const typed = String(text || '').trim();
     if (!typed) { this.notice = 'Type a code or a room name first.'; this.render(); return; }
-    this.net.joinPeer(typed, this.callsign);
+    this.net.joinPeer(typed, this.callsign, { token: opts.token || null });
     this.joinField = typed;
+    /* The failure the broker never reports: a registered host that will not answer. The
+     * wall clock lives on this screen (see the header), so the deadline does too. The
+     * attempt object's IDENTITY is the guard — if this attempt already ended, or a second
+     * one started, the timer finds a different object and does nothing. */
+    const stamp = this.net.joinAttempt;
+    if (stamp) {
+      setTimeout(() => {
+        if (this.net.joinAttempt === stamp
+          && this.net.abandonJoin(`nobody answered on ${typed.toUpperCase()}`)) this.refresh();
+      }, JOIN_TIMEOUT_MS);
+    }
     this.render();
   }
 

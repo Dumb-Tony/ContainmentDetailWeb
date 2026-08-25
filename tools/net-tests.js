@@ -41,7 +41,10 @@ import {
   Lobby, SessionDirectory, LOBBY_PHASE, VISIBILITY, LOG_KIND, LOG_WORDS, REMOVAL_REASONS,
   DEFAULT_REASON, ADVERT_FIELDS, roomIdFor, roomIdForCode, roomSlug, nameExposure,
 } from '../src/net/lobby.js';
-import { ago, loadRecent, rememberRoom, LobbyScreen } from '../src/ui/lobby.js';
+import {
+  ago, loadRecent, rememberRoom, LobbyScreen,
+  loadResume, saveResume, clearResume, RESUME_KEY,
+} from '../src/ui/lobby.js';
 
 /* ── rigging ─────────────────────────────────────────────────────────────────
  * A session with a controllable clock. The lobby is timed against WALL time in the shipped
@@ -1061,6 +1064,322 @@ async function sectionW(content) {
   ok('W11 and the squad is told whose seat went and why', /off the air/i.test(said), said.slice(-160));
   emit();
 }
+/* ── V. the reload that gets you back into YOUR seat ─────────────────────── */
+async function sectionV(content) {
+  heading('V. a friend who drops mid-mission gets back into their seat, by name');
+
+  /**
+   * The two things that end real co-op playtests early: a reload that loses your seat, and
+   * a joiner called "Operative". The host has held seats and honoured tokens since §11.5
+   * shipped; what was missing was the CLIENT remembering anything across a reload. The
+   * memory is one blob in sessionStorage — token, room, YOUR OWN callsign — written at
+   * WELCOME by the lobby screen, and §21.2 is the constraint the storage tests below
+   * enforce: no other player's typed name may ever be in it.
+   */
+  const mem = () => {
+    const m = new Map();
+    return {
+      getItem: (k) => (m.has(k) ? m.get(k) : null),
+      setItem: (k, v) => m.set(k, String(v)),
+      removeItem: (k) => m.delete(k),
+      dump: () => JSON.stringify([...m.entries()]),
+    };
+  };
+
+  const host = rig(content, { seed: 'resume-h' });
+  host.n.host();
+  host.g.commitLoadout(RECOMMENDED_MANIFEST);
+  host.n.selectOperation({ id: 'op-1', label: 'Op' });
+
+  /* A machine that saved a callsign once, joining the way `joinPeer` would: the room code
+   * goes on the session BEFORE the hello, which is what joinPeer does and the loopback
+   * skips. */
+  const localStore = mem(), sessionStore = mem();
+  localStore.setItem('cd.lobby.callsign', 'Vasquez');
+  const c1 = mkClient(content, { seed: 'resume-c' });
+  c1.clock.ms = 5000;
+  const root1 = document.createElement('div');
+  document.body.appendChild(root1);
+  const screen1 = new LobbyScreen(root1, {
+    net: c1.n, site: { operations: [] }, now: () => c1.clock.ms, storage: localStore, session: sessionStore,
+  });
+  c1.n.code = 'AB12C';
+  seatOn(host, c1, screen1.callsign);
+  const seatId = c1.n.localPlayerId;
+  const issued = host.n.seats.get(seatId).token;
+
+  const blob = loadResume(sessionStore);
+  ok('V1 a WELCOME writes the seat to sessionStorage — token, room, own callsign', !!blob, sessionStore.dump().slice(0, 120));
+  eq('V2 and the token is the one the host issued, verbatim', blob.token, issued);
+  eq('V3 filed under the room it belongs to', blob.code, 'AB12C');
+  eq('V4 with the callsign this machine typed', blob.callsign, 'Vasquez');
+
+  /* Somebody ELSE with a distinctive name, so the privacy grep below has teeth. */
+  const c2 = mkClient(content, { seed: 'resume-c2' });
+  seatOn(host, c2, 'Zebulon Drake');
+  ok('V5 the other operative really is on the host\'s roster, so V6 is not vacuous',
+    JSON.stringify(encodeLobby(host.n.lobby)).includes('Zebulon'));
+  ok('V6 and NO other player\'s callsign is in this machine\'s stored blob (§21.2)',
+    !sessionStore.dump().includes('Zebulon') && !localStore.dump().includes('Zebulon'),
+    sessionStore.dump().slice(0, 160));
+  eq('V7 the blob\'s whole shape is five known fields — a roster cannot grow in it',
+    Object.keys(loadResume(sessionStore)).sort().join(), 'atMs,callsign,code,room,token');
+
+  /* Give the seat the things that must survive: kit in a slot, a position, and a spent
+   * action budget. */
+  const p = host.g.playerById(seatId);
+  p.take(content.itemsById.get('floodlight-tripod'));
+  p.x = 7.25; p.z = 4.5;
+  for (let i = 0; i < 3; i++) c1.n.act(ACT.SLOT, { n: 1 });
+  eq('V8 the seat has acted, so its replay guard is wound up', host.n.seats.get(seatId).lastAct, 3);
+
+  /* The reload. The tab dies; the host holds the seat. */
+  [...host.n.seats.values()].find((s) => s.token === issued).link.close();
+  eq('V9 the drop holds the seat rather than freeing it', host.g.players.length, 3);
+  eq('V10 marked off the radio', host.g.playerById(seatId).connected, false);
+
+  /* A fresh page: new Game, new NetSession, new screen — SAME stores, which is all a
+   * reload keeps. */
+  const back = mkClient(content, { seed: 'resume-back' });
+  const root2 = document.createElement('div');
+  document.body.appendChild(root2);
+  const screen2 = new LobbyScreen(root2, {
+    net: back.n, site: { operations: [] }, now: () => back.clock.ms, storage: localStore, session: sessionStore,
+  });
+  ok('V11 the fresh screen finds the held seat in sessionStorage', !!screen2.resume
+    && screen2.resume.token === issued);
+  screen2.show(null, { joiner: true });
+  const rejoinBtn = screen2.node.querySelector('[data-rejoin]');
+  ok('V12 and opens offering "Rejoin as Vasquez" in words', !!rejoinBtn
+    && /Rejoin as Vasquez/.test(screen2.node.textContent), screen2.node.textContent.slice(0, 120));
+  ok('V13 as the PRIMARY action — before the blank join field, styled as the go button',
+    !!rejoinBtn && rejoinBtn.className.includes('go')
+    && screen2.node.innerHTML.indexOf('data-rejoin') < screen2.node.innerHTML.indexOf('data-dojoin'));
+
+  /* The reconnect, through the REAL hello path, offering the stored token. */
+  const [rh, rc] = loopbackPair();
+  host.n.accept(rh);
+  back.n.join(rc, { name: 'Somebody Else', token: screen2.resume.token });
+  eq('V14 the host gives back the SAME seat', back.n.localPlayerId, seatId);
+  eq('V15 no second operative was created for it', host.g.players.length, 3);
+  eq('V16 and the seat is back on the radio', host.g.playerById(seatId).connected, true);
+  near('V17 standing exactly where they dropped — x', host.g.playerById(seatId).x, 7.25, 0.001);
+  near('V18 and z', host.g.playerById(seatId).z, 4.5, 0.001);
+  ok('V19 with their kit still in the slot (§11.5: reconnect restores inventory)',
+    host.g.playerById(seatId).carrying('floodlight-tripod'));
+  ok('V20 and the welcome snapshot hands the same seat and kit to the client',
+    back.g.playerById(seatId) && back.g.playerById(seatId).carrying('floodlight-tripod'),
+    back.g.playerById(seatId) ? 'seat found, no tripod' : 'no seat');
+  /* The LOCAL seat's position is deliberately not written by `applySnapshot` — it goes
+   * through the shipped correction path, and a resume error is far past `snapErrorM`
+   * (1.2 m), so one reconcile is a TELEPORT to the host's answer. Assert through the real
+   * mechanism rather than around it. */
+  back.g.reconcileLocal(seatId);
+  near('V20b one reconcile later the client stands where the host says they are',
+    back.g.playerById(seatId).x, 7.25, 0.02);
+  eq('V21 identity is the token, not the typed name — the callsign is still Vasquez',
+    host.n.lobby.seatOf(seatId).callsign, 'Vasquez');
+  ok('V22 and the moderation record calls it a resume', host.n.lobby.bySeat(seatId)
+    .some((e) => e.kind === LOG_KIND.RESUMED));
+
+  /**
+   * ⚠ THE REPLAY GUARD RESTARTS WITH THE LINK. A reloaded client counts its actions from
+   * one again, and the guard held the OLD session's high-water mark — so every ACT a
+   * resumed operative sent was silently dropped as a replay until they had clicked past
+   * their whole previous session. The seat looked fine and did nothing.
+   */
+  const acts = host.n.actsReceived;
+  back.n.act(ACT.SLOT, { n: 2 });
+  eq('V23 the first action after a resume is APPLIED, not dropped as a replay',
+    host.n.actsReceived, acts + 1);
+  eq('V24 and it did the thing', host.g.playerById(seatId).heldSlot,
+    [...host.g.playerById(seatId).slots.keys()][2]);
+
+  /**
+   * ⚠ A DUPLICATED TAB CARRIES A COPY OF sessionStorage, so two windows can offer the
+   * SAME token. The seat must converge to exactly one of them: the newer link wins and
+   * the older is hung up — not left believing it plays.
+   */
+  const dup = mkClient(content, { seed: 'resume-dup' });
+  const [dh, dc] = loopbackPair();
+  host.n.accept(dh);
+  dup.n.join(dc, { name: 'Vasquez', token: issued });
+  eq('V25 the duplicate resumes into the same seat', dup.n.localPlayerId, seatId);
+  eq('V26 still with no second operative', host.g.players.length, 3);
+  ok('V27 the host now writes to the newer link', host.n.seats.get(seatId).link === dh);
+  /* ⚠ `rc.open` is the wrong fact to assert: a loopback endpoint's `open` flag is its
+   * OWN; the far end learns through `onClose`, exactly like a real DataConnection whose
+   * wrapper flips the flag in the 'close' handler. What the fix owns is the host-side
+   * hangup and what the old tab HEARS. */
+  eq('V28 and the older tab\'s host-side link was hung up rather than left half-believing', rh.open, false);
+  ok('V28b and the older tab heard the hangup', /disconnect/i.test(back.n.status), back.n.status);
+
+  /* ── the blocked resume, through the stored blob ── */
+  host.n.removeSeat(seatId, 'grief');
+  const blocked = mkClient(content, { seed: 'resume-blocked' });
+  const root3 = document.createElement('div');
+  document.body.appendChild(root3);
+  const screen3 = new LobbyScreen(root3, {
+    net: blocked.n, site: { operations: [] }, now: () => blocked.clock.ms, storage: localStore, session: sessionStore,
+  });
+  ok('V29 the blob is still on the machine after a removal, so the next assertion is real',
+    !!screen3.resume && screen3.resume.token === issued);
+  const [bh, bc] = loopbackPair();
+  host.n.accept(bh);
+  blocked.n.join(bc, { name: 'Vasquez', token: screen3.resume.token });
+  ok('V30 a removed operative\'s stored token does not walk them back in',
+    !host.g.players.some((q) => q.id === seatId) && blocked.n.role === ROLE.CLIENT);
+  ok('V31 and they are told why, in words that survive the hangup',
+    /removed/i.test(blocked.n.status), blocked.n.status);
+  eq('V32 the session says structurally that the offered token was refused', blocked.n.tokenRefused, true);
+  screen3.refresh();
+  ok('V33 so the screen burns the blob — that seat is never offered again',
+    screen3.resume === null && loadResume(sessionStore) === null,
+    String(sessionStore.getItem(RESUME_KEY)));
+
+  [root1, root2, root3].forEach((r) => r.remove());
+  emit();
+}
+
+/* ── V2. the joiner has a name, and a dead room fails in words ───────────── */
+async function sectionV2(content) {
+  heading('V2. names that propagate, and invite links that fail honestly');
+
+  /* ── the rename, through the host's validated LACT path ── */
+  const hostR = rig(content, { seed: 'rename-h' });
+  hostR.n.host();
+  hostR.n.selectOperation({ id: 'op-1', label: 'Op' });
+  const rn = mkClient(content, { seed: 'rename-c' });
+  const rl = seatOn(hostR, rn, 'Operative');
+  const rid = rn.n.localPlayerId;
+  eq('V34 an invite-link joiner lands as the default until they pick a name',
+    hostR.n.lobby.seatOf(rid).callsign, 'Operative');
+
+  rn.n.setCallsign('Nyx Seven');
+  eq('V35 a client rename reaches the host\'s roster', hostR.n.lobby.seatOf(rid).callsign, 'Nyx Seven');
+  eq('V36 and the operative under it', hostR.g.playerById(rid).name, 'Nyx Seven');
+  eq('V37 and the host\'s echo is what renames the client\'s own copy',
+    rn.n.lobby.seatOf(rid).callsign, 'Nyx Seven');
+
+  rl.cl.send({ t: MSG.LACT, k: LACT.CALLSIGN, n: 'Y'.repeat(99) });
+  eq('V38 a raw ninety-nine-character rename is clamped by the HOST, not by the sender\'s manners',
+    hostR.n.lobby.seatOf(rid).callsign.length, 14);
+
+  hostR.n.setReady('p1', true);
+  rn.n.askReady(true);
+  ok('V39 the squad deploys, so the next refusal is about the phase', hostR.n.deployLobby());
+  rn.n.setCallsign('Too Late');
+  eq('V40 a rename after deploy is refused — the roster is settled once the card is taken',
+    hostR.n.lobby.seatOf(rid).callsign, 'Y'.repeat(14));
+
+  /* ── the once-only name prompt, and the dead room, on the shipped screen ──
+   * `joinPeer` needs a Peer; FakePeer is lifted from security-tests section SE with its
+   * name kept, per the house rule about copied code staying greppable. */
+  const keepPeer = globalThis.Peer;
+  const made = [];
+  class FakePeer {
+    constructor(id) { this.id = id; this.open = false; this._h = new Map(); made.push(this); }
+
+    on(ev, fn) { if (!this._h.has(ev)) this._h.set(ev, []); this._h.get(ev).push(fn); return this; }
+
+    fire(ev, arg) { for (const fn of (this._h.get(ev) || []).slice()) fn(arg); }
+
+    destroy() { this.open = false; }
+  }
+  const mem = () => {
+    const m = new Map();
+    return {
+      getItem: (k) => (m.has(k) ? m.get(k) : null),
+      setItem: (k, v) => m.set(k, String(v)),
+      removeItem: (k) => m.delete(k),
+    };
+  };
+
+  try {
+    globalThis.Peer = FakePeer;
+    const jc = mkClient(content, { seed: 'dead-room' });
+    const freshLocal = mem(), freshSession = mem();
+    const rootJ = document.createElement('div');
+    document.body.appendChild(rootJ);
+    const screenJ = new LobbyScreen(rootJ, {
+      net: jc.n, site: { operations: [] }, now: () => jc.clock.ms, storage: freshLocal, session: freshSession,
+    });
+    screenJ.show(null, { joiner: true });
+    screenJ.autoJoin('QQ9ZZ');
+    ok('V41 a machine that never saved a callsign is asked for one, inline, exactly then',
+      screenJ.askName === true && !!screenJ.node.querySelector('[data-firstname]'));
+    ok('V42 while the join goes ahead underneath — the prompt stalls nothing',
+      !!jc.n.joinAttempt && jc.n.joinAttempt.target === 'QQ9ZZ');
+    ok('V43 and the screen says it is asking, with the join button parked',
+      /Asking/.test(screenJ.node.textContent) && screenJ.node.querySelector('[data-dojoin]').disabled === true);
+
+    /* The broker answers: nobody holds that id. This is what a dead invite link IS. */
+    made[made.length - 1].fire('error', { type: 'peer-unavailable' });
+    ok('V44 the failure is structural — target and reason, not a status string to parse',
+      !!jc.n.joinFailed && jc.n.joinFailed.target === 'QQ9ZZ'
+      && /nobody is holding/i.test(jc.n.joinFailed.why), JSON.stringify(jc.n.joinFailed));
+    ok('V45 and the aspirational room identity came back off the session — this is what used to brick the screen',
+      jc.n.code === null && jc.n.roomName === '' && jc.n.peer === null && jc.n.joinAttempt === null);
+
+    screenJ.refresh();
+    const said = screenJ.node.textContent;
+    ok('V46 the lobby says it in words: nobody is answering, the room may be over',
+      /Nobody is answering on QQ9ZZ/.test(said) && /room may be over/.test(said), said.slice(0, 200));
+    ok('V47 with the join controls BACK — a second try is a click, not a reload',
+      !!screenJ.node.querySelector('[data-dojoin]') && screenJ.node.querySelector('[data-dojoin]').disabled === false);
+    ok('V48 and the host-your-own path right there on the same screen',
+      !!screenJ.node.querySelector('[data-hostnow]') && !!screenJ.node.querySelector('[data-open]')
+      && screenJ.node.querySelector('[data-open]').disabled === false);
+
+    /* The prompt is answered — once, for good. */
+    const nameField = screenJ.node.querySelector('[data-firstname]');
+    nameField.value = 'Nyx';
+    screenJ.node.querySelector('[data-firstnamego]').click();
+    eq('V49 answering saves the callsign on this machine', freshLocal.getItem('cd.lobby.callsign'), 'Nyx');
+    ok('V50 and takes the prompt down', screenJ.askName === false && !screenJ.node.querySelector('[data-firstname]'));
+    const rootJ2 = document.createElement('div');
+    document.body.appendChild(rootJ2);
+    const screenJ2 = new LobbyScreen(rootJ2, {
+      net: jc.n, site: { operations: [] }, now: () => jc.clock.ms, storage: freshLocal, session: freshSession,
+    });
+    screenJ2.show(null, { joiner: true });
+    screenJ2.autoJoin('QQ7XX');
+    ok('V51 the question is asked ONCE per machine — a later auto-join with a saved name never asks',
+      screenJ2.askName === false && !screenJ2.node.querySelector('[data-firstname]'));
+
+    /* The failure the broker never reports: a registered host that will not answer. The
+     * screen's deadline calls it, with the same cleanup and the same words. */
+    ok('V52 a join that hangs can be abandoned', jc.n.abandonJoin('nobody answered on QQ7XX'));
+    screenJ2.refresh();
+    ok('V53 and reads the same on screen: nobody is answering', /Nobody is answering on QQ7XX/.test(screenJ2.node.textContent),
+      screenJ2.node.textContent.slice(0, 160));
+
+    /* ── autoJoin picks the token, and only for ITS room ── */
+    const aj = mkClient(content, { seed: 'aj' });
+    const ajSession = mem();
+    saveResume(ajSession, { token: 'p2-TOK99', code: 'AB12C', room: '', callsign: 'Vasquez' }, 100);
+    let saw = 'never called';
+    aj.n.joinPeer = (code, name, opts) => { saw = opts ? opts.token : 'no opts'; return true; };
+    const rootA = document.createElement('div');
+    document.body.appendChild(rootA);
+    const screenA = new LobbyScreen(rootA, {
+      net: aj.n, site: { operations: [] }, now: () => 1000, storage: freshLocal, session: ajSession,
+    });
+    screenA.show(null, { joiner: true });
+    screenA.autoJoin('ab12c');
+    eq('V54 an invite link back into the SAME room offers the stored token — the reload IS the resume',
+      saw, 'p2-TOK99');
+    ok('V55 and does not nag a returning operative for a name', screenA.askName === false);
+    screenA.autoJoin('ZZ88Z');
+    eq('V56 while a DIFFERENT room gets a fresh hello and no token', saw, null);
+
+    [rootJ, rootJ2, rootA].forEach((r) => r.remove());
+  } finally {
+    globalThis.Peer = keepPeer;
+  }
+  emit();
+}
+
 /* ── run ─────────────────────────────────────────────────────────────────── */
 await suite('net-tests', async () => {
   const content = await loadContent({ incident: 'cold-storage-draught' });
@@ -1074,4 +1393,6 @@ await suite('net-tests', async () => {
   await run('T', () => sectionT());
   await run('W', () => sectionW(content));
   await run('X', () => sectionX(content));
+  await run('V', () => sectionV(content));
+  await run('V2', () => sectionV2(content));
 });

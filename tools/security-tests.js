@@ -56,7 +56,7 @@ import {
 import { t as msgFor } from '../src/core/i18n.js';
 import { Hud, escapeHtml } from '../src/ui/hud.js';
 import { Panels } from '../src/ui/panels.js';
-import { LobbyScreen, loadRecent, rememberRoom } from '../src/ui/lobby.js';
+import { LobbyScreen, loadRecent, rememberRoom, loadResume, RESUME_KEY } from '../src/ui/lobby.js';
 import { CommsWheel, WHEEL_ORDER } from '../src/ui/commswheel.js';
 import {
   Settings, SETTINGS_KEY, SETTINGS_QUARANTINE_KEY, SETTINGS_VERSION,
@@ -664,6 +664,48 @@ async function sectionSD() {
   const screen2 = new LobbyScreen(screenRoot, { net: solo.n, site: { operations: [] }, now: () => 1e12, storage: cs });
   ok('SD25 a stored callsign is clamped on the way OUT as well as on the way in',
     screen2.callsign.length <= 14, `${screen2.callsign.length}`);
+
+  /* ── the resume blob, which is the newest thing under a shared origin's key ──
+   * sessionStorage on `<user>.github.io` is shared with every project published under
+   * that name, exactly like localStorage above — so what comes back out is rebuilt from
+   * a whitelist, and the rejoin button it feeds is asserted on the DOM like every other
+   * surface. Built through JSON.parse so `__proto__` is an OWN key, as the wire and the
+   * disk really deliver it. */
+  const evilResume = `{"token":${JSON.stringify(`${LONG}${String.fromCharCode(0, 7)}${'T'.repeat(200)}`)},`
+    + '"code":"ab12c<script>","room":"Night Shift!!",'
+    + `"callsign":${JSON.stringify(`${CALLSIGN}${'A'.repeat(300)}`)},`
+    + '"atMs":"yesterday","roster":["Vasquez Roster","Drake Roster"],'
+    + '"__proto__":{"cdResumePolluted":1}}';
+  const rsStore = { getItem: (k) => (k === RESUME_KEY ? evilResume : null), setItem() {}, removeItem() {} };
+  const rs = loadResume(rsStore);
+  ok('SD26 a poisoned resume blob comes back clamped — token bounded and stripped of control characters',
+    !!rs && rs.token.length <= 64 && !(new RegExp('[\u0000-\u001f]')).test(rs.token), rs ? `${rs.token.length}` : 'refused');
+  eq('SD27 with exactly the five fields a resume is — a roster smuggled in does not survive',
+    Object.keys(rs).sort().join(), 'atMs,callsign,code,room,token');
+  ok('SD28 the callsign is the fourteen a client lives under, and the time is a number',
+    rs.callsign.length <= 14 && typeof rs.atMs === 'number' && rs.atMs === 0,
+    `${rs.callsign.length} / ${JSON.stringify(rs.atMs)}`);
+  eq('SD29 and nothing reached Object.prototype on the way', ({}).cdResumePolluted, undefined);
+  for (const junk of ['[1,2]', '"a string"', '42', '{"code":"AB12C"}', '{not json']) {
+    rsStore.getItem = () => junk;
+    if (loadResume(rsStore) !== null) ok(`SD30 a resume blob of the wrong shape is refused outright (${junk.slice(0, 12)})`, false, junk);
+  }
+  ok('SD30 a resume blob of the wrong shape — array, string, number, tokenless, unparseable — is refused outright', true);
+  ok('SD31 and a store that throws yields no resume rather than a crash',
+    loadResume({ getItem() { throw new Error('locked'); } }) === null);
+
+  /* The rejoin offer, rendered from the hostile blob. */
+  rsStore.getItem = (k) => (k === RESUME_KEY ? evilResume : null);
+  const screen4 = new LobbyScreen(screenRoot, {
+    net: solo.n, site: { operations: [] }, now: () => 1e12, storage: fake, session: rsStore,
+  });
+  screen4.show(null);
+  ok('SD32 the rejoin button renders the stored callsign as text, not as an element',
+    injectedIn(screen4.node) === 0 && !!screen4.node.querySelector('[data-rejoin]'),
+    `${injectedIn(screen4.node)} injected`);
+  ok('SD33 with the name still legible on the button, so this is escaping and not dropping',
+    screen4.node.textContent.includes(CALLSIGN), screen4.node.textContent.slice(0, 120));
+
   screenRoot.remove();
   emit();
 }
@@ -968,6 +1010,36 @@ async function sectionSF(content) {
     host.n.pump(200, null);
     return c1.n.snapsReceived > s;
   })(), `${c1.n.snapsReceived}`);
+
+  /* ── a resume token is a string this host issued, or it is nothing ────────
+   * The resume path hands back a seat WITH KIT, which makes the token the most valuable
+   * field in the hello — so its guard gets the same treatment the sequence number got:
+   * every wrong shape is treated as ABSENT, looked up never, and lands on the ordinary
+   * join path. A fresh rig, because the shared one above is deliberately full. */
+  const tiny = rig(content, { seed: 'sf-token' });
+  tiny.n.host();
+  tiny.g.commitLoadout(RECOMMENDED_MANIFEST);
+  const shapes = [{ deep: true }, 42, ['t'], 'T'.repeat(65)];
+  for (const tok of shapes) {
+    const [th, tc] = loopbackPair();
+    tiny.n.accept(th);
+    tc.send({ t: MSG.HELLO, v: PROTOCOL_VERSION, name: 'Shape', token: tok });
+  }
+  eq('SF38 a token of the wrong shape — object, number, array, or over 64 characters — is treated as absent and buys a fresh seat, not a lookup',
+    tiny.g.players.length, 1 + shapes.length);
+  ok('SF39 and none of them read as a resume — nothing on the record says anybody came back',
+    !tiny.n.lobby.log.some((e) => e.kind === 'resumed'), tiny.n.lobby.log.map((e) => e.kind).join());
+
+  /* The squad is now full, so a well-formed token the host never issued meets the gate
+   * every stranger meets. A 64-character string is the largest thing the guard admits to
+   * the lookup, and the lookup owes it nothing. */
+  let tokenHeard = '';
+  const [fh, fc] = loopbackPair();
+  tiny.n.accept(fh);
+  fc.onMessage = (m) => { tokenHeard = m.why || m.t; };
+  fc.send({ t: MSG.HELLO, v: PROTOCOL_VERSION, name: 'Sixth', token: 'T'.repeat(64) });
+  ok('SF40 a well-formed token this host never issued is not a skeleton key — the full-squad refusal stands',
+    /full/i.test(tokenHeard), tokenHeard);
   note(`host counters after the section: ${host.n.malformed} unreadable, `
     + `${host.n.actsRefused} refused, ${host.n.actsDropped || 0} stale, ${host.n.actsFlooded} flooded`);
   emit();

@@ -205,6 +205,33 @@ export class NetSession {
     this.localPlayerId = 'p1';
     /** Handed back by the host so a dropped operative can reclaim their own slot. */
     this.token = null;
+    /**
+     * Fired once per WELCOME, on the client. This is the moment the host has handed back a
+     * seat and a resume token, and the ONE place a screen with a storage can be told to
+     * remember them — `src/ui/lobby.js` wires it and keeps the blob in sessionStorage.
+     * A dedicated hook rather than a ride on `onStatus`, because main.js reassigns the
+     * shared three after the screen is built and a piggyback would be silently clobbered.
+     */
+    this.onWelcome = null;
+    /** The token this client OFFERED in its hello, which is not `this.token` — that one is
+     *  only written by a WELCOME. Needed to tell "the host refused my resume" from "the
+     *  host refused me", because only the first should burn the stored blob. */
+    this._offeredToken = null;
+    /** Set when a REFUSE arrives on a hello that carried a token: the resume is dead and
+     *  whoever stored it should forget it. Sticky, like the two reasons above. */
+    this.tokenRefused = false;
+    /**
+     * ⚠ A JOIN THAT IS STILL IN FLIGHT AND A JOIN THAT DIED ARE TWO STATES, AND `status`
+     * WAS CARRYING BOTH AS PROSE. The screen needs them structurally: while `joinAttempt`
+     * is set the join column stays up saying "asking"; when it becomes `joinFailed` the
+     * screen says in words that nobody answered and offers hosting instead. Without these,
+     * a dead room left the lobby showing a DISABLED host panel with the failed code
+     * rendered as if it were your own room — measured before this existed: `joinPeer` set
+     * `this.code` optimistically, `committed` read it, and the join controls vanished on
+     * the first click, permanently.
+     */
+    this.joinAttempt = null;
+    this.joinFailed = null;
     this.lastSnapshot = null;
     this.snapsReceived = 0;
     this.cmdsReceived = 0;
@@ -579,7 +606,27 @@ export class NetSession {
         if (seat.token !== token) continue;
         const p = this.game.playerById(id);
         if (!p) break;
+        /* ⚠ THE OLD LINK IS HUNG UP, AND ONLY AFTER THE SEAT HAS MOVED. A duplicated tab
+         * copies the original's sessionStorage, so two windows can offer the SAME token —
+         * and before this, both believed they held the seat while the host only wrote to
+         * the newer link, and the older one could re-hello the seat straight back.
+         * Reassign FIRST, then close: `_seatDropped` looks a seat up by link identity, so
+         * once `seat.link` is the new one the old link's close handler finds nothing and
+         * cannot mark the freshly resumed operative as dropped. */
+        const prev = seat.link;
         seat.link = link;
+        /* The seat is no longer a candidate for `_reclaimHeldSeats`, and it must not look
+         * like one: `droppedAtMs` is the sweep's whole evidence. */
+        delete seat.droppedAtMs;
+        /**
+         * ⚠ A RELOADED CLIENT COUNTS ITS ACTIONS FROM ONE AGAIN. The replay guard is a
+         * per-seat high-water mark, so leaving the old one in place silently dropped every
+         * ACT a resumed operative sent until they had clicked past their whole previous
+         * session — a seat that looks fine and does nothing. Stale retransmits die with
+         * the old link; the guard restarts with it.
+         */
+        seat.lastAct = 0;
+        if (prev && prev !== link && prev.open) prev.close();
         p.connected = true;
         p.remote = true;
         link.send(this._welcome(id, seat.token));
@@ -872,6 +919,10 @@ export class NetSession {
     this.link = link;
     this.refusedWhy = null;
     this.removedWhy = null;
+    this.joinAttempt = null;             // the link opened; the attempt is over
+    this.joinFailed = null;
+    this.tokenRefused = false;
+    this._offeredToken = token || this.token || null;
     link.onMessage = (m) => this._clientOnMessage(m);
     /* ⚠ `onClose` MUST NOT OVERWRITE A REASON. A refusal and a removal are both followed
      * immediately by a hangup, and whichever of the two messages arrives is the only
@@ -887,7 +938,7 @@ export class NetSession {
      * status afterwards then overwrites "connected" with "joining" and leaves the player
      * staring at a lie. (Recorded against the same line in SmallTownEmergencyServices.) */
     this._say('joining');
-    link.send({ t: MSG.HELLO, v: PROTOCOL_VERSION, name, token: token || this.token });
+    link.send({ t: MSG.HELLO, v: PROTOCOL_VERSION, name, token: this._offeredToken });
     return this;
   }
 
@@ -931,12 +982,24 @@ export class NetSession {
       }
       this._say('connected');
       this._roster();
+      /* The seat and the token are now real. See the field's comment: the screen keeps
+       * them, this file has no storage and wants none. */
+      if (this.onWelcome) this.onWelcome(this);
       return;
     }
     /* A refusal is free text the host wrote, printed on the lobby screen. Clamped here so a
      * hostile host cannot hand a client a megabyte of "reason"; escaped there, because this
      * file cannot see the DOM and that one cannot see the wire. */
-    if (m.t === MSG.REFUSE) { this.refusedWhy = safeLine(m.why, 200) || 'refused'; this._say(this.refusedWhy); return; }
+    if (m.t === MSG.REFUSE) {
+      this.refusedWhy = safeLine(m.why, 200) || 'refused';
+      /* A hello that offered a token and got a refusal is a token the host would not
+       * honour — blocked, or issued by a session that no longer exists. The blob keeping
+       * it should be burned, and the storage lives on the screen, so this end just says
+       * so structurally. (A refusal with NO token offered says nothing about tokens.) */
+      if (this._offeredToken) this.tokenRefused = true;
+      this._say(this.refusedWhy);
+      return;
+    }
     /**
      * ⚠ THE REMOVAL NOTICE IS THIS FEATURE'S VERSION OF THE DESTROYED REFUSAL.
      *
@@ -1094,6 +1157,8 @@ export class NetSession {
     try { if (this._dirPeer) this._dirPeer.destroy(); } catch { /* ditto */ }
     try { if (this._dirConn) this._dirConn.close(); } catch { /* ditto */ }
     this.seats.clear(); this._actBudget.clear();
+    this.joinAttempt = null; this.joinFailed = null;
+    this.tokenRefused = false; this._offeredToken = null;
     this.link = null; this.peer = null;
     this._dirPeer = null; this._dirConn = null;
     this.directory = null;
@@ -1166,8 +1231,20 @@ export class NetSession {
   /**
    * Join a room by CODE or by NAME. A five-character code is tried as a code; anything
    * else is tried as a room name, which is what lets a squad meet on a word.
+   *
+   * `token` is a resume token this machine stored from an earlier WELCOME in the same
+   * room — the invite-link joiner who reloaded, back into THEIR seat. It rides the same
+   * hello; the host decides what it is worth.
+   *
+   * ⚠ A DEAD ROOM USED TO BRICK THE SCREEN. `this.code` was set optimistically before
+   * anybody answered, the lobby's `committed` check read it, and a failed join therefore
+   * left the page showing a disabled host panel with the failed code rendered as if it
+   * were your own room — no join field, no retry, until a reload. The failure now CLEANS
+   * UP: the aspirational identity comes back off, the Peer is destroyed rather than
+   * leaked, and what remains is `joinFailed`, which the screen turns into words and a
+   * host-your-own button.
    */
-  joinPeer(codeOrName, name) {
+  joinPeer(codeOrName, name, { token = null } = {}) {
     const Peer = globalThis.Peer;
     if (!Peer) { this._say('peerjs did not load'); return false; }
     const typed = String(codeOrName || '').trim();
@@ -1177,6 +1254,24 @@ export class NetSession {
     if (!id) { this._say('that room name has nothing in it'); return false; }
     this.code = asCode ? typed.toUpperCase() : '';
     this.roomName = asCode ? '' : roomSlug(typed);
+    this.joinFailed = null;
+    this.joinAttempt = { target: asCode ? typed.toUpperCase() : roomSlug(typed), atMs: this.now() };
+
+    let failed = false;
+    const fail = (why) => {
+      /* Once seated, a late broker error is noise, not a failure — and fail() must be
+       * idempotent because a data-channel error and a peer error can both fire for one
+       * dead room. */
+      if (failed || this.role === ROLE.CLIENT) return;
+      failed = true;
+      this.joinFailed = { target: this.joinAttempt ? this.joinAttempt.target : typed.toUpperCase(), why };
+      this.joinAttempt = null;
+      this.code = null;
+      this.roomName = '';
+      if (this.peer === peer) this.peer = null;
+      try { peer.destroy(); } catch { /* gone */ }
+      this._say(why);
+    };
 
     this._say('connecting…');
     const peer = new Peer(PEER_OPTS);
@@ -1184,14 +1279,36 @@ export class NetSession {
     peer.on('open', () => {
       const conn = peer.connect(id, { reliable: true });
       const link = wrapConn(conn);
-      conn.on('open', () => this.join(link, { name }));
+      conn.on('open', () => this.join(link, { name, token }));
       conn.on('data', (d) => link.onMessage && link.onMessage(d));
       conn.on('close', () => { link.open = false; if (link.onClose) link.onClose(); });
-      conn.on('error', () => this._say('could not reach that room'));
+      conn.on('error', () => fail('could not reach that room'));
     });
     peer.on('error', (e) => {
-      this._say(e && e.type === 'peer-unavailable' ? 'nobody is holding that room' : `error: ${e && e.type}`);
+      fail(e && e.type === 'peer-unavailable' ? 'nobody is holding that room' : `error: ${e && e.type}`);
     });
+    return true;
+  }
+
+  /**
+   * The screen's give-up, for the failure the broker never reports: a host whose tab is
+   * registered but gone, or an ICE path that will never come up — the connection neither
+   * opens nor errors, and "connecting…" would sit there for ever. Wall time lives on the
+   * screen (K5), so the DEADLINE is the caller's; this end only knows how to stop
+   * honestly, with the same cleanup a broker refusal gets.
+   *
+   * @returns {boolean} true if there was an attempt to abandon
+   */
+  abandonJoin(why = 'nobody answered') {
+    if (this.role === ROLE.CLIENT || !this.joinAttempt) return false;
+    this.joinFailed = { target: this.joinAttempt.target, why };
+    this.joinAttempt = null;
+    this.code = null;
+    this.roomName = '';
+    const peer = this.peer;
+    this.peer = null;
+    try { if (peer) peer.destroy(); } catch { /* gone */ }
+    this._say(why);
     return true;
   }
 

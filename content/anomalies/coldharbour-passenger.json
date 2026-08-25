@@ -452,6 +452,16 @@
 
   "claims": [
     {
+      "id": "claim-the-july-answer",
+      "dimension": "anchor",
+      "text": "This is the July thing again, back on its own ground. Contain it the July way: everything off, everybody quiet, and wait it out.",
+      "truth": false,
+      "supportedBy": [
+        "caller-file",
+        "rangers-habit"
+      ]
+    },
+    {
       "id": "claim-it-does-not-travel",
       "dimension": "trigger",
       "text": "It has never crossed a room on its own. It is on this floor because a man carried it here.",
