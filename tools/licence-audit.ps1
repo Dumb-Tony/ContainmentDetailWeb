@@ -298,8 +298,15 @@ function StripNamespaces($text) {
 # on the run: a CSP is a place a host can be smuggled in, it is simply not a place one can
 # be reached from.
 function StripCsp($text) {
-  return [regex]::Replace($text,
+  $t = [regex]::Replace($text,
     '(?is)<meta\s+http-equiv\s*=\s*"Content-Security-Policy"[^>]*>', '(csp-allowlist)')
+  # The unfurl tags are the second legitimate place a URL lives without being a reach:
+  # og:url / og:image / twitter:image are addresses FOR this page, required absolute by the
+  # OpenGraph spec, and they may name exactly one host — the canonical deploy origin. The
+  # pattern binds the property name AND the origin, so a scraper tag pointing anywhere else
+  # is still a finding.
+  return [regex]::Replace($t,
+    '(?is)<meta\s+(?:property|name)\s*=\s*"(?:og:url|og:image|twitter:image)"\s+content\s*=\s*"https://dumb-tony\.github\.io/[^"]*">', '(unfurl-address)')
 }
 $shipped = @()
 foreach ($d in $ShippedDirs) {

@@ -239,11 +239,21 @@ async function boot() {
        * which is what makes "the building is the constant" (§15.2) worth anything past the
        * second visit. It is derived from the site's own history rather than a random draw,
        * so a squad can be told which one they are on and get it again. */
-      const nextScenario = `${op ? op.id : incidentId}-${progression.profile.operationsCompleted + 1}`;
+      /* ⚠ THE FIRST NIGHT IS THE AUTHORED NIGHT. 14.4's variation makes redeployment a
+       * different night, and the derived first scenario made it a different night for a
+       * player who had never seen the FIRST one: runs 7 and 8 of the friend test both drew
+       * a faulted storage circuit on operation one, and run 8's first-timer died to it --
+       * fumbling a breaker the briefing said would work, because the briefing describes
+       * the AUTHORED floor. Variation exists to stop knowledge going stale; a player with
+       * no knowledge has nothing to vary against. From the second operation on, every
+       * night is a different night; the first one is the one the briefing is true of. */
+      const opsDone = progression.profile.operationsCompleted;
+      const nextScenario = opsDone > 0 ? `${op ? op.id : incidentId}-${opsDone + 1}` : null;
       if (op && op.incident && (op.incident !== incidentId || nextScenario !== scenario)) {
         const u = new URL(location.href);
         u.searchParams.set('incident', op.incident);
-        u.searchParams.set('scenario', nextScenario);
+        if (nextScenario) u.searchParams.set('scenario', nextScenario);
+        else u.searchParams.delete('scenario');
         /* ⚠ THE CHOICE SURVIVES THE RELOAD, WHICH IS THE WHOLE FIX. The scenario always
          * changes, so this branch always navigates — and before `flow` existed, the fresh
          * page opened the operations board again and the same button had to be clicked a
