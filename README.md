@@ -42,7 +42,7 @@ power puzzle matters — the office breaker is out on the bay wall, the storage 
 The mission ends when the case is sealed, has held for thirty seconds, and is carried up
 the stairs. It can be lost at any point in that sentence.
 
-## Nine incidents, four buildings, eight things
+## Ten incidents, four buildings, eight things
 
 The content unit is an **Incident Package**, not a map — an anomaly file holds rules and
 nothing about where; a map holds geometry and nothing about what happened;
@@ -69,8 +69,31 @@ of the light, facing away, at the wrong scale for the distance") and the rendere
 of them. `presence.form` names one of six shapes now, and every span comes out of a sentence
 the file already said.
 
+The world stopped being a graybox in the same pass: nine deployables with outline-distinct
+rigs (a tripod is three splayed legs and a lit pane; the case has a proud rim and twin
+pulsing heater strips), squadmates as 1.70 m figures with headlamp cones and seat-coloured
+armbands, luminaire glow that follows the circuits, a green stack over extraction, and an
+outdoor family — the reserve finally reads as a forest compound at night, not a very large
+room. The thermal layer keeps its honesty per part: **a dead tripod is cold on the imager**,
+which it never was before.
+
+
 A squad that arrives with the first playbook finds every instinct wrong. That is the point
 (GDD §15.2: the building is the constant, the incident is the variable).
+
+**The generator.** The reserve's second operation, and the one aimed at a specific squad:
+the one that contained the caller here in July and left as policy the single sentence that
+operation taught. *No powered sound sources on the reserve floor.* It is pinned in the hut,
+signed, obeyed for months — and this operation cannot be finished without breaking it. The
+passenger from level 2 is riding the compound generator, eleven years without a break; it is
+dislodged by attention and rehoused by warmth, and the only portable warmth you own is the
+loud kind. A heater was a beacon on this floor's last operation. Tonight it is bait.
+
+The board's best wrong answer is the old standing order itself: "this is the July thing
+again — contain it the July way" is a claim on the board, the evidence for it is real, and a
+squad that believes it will do the exact opposite of what works. The support ladder keeps it
+below *strong* forever, because a false lead a careful squad can fully confirm is a lie, not
+a puzzle.
 
 **Ashlar House, ninth floor.** The mirror of that: the same draught, on a condemned
 crosswall block with a drained district-heating gallery running its full width. Nineteen
@@ -529,14 +552,31 @@ joins: they land on your roster having typed nothing. Everybody clicks **Report 
 host clicks **Take the operation**, picks the squad's kit, and deploys — every other seat's
 lobby closes itself the moment that happens.
 
+Phones work: touch controls report a **virtual gamepad into the same input path the keyboard
+uses** — no second code path, and rebinding re-routes your thumbs automatically. A friend
+who drops mid-mission can **rejoin their own seat** (same position, same kit) from the
+"Rejoin as…" button their reload offers; a dead room fails in words with host-your-own one
+click away.
+
+When the mission resolves, the debrief opens itself, releases the mouse, and offers two
+buttons: **Return to the site** (the operations board, with tonight already credited — it
+used to be a reload that replayed the same night), and **Copy playtest report** — the §21
+facilitator record, thousands of characters of what actually happened, one click from the
+screen a playtest ends on. That is the button that makes friends useful: when something
+feels wrong, they copy, they paste, you read.
+
 This flow is not assumed to work; it is *played*, headlessly, by `tools/playtest.js` — real
 clicks on the real buttons, real key events into the real input path, the canvas photographed
 at every step. It exists because 1,994 green assertions coexisted with an unplayable game:
 every suite drove the simulation through its seams, and nothing had ever clicked "Take the
 operation" to find that it led back to itself, through a page reload, into a lobby whose
 deploy button sat disabled behind a ready-gate a solo player could never want. The driver
-measured that wall (four clicks to a dead end), and now asserts its absence — 21 checks from
-"the board offers the real choice" to "the friend holds a two-operative world".
+measured that wall (four clicks to a dead end), and now asserts its absence — and then kept
+going: ten driver runs later it plays a COMPLETE containment through the UI on both the solo
+and the squad path — statement, breakers, fence, lure, seal, 30 seconds of custody, the
+stair head, the grade — and walks the debrief out the other side. 83 checks, zero fails,
+22 frames a person can look at. Two of those runs drew the faulted-circuit night and died
+to it, which is why the first night is now the authored night.
 
 ## Controls
 
@@ -638,11 +678,11 @@ the next, a suite that hangs cannot take the others with it, and a suite that pr
 result block at all counts as a **failure** rather than as zero assertions and no problem.
 A crashed page reporting green is the failure mode the whole harness exists to avoid.
 
-**1,994 assertions across twelve suites, all headless.** The twelve are the milestone-0 suite
+**2,164 assertions across thirteen suites, all headless.** The thirteen are the milestone-0 suite
 (everything true of *every* package), the content suite (the numbers that make one incident
 the incident it is), the net suite, the tablet suite, and six that arrived with the
 milestones they check: licensing and rollback, localization, onboarding, telemetry,
-platform, security and load — plus one that does nothing but start the game.
+platform, security, load and touch — plus one that does nothing but start the game.
 
 That last one exists because nothing else did. Ten suites and 1,946 assertions all built a
 world the same way — `loadContent()`, then `new Game(...)` — which is the right shape for
