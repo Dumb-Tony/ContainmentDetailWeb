@@ -688,8 +688,62 @@ export class Panels {
           <ul class="rules">${rules}</ul>
         </section>
       </div>`,
-      `<button class="go" data-again>${msg('debrief.screen.again')}</button>`);
-    this.node.querySelector('[data-again]').onclick = () => window.location.reload();
+      `<button class="ghost" data-report>${msg('debrief.screen.copyReport')}</button>
+       <button class="go" data-return>${msg('debrief.screen.return')}</button>`);
+
+    /**
+     * ⚠ THIS BUTTON WAS `window.location.reload()` AND NOBODY HAD EVER CLICKED IT.
+     *
+     * The first driver to reach this screen through the UI (tools/playtest.js) measured
+     * where a reload leads. It keeps the whole query string, so a solo player went back to
+     * the LOADOUT of the scenario they had just closed — same `?scenario=` seed, the same
+     * night over again, the operations board never seen and the next-scenario derivation
+     * (`operationsCompleted + 1`, main.js) never consulted. A squad client went back to
+     * `?join=CODE`, a room whose host peer no longer exists. "Run it again" was a button
+     * that replayed the one night the campaign says is finished.
+     *
+     * Every operation starts at the operations board, and the boot router shows the board
+     * exactly when no flow/join parameter rides the URL — so the debrief leads there: the
+     * bare pathname (never a hard-coded '/', which would break under Pages' repo subpath).
+     * Progression is already credited by the time this screen opens — main.js applies the
+     * debrief BEFORE showing it — so the board this lands on already counts tonight.
+     */
+    this.node.querySelector('[data-return]').onclick = () => {
+      window.location.href = window.location.pathname;
+    };
+
+    /* §21's facilitator record, one click from the screen a playtest ends on. The copy
+     * dance is lobby.js's data-copy pattern: clipboard first, and a select-fallback
+     * textarea when the browser refuses — a copy button that can fail silently is worse
+     * than no button, because the paste that follows is an old clipboard. The record is
+     * pulled from the debug handle and never pushed anywhere; handing it to somebody
+     * stays a decision a person makes, once, out loud (main.js §21 note). */
+    const rep = this.node.querySelector('[data-report]');
+    if (rep) {
+      rep.onclick = () => {
+        const cd = window.__CD;
+        const text = cd && typeof cd.sessionRecordText === 'function' ? cd.sessionRecordText() : '';
+        if (!text) return;
+        const done = () => {
+          rep.textContent = msg('debrief.screen.copied');
+          setTimeout(() => { rep.textContent = msg('debrief.screen.copyReport'); }, 1800);
+        };
+        const fallback = () => {
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.setAttribute('readonly', '');
+          ta.style.cssText = 'position:fixed;left:-9999px;top:0';
+          this.node.appendChild(ta);
+          ta.select();
+          try { document.execCommand('copy'); } catch { /* the selection itself remains */ }
+          ta.remove();
+          done();
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(done, fallback);
+        } else { fallback(); }
+      };
+    }
   }
 }
 

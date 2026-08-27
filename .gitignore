@@ -9,3 +9,6 @@ _*.html
 .DS_Store
 Thumbs.db
 *.swp
+
+# result-channel droppings from the playtest driver (serve.ps1 /__result)
+_result-*.txt

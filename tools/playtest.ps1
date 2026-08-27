@@ -7,9 +7,17 @@
 #
 #   powershell -ExecutionPolicy Bypass -File tools/playtest.ps1
 #   powershell -ExecutionPolicy Bypass -File tools/playtest.ps1 -OutDir C:\somewhere
+#
+# ⚠ THE STORY IS NOW TWO COMPLETE OPERATIONS (solo, then squad-host) played in real time:
+# the draught walks to the lure at its own pace and custody must hold 30 true seconds,
+# twice. A full green run is 20-35 minutes of wall clock (measured: the lure leg alone can
+# take four real minutes per operation), so the default wait is sized for the story, not
+# for a smoke test. The driver posts its report the moment it finishes; the wait is a
+# ceiling, not a duration — and the driver also posts a ROLLING PARTIAL to slot 800, so a
+# run that dies mid-story still leaves its measurements (see below).
 param(
   [int]$Port = 8461,
-  [int]$WaitSeconds = 240,
+  [int]$WaitSeconds = 2700,
   [string]$OutDir = ""
 )
 $ErrorActionPreference = 'Stop'
@@ -70,13 +78,23 @@ foreach ($f in Get-ChildItem $root -Filter "_result-9*.txt" | Sort-Object Name) 
   Remove-Item $f.FullName -Force
 }
 
+$partialFile = Join-Path $root "_result-800.txt"
 if (Test-Path $report) {
   Get-Content $report -Encoding UTF8 | Write-Host
   Remove-Item $report -Force
   Write-Host ""
   Write-Host "$shots frame(s) written to $OutDir" -ForegroundColor Green
+} elseif (Test-Path $partialFile) {
+  # The run outlived the ceiling but the rolling partial holds everything measured up to
+  # the last leg boundary — 25 minutes of PT lines died with the first timeout and this
+  # is what keeps that from happening twice.
+  Write-Host "NO FINAL REPORT (ceiling hit) -- printing the rolling partial:" -ForegroundColor Yellow
+  Get-Content $partialFile -Encoding UTF8 | Write-Host
+  Write-Host ""
+  Write-Host "$shots frame(s) written to $OutDir" -ForegroundColor Yellow
 } else {
   Write-Host "NO REPORT -- the driver never finished. Check the scratch page by hand." -ForegroundColor Red
 }
+if (Test-Path $partialFile) { try { Remove-Item $partialFile -Force } catch {} }
 if ($srv.Process -and -not $srv.Process.HasExited) { try { Stop-Process -Id $srv.Process.Id -Force } catch {} }
 try { Remove-Item $scratch -Force -ErrorAction Stop } catch {}

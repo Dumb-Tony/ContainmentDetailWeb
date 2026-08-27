@@ -159,6 +159,9 @@
       "markedTrue": "the site behaved this way",
       "markedFalse": "the site never behaved this way",
       "unmarked": "—",
+      "copyReport": "Copy playtest report",
+      "copied": "Copied",
+      "return": "Return to the site",
       "again": "Run it again"
     }
   },
